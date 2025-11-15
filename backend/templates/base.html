@@ -1,0 +1,33 @@
+{% load compress %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es-mx">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>El Tordillo | Agropecuaria</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  {% compress css %}
+  <link rel="stylesheet" href="{% static 'src/output.css' %}">
+  {% endcompress %}
+</head>
+
+<body class="">
+  {% include 'core/includes/layouts/_navbar.html' %}
+  {% include 'core/includes/layouts/_sidebar.html' %}
+  <div class="p-4 sm:ml-64">
+    <div class="p-4 mt-14">
+      {% block content %}
+      {% endblock %}
+    </div>
+  </div>
+  {% compress js %}
+  <script src="{% static 'src/flowbite.min.js' %}"></script>
+  {% endcompress %}
+</body>
+
+</html>

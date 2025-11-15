@@ -1,0 +1,95 @@
+# =========================================
+#  Django / Python
+# =========================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.log
+
+# Django specific
+media/
+staticfiles/
+*.mo
+*.pot
+
+# =========================================
+#  Entornos virtuales y entornos locales
+# =========================================
+venv/
+env/
+ENV/
+.venv/
+.pytest_cache/
+.coverage
+*.cover
+*.pid
+*.seed
+*.bak
+*.swp
+*.tmp
+
+# =========================================
+#  Archivos de configuración y secretos
+# =========================================
+.env
+*.env
+config.json
+secrets.json
+*.pem
+*.crt
+*.key
+
+# =========================================
+#  Node / Tailwind / DaisyUI
+# =========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+*.tsbuildinfo
+
+# Build / Compilaciones CSS
+/src/styles.css
+/static/css/app.css
+/static/js/*
+build/
+dist/
+
+# =========================================
+#  IDEs y entornos de desarrollo
+# =========================================
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# =========================================
+#  SO / Sistema
+# =========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================================
+#  Archivos temporales y backups
+# =========================================
+*.bak
+*.tmp
+*.temp
+*.orig
+*.old
+
+# =========================================
+#  Docker / Contenedores (por si se usa después)
+# =========================================
+*.dockerfile
+docker-compose.override.yml
+__docker/
+
+
+CACHE/

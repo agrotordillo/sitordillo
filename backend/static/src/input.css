@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "flowbite/src/themes/default";
+@plugin "flowbite/plugin";
+@source "../../node_modules/flowbite";
+
+
+
+
+/* 🖋️ Fuente global: Montserrat */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+/* 🌍 Aplicar Montserrat globalmente */
+@layer base {
+  html {
+    font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  body {
+    @apply text-secondary-800 bg-gray-50;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-semibold text-secondary-900;
+  }
+
+  p, label, input, button {
+    @apply font-medium;
+  }
+}
+
+
+
+@theme {
+  /* 🌿 Verde corporativo */
+  --color-primary-50: #E6F5E8;
+  --color-primary-100: #C8EBCF;
+  --color-primary-200: #A9E1B5;
+  --color-primary-300: #8BD69C;
+  --color-primary-400: #6CCB82;
+  --color-primary-500: #3AA84B; /* Base corporativa */
+  --color-primary-600: #308E3F;
+  --color-primary-700: #267534;
+  --color-primary-800: #1C5B28;
+  --color-primary-900: #13321B;
+
+  /* 💚 Verde acento */
+  --color-accent-50: #EAFEEB;
+  --color-accent-100: #C7FBCB;
+  --color-accent-200: #A3F8AB;
+  --color-accent-300: #7FF58A;
+  --color-accent-400: #5BF26A;
+  --color-accent-500: #70E07B; /* Brillante natural */
+  --color-accent-600: #51C55D;
+  --color-accent-700: #3BA148;
+  --color-accent-800: #276C30;
+  --color-accent-900: #15391A;
+
+  /* ⚪ Gris neutro */
+  --color-secondary-50: #F8F8F8;
+  --color-secondary-100: #EAEAEA;
+  --color-secondary-200: #D6D6D6;
+  --color-secondary-300: #C4C5C7;
+  --color-secondary-400: #A9AAAC;
+  --color-secondary-500: #8D8F91;
+  --color-secondary-600: #717375;
+  --color-secondary-700: #555758;
+  --color-secondary-800: #393B3C;
+  --color-secondary-900: #1E1F1F;
+
+  /* 🖤 Fondo y texto */
+  --color-background: #101410;
+  --color-surface: #161A16;
+  --color-text: #F2F2F2;
+}
