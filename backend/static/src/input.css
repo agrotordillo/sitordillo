@@ -2,73 +2,80 @@
 @import "flowbite/src/themes/default";
 @plugin "flowbite/plugin";
 @source "../../node_modules/flowbite";
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap");
 
-
-
-
-/* 🖋️ Fuente global: Montserrat */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
-
-/* 🌍 Aplicar Montserrat globalmente */
 @layer base {
   html {
-    font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+    font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    @apply scroll-smooth;
   }
-
   body {
-    @apply text-secondary-800 bg-gray-50;
+    @apply bg-gray-50 text-gray-900;
   }
-
-  h1, h2, h3, h4, h5 {
-    @apply font-semibold text-secondary-900;
-  }
-
-  p, label, input, button {
-    @apply font-medium;
+  hr {
+    @apply mt-2 mb-6 border-default;
   }
 }
 
-
+@layer components {
+  .input {
+    @apply w-full bg-neutral-secondary-medium border border-default-medium text-body shadow-xs placeholder:text-gray-300 text-sm rounded p-3 mb-6 focus:ring-4 focus:ring-neutral-tertiary focus:outline-none;
+  }
+  .label {
+    @apply block mb-2 text-sm font-medium text-body;
+  }
+  .btn-primary {
+    @apply text-white bg-brand box-border border border-transparent hover:bg-brand-strong focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded text-sm px-4 py-2.5 focus:outline-none cursor-pointer;
+  }
+  .btn-secondary {
+    @apply text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-4 focus:ring-neutral-tertiary shadow-xs font-medium leading-5 rounded text-sm px-4 py-2.5 focus:outline-none cursor-pointer;
+  }
+  .container-secondary {
+    @apply bg-white p-6 rounded border border-default shadow-xs;
+  }
+  .container-primary {
+    @apply mx-auto w-full max-w-7xl 2xl:max-w-5xl p-4;
+  }
+  .container-primary-lg {
+    @apply mx-auto w-full max-w-8xl p-4;
+  }
+  .module-title {
+    @apply text-xl font-bold text-body;
+  }
+}
 
 @theme {
-  /* 🌿 Verde corporativo */
-  --color-primary-50: #E6F5E8;
-  --color-primary-100: #C8EBCF;
-  --color-primary-200: #A9E1B5;
-  --color-primary-300: #8BD69C;
-  --color-primary-400: #6CCB82;
-  --color-primary-500: #3AA84B; /* Base corporativa */
-  --color-primary-600: #308E3F;
+  --color-primary-50: #e6f5e8;
+  --color-primary-100: #c8ebcf;
+  --color-primary-200: #a9e1b5;
+  --color-primary-300: #8bd69c;
+  --color-primary-400: #6ccb82;
+  --color-primary-500: #3aa84b;
+  --color-primary-600: #308e3f;
   --color-primary-700: #267534;
-  --color-primary-800: #1C5B28;
-  --color-primary-900: #13321B;
-
-  /* 💚 Verde acento */
-  --color-accent-50: #EAFEEB;
-  --color-accent-100: #C7FBCB;
-  --color-accent-200: #A3F8AB;
-  --color-accent-300: #7FF58A;
-  --color-accent-400: #5BF26A;
-  --color-accent-500: #70E07B; /* Brillante natural */
-  --color-accent-600: #51C55D;
-  --color-accent-700: #3BA148;
-  --color-accent-800: #276C30;
-  --color-accent-900: #15391A;
-
-  /* ⚪ Gris neutro */
-  --color-secondary-50: #F8F8F8;
-  --color-secondary-100: #EAEAEA;
-  --color-secondary-200: #D6D6D6;
-  --color-secondary-300: #C4C5C7;
-  --color-secondary-400: #A9AAAC;
-  --color-secondary-500: #8D8F91;
+  --color-primary-800: #1c5b28;
+  --color-primary-900: #13321b;
+  --color-accent-50: #eafeeb;
+  --color-accent-100: #c7fbcb;
+  --color-accent-200: #a3f8ab;
+  --color-accent-300: #7ff58a;
+  --color-accent-400: #5bf26a;
+  --color-accent-500: #70e07b;
+  --color-accent-600: #51c55d;
+  --color-accent-700: #3ba148;
+  --color-accent-800: #276c30;
+  --color-accent-900: #15391a;
+  --color-secondary-50: #f8f8f8;
+  --color-secondary-100: #eaeaea;
+  --color-secondary-200: #d6d6d6;
+  --color-secondary-300: #c4c5c7;
+  --color-secondary-400: #a9aaac;
+  --color-secondary-500: #8d8f91;
   --color-secondary-600: #717375;
   --color-secondary-700: #555758;
-  --color-secondary-800: #393B3C;
-  --color-secondary-900: #1E1F1F;
-
-  /* 🖤 Fondo y texto */
+  --color-secondary-800: #393b3c;
+  --color-secondary-900: #1e1f1f;
   --color-background: #101410;
-  --color-surface: #161A16;
-  --color-text: #F2F2F2;
+  --color-surface: #161a16;
+  --color-text: #f2f2f2;
 }

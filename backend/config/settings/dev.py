@@ -1,21 +1,25 @@
 from .base import *
 
 DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
-# INSTALLED_APPS += ["debug_toolbar"]
-# MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
-
-INTERNAL_IPS = ["127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost:4200",
-    "http://127.0.0.1:4200",
 ]
 
-# SECURE_SSL_REDIRECT = False
-# CSRF_COOKIE_SECURE = False
-# SESSION_COOKIE_SECURE = False
-# SECURE_PROXY_SSL_HEADER = None
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost",
+    "http://127.0.0.1",
+]
+
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+SECURE_PROXY_SSL_HEADER = None
