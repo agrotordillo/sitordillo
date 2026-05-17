@@ -36,6 +36,8 @@ ENV/
 # =========================================
 .env
 *.env
+backend/.env/
+!backend/.env.example
 config.json
 secrets.json
 *.pem
@@ -53,10 +55,10 @@ package-lock.json
 pnpm-lock.yaml
 *.tsbuildinfo
 
-# Build / Compilaciones CSS
-/src/styles.css
-/static/css/app.css
-/static/js/*
+# Tailwind: solo el CSS compilado va al repo (output.css)
+backend/static/src/input.css
+
+# Build
 build/
 dist/
 
