@@ -1,6 +1,6 @@
 // ejemplo-simple.js
 import { $, on } from "../core/dom.js";
-import { events } from "../app.js";
+import { events, notifications } from "../app.js";
 
 class EjemploSimplePage {
   constructor() {

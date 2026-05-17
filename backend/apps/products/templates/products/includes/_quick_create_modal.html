@@ -1,0 +1,65 @@
+{# Requiere scope Alpine quickCreate (open, close, submit, loading, title, fields, errors, values) #}
+<template x-teleport="body">
+  <div x-show="open" x-cloak>
+    <div
+      class="modal-backdrop"
+      @click="close()"
+      x-transition:enter="motion-ui-fade-enter-active"
+      x-transition:enter-start="motion-ui-fade-enter-from"
+      x-transition:enter-end="motion-ui-fade-enter-to"
+      x-transition:leave="motion-ui-fade-leave-active"
+      x-transition:leave-start="motion-ui-fade-leave-from"
+      x-transition:leave-end="motion-ui-fade-leave-to"
+    ></div>
+    <div class="modal-shell" @keydown.escape.window="close()">
+      <div
+        class="modal-panel"
+        @click.stop
+        x-transition:enter="motion-ui-panel-enter-active"
+        x-transition:enter-start="motion-ui-panel-enter-from"
+        x-transition:enter-end="motion-ui-panel-enter-to"
+        x-transition:leave="motion-ui-panel-leave-active"
+        x-transition:leave-start="motion-ui-panel-leave-from"
+        x-transition:leave-end="motion-ui-panel-leave-to"
+      >
+        <header class="modal-header">
+          <h3 class="text-sm font-semibold text-gray-800" x-text="title"></h3>
+          <button type="button" class="btn-icon" @click="close()" aria-label="Cerrar">
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+          </button>
+        </header>
+        <form @submit.prevent="submit()" novalidate>
+          <div class="modal-body">
+            <p x-show="errors.__all__" x-cloak class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2"
+              x-text="(errors.__all__ || []).join(' ')"></p>
+            <template x-for="f in fields" :key="f.name">
+              <div>
+                <label class="label" :for="'qc-' + f.name" x-text="f.label + (f.required ? '' : ' (opcional)')"></label>
+                <template x-if="f.type === 'textarea'">
+                  <textarea class="input" rows="3" :id="'qc-' + f.name" x-model="values[f.name]" :required="f.required" :data-qc-autofocus="f.autofocus || null"></textarea>
+                </template>
+                <template x-if="f.type !== 'textarea'">
+                  <input class="input" type="text" :id="'qc-' + f.name" x-model="values[f.name]" :required="f.required" :data-qc-autofocus="f.autofocus || null">
+                </template>
+                <p class="field-error" x-show="errors[f.name]" x-cloak x-text="(errors[f.name] || []).join(' ')"></p>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" @click="close()" :disabled="loading">Cancelar</button>
+            <button type="submit" class="btn-primary" :disabled="loading">
+              <span x-show="!loading">Guardar</span>
+              <span x-show="loading" x-cloak class="inline-flex items-center gap-2">
+                <svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Guardando…
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>

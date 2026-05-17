@@ -1,0 +1,71 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Subcategorías{% endblock title %}
+{% block title_layout %}Subcategorías{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Subcategorías</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'products:subcategory-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nueva subcategoría
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+    <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Folio</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Categoría</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Descripción</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha de creación</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for sub in subcategories %}
+            <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400 hidden sm:table-cell">{{ sub.folio }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ sub.nombre }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ sub.categoria.nombre }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 max-w-xs truncate hidden lg:table-cell">{{ sub.descripcion|default:"-" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+                    {% if sub.is_active %}
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Activo
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Inactivo
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 hidden md:table-cell">{{ sub.created_at|date:"d/m/Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+                    <div class="flex flex-col items-center gap-2">
+                        <svg class="w-10 h-10 text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" />
+                        </svg>
+                        <p class="text-sm text-gray-400">No hay subcategorías registradas</p>
+                        <a href="{% url 'products:subcategory-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock main_content %}

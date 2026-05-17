@@ -1,0 +1,54 @@
+{% if form and form.errors %}
+<div class="flex gap-3 p-4 mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl" role="alert">
+  <svg class="w-4 h-4 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+  </svg>
+  <div>
+    <p class="font-medium">No fue posible guardar. Corrige los campos marcados.</p>
+    <ul class="mt-1.5 list-disc list-inside space-y-0.5">
+      {% for error in form.non_field_errors %}
+      <li>{{ error }}</li>
+      {% endfor %}
+      {% for field in form %}
+      {% for error in field.errors %}
+      <li><span class="font-medium">{{ field.label }}:</span> {{ error }}</li>
+      {% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+{% if messages %}
+{% for message in messages %}
+{% if 'success' in message.tags %}
+<div class="flex items-center gap-3 p-4 mb-6 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl" role="alert">
+  <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+  <p>{{ message }}</p>
+</div>
+{% elif 'error' in message.tags %}
+<div class="flex items-center gap-3 p-4 mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl" role="alert">
+  <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+  </svg>
+  <p>{{ message }}</p>
+</div>
+{% elif 'warning' in message.tags %}
+<div class="flex items-center gap-3 p-4 mb-6 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl" role="alert">
+  <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008Zm-8.58 3h17.16a1.5 1.5 0 0 0 1.299-2.25L13.299 3.75a1.5 1.5 0 0 0-2.598 0L2.121 17.25a1.5 1.5 0 0 0 1.299 2.25Z" />
+  </svg>
+  <p>{{ message }}</p>
+</div>
+{% else %}
+<div class="flex items-center gap-3 p-4 mb-6 text-sm text-sky-700 bg-sky-50 border border-sky-200 rounded-xl" role="alert">
+  <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25 12 11.25v5.25h.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+  <p>{{ message }}</p>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,33 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Crear unidad de medida{% endblock title %}
+{% block title_layout %}Crear unidad de medida{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:unit-list' %}" class="text-gray-400 hover:text-primary-600">Unidades de medida</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="grid gap-6 md:grid-cols-2">
+    <div>
+      <label for="{{ form.nombre.id_for_label }}" class="label">Nombre de la unidad</label>
+      {{ form.nombre }}
+    </div>
+    <div>
+      <label for="{{ form.abreviatura.id_for_label }}" class="label">Abreviatura</label>
+      {{ form.abreviatura }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'products:unit-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

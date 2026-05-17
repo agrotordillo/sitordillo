@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+{% block content %}
+<div class="container-primary-lg">
+    <div class="container-secondary">
+        <div class="header-container">
+            <div>
+                <h2 class="module-title">{% block title_layout %}Listado{% endblock title_layout %}</h2>
+                {% block breadcrumbs %}{% endblock breadcrumbs %}
+            </div>
+            {% block table_actions %}{% endblock table_actions %}
+        </div>
+        <div class="body-container">
+            <div class="px-4 pt-5 sm:px-6 sm:pt-6">
+                {% include "core/includes/_form_alerts.html" %}
+            </div>
+            {% block main_content %}{% endblock main_content %}
+        </div>
+    </div>
+</div>
+{% endblock content %}

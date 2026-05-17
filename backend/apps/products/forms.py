@@ -1,56 +1,66 @@
-# django imports
 from apps.core.forms import BaseModelForm
-from django import forms
-# local imports
-from .models import Productos
+from .models import Producto, Categoria, Subcategoria, Marca, Proveedor, UnidadMedida
 
-class ProductForm(forms.ModelForm):
-    """Formulario para creación y edición de productos."""
+
+class ProductForm(BaseModelForm):
     class Meta:
-        model = Productos
-        fields = "__all__"
-    
+        model = Producto
+        fields = [
+            "nombre",
+            "marca",
+            "proveedor",
+            "sku",
+            "codigo_barras",
+            "categoria",
+            "subcategoria",
+            "tipo",
+            "unidad_medida",
+            "descripcion",
+            "notas",
+            "precio_costo",
+            "precio_venta",
+            "stock_minimo",
+            "stock_maximo",
+        ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        cat_id = self.data.get("categoria") if self.is_bound else None
+        if not cat_id and self.instance.pk:
+            cat_id = self.instance.categoria_id
+        if cat_id:
+            self.fields["subcategoria"].queryset = Subcategoria.objects.filter(
+                categoria_id=cat_id, is_active=True
+            )
+        else:
+            self.fields["subcategoria"].queryset = Subcategoria.objects.none()
 
 
+class CategoryForm(BaseModelForm):
+    class Meta:
+        model = Categoria
+        fields = ["nombre", "descripcion"]
 
 
+class SubcategoryForm(BaseModelForm):
+    class Meta:
+        model = Subcategoria
+        fields = ["nombre", "categoria", "descripcion"]
 
 
-        # [
-            # "sku",
-            # "barcode",
-            # "name",
-            # "product_type",
-            # # "category",
-            # "brand",
-            # "base_unit",
-            # "aux_unit",
-            # "aux_factor",
-            # "weight_kg",
-            # "purchase_price",
-            # "sale_price",
-            # "tax_rate",
-            # "global_stock",
-            # "min_stock",
-            # "is_stockable",
-        # ]
+class BrandForm(BaseModelForm):
+    class Meta:
+        model = Marca
+        fields = ["nombre", "descripcion"]
 
 
-    #     widgets = {
-    #         "product_type": forms.Select(attrs={"class": "w-full"}),
-    #         "category": forms.Select(attrs={"class": "w-full"}),
-    #         "description": forms.Textarea(attrs={"rows": 3}),
-    #         "is_stockable": forms.CheckboxInput(attrs={"class": "h-4 w-4"}),
-    #     }
+class SupplierForm(BaseModelForm):
+    class Meta:
+        model = Proveedor
+        fields = ["nombre", "descripcion"]
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.helper = FormHelper()
-    #     self.helper.form_method = "post"
-    #     self.helper.attrs = {
-    #         "class": "space-y-6",
-    #         "novalidate": "novalidate",
-    #     }
-    #     self.helper.add_input(Submit("submit", "Guardar producto", css_class="btn-primary"))
+
+class UnitMeasureForm(BaseModelForm):
+    class Meta:
+        model = UnidadMedida
+        fields = ["nombre", "abreviatura"]

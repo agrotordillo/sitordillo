@@ -1,0 +1,401 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block primary_container_class %}container-form-wide{% endblock primary_container_class %}
+{% block title %}Crear producto{% endblock title %}
+{% block title_layout %}Crear producto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:product-list' %}" class="text-gray-400 hover:text-primary-600">Productos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post"
+      x-data="dependentSelect({
+        parent: '#id_categoria',
+        child: '#id_subcategoria',
+        url: '/api/products/subcategories/',
+        param: 'category',
+        initial: '{{ form.subcategoria.value|default_if_none:"" }}',
+        placeholder: 'Selecciona primero una categoría'
+      })">
+  {% csrf_token %}
+
+  <div class="product-form-cards">
+    <div class="form-card-layout">
+      {# Columna izquierda: general, clasificación, identificación e información adicional #}
+      <div class="form-card-col">
+
+        {# ─── Información general ──────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const nombre = document.getElementById('id_nombre')?.value?.trim();
+            const tipo = document.getElementById('id_tipo');
+            const tipoLabel = tipo?.selectedOptions[0]?.text;
+            if (!nombre) return 'Sin información capturada';
+            return tipoLabel ? `${nombre} · ${tipoLabel}` : nombre;
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 2h-11ZM6 6.75a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 6.75Zm0 3.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 10Zm0 3.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Información general</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="sm:col-span-2">
+                <label for="{{ form.nombre.id_for_label }}" class="label">Nombre del producto</label>
+                {{ form.nombre }}
+              </div>
+              <div>
+                <label for="{{ form.marca.id_for_label }}" class="label">Marca <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_marca',
+                  url: '{% url 'api:brand-quick-create' %}',
+                  title: 'Nueva marca',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+                  ]
+                })">
+                  {{ form.marca }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva marca" title="Agregar nueva marca">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
+              </div>
+              <div>
+                <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_proveedor',
+                  url: '{% url 'api:supplier-quick-create' %}',
+                  title: 'Nuevo proveedor',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+                  ]
+                })">
+                  {{ form.proveedor }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nuevo proveedor" title="Agregar nuevo proveedor">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
+              </div>
+              <div>
+                <label for="{{ form.tipo.id_for_label }}" class="label">Tipo de producto</label>
+                {{ form.tipo }}
+              </div>
+              <div>
+                <label for="{{ form.unidad_medida.id_for_label }}" class="label">Unidad de medida <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_unidad_medida',
+                  url: '{% url 'api:unit-quick-create' %}',
+                  title: 'Nueva unidad de medida',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'abreviatura', label: 'Abreviatura', required: true }
+                  ]
+                })">
+                  {{ form.unidad_medida }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva unidad de medida" title="Agregar nueva unidad de medida">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Clasificación ───────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const cat = document.getElementById('id_categoria');
+            const sub = document.getElementById('id_subcategoria');
+            const catLabel = cat?.value ? cat.selectedOptions[0]?.text : '';
+            const subLabel = sub?.value ? sub.selectedOptions[0]?.text : '';
+            if (catLabel && subLabel) return `${catLabel} › ${subLabel}`;
+            if (catLabel) return catLabel;
+            return 'Sin clasificación asignada';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.5 2A2.5 2.5 0 0 0 2 4.5v3.879a2.5 2.5 0 0 0 .732 1.767l7 7a2.5 2.5 0 0 0 3.536 0l3.879-3.879a2.5 2.5 0 0 0 0-3.535l-7-7A2.5 2.5 0 0 0 8.379 2H4.5ZM6 5.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Clasificación</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.categoria.id_for_label }}" class="label">Categoría <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.categoria }}
+              </div>
+              <div>
+                <label for="{{ form.subcategoria.id_for_label }}" class="label">Subcategoría <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.subcategoria }}
+                <p x-show="loading" x-cloak class="mt-1.5 text-xs text-gray-400 flex items-center gap-1.5">
+                  <svg class="animate-spin w-3.5 h-3.5 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                  Cargando subcategorías…
+                </p>
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Identificación ──────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const sku = document.getElementById('id_sku')?.value?.trim();
+            const cb = document.getElementById('id_codigo_barras')?.value?.trim();
+            const parts = [];
+            if (sku) parts.push(`SKU: ${sku}`);
+            if (cb) parts.push(`CB: ${cb}`);
+            return parts.length ? parts.join(' · ') : 'Sin códigos asignados';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM6.5 4.75A.75.75 0 0 1 7.25 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM10 4.75A.75.75 0 0 1 10.75 4h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V4.75ZM15 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75Z" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Identificación</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.sku.id_for_label }}" class="label">SKU</label>
+                {{ form.sku }}
+              </div>
+              <div>
+                <label for="{{ form.codigo_barras.id_for_label }}" class="label">Código de barras <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.codigo_barras }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Información adicional ───────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: false,
+          get summary() {
+            const desc = document.getElementById('id_descripcion')?.value?.trim();
+            const notas = document.getElementById('id_notas')?.value?.trim();
+            const parts = [];
+            if (desc) parts.push('Descripción');
+            if (notas) parts.push('Notas');
+            return parts.length ? `Con ${parts.join(' y ').toLowerCase()}` : 'Sin información adicional';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Información adicional</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="sm:col-span-2">
+                <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.descripcion }}
+              </div>
+              <div class="sm:col-span-2">
+                <label for="{{ form.notas.id_for_label }}" class="label">Notas <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.notas }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      {# Columna derecha: precios e inventario #}
+      <div class="form-card-col">
+
+        {# ─── Precios ─────────────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const costo = document.getElementById('id_precio_costo')?.value;
+            const venta = document.getElementById('id_precio_venta')?.value;
+            const fmt = (v) => {
+              const n = parseFloat(v);
+              return isNaN(n) ? '0.00' : n.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+            };
+            return `Costo $${fmt(costo)} · Venta $${fmt(venta)}`;
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h2.93a4.5 4.5 0 0 0-1.96-3.5h-1.72ZM5 7.5a3.5 3.5 0 0 1 7 0v5a3.5 3.5 0 0 1-7 0v-5Zm9.5 4.95v2.55c0 .414.336.75.75.75h2.93a4.5 4.5 0 0 0-1.96-3.5h-1.72Zm-2.5 0a4.5 4.5 0 0 0-1.96 3.5h2.96a.75.75 0 0 0 .75-.75v-2.75H12Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Precios</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.precio_costo.id_for_label }}" class="label">Precio de costo</label>
+                {{ form.precio_costo }}
+              </div>
+              <div>
+                <label for="{{ form.precio_venta.id_for_label }}" class="label">Precio de venta</label>
+                {{ form.precio_venta }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Inventario ──────────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const min = document.getElementById('id_stock_minimo')?.value || '0';
+            const max = document.getElementById('id_stock_maximo')?.value || '0';
+            return `Mín ${min} · Máx ${max}`;
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 .75a.75.75 0 0 0-.75.75v.75H8.5A1.5 1.5 0 0 0 7 3.75v.5a1.5 1.5 0 0 0 1.5 1.5h3A1.5 1.5 0 0 0 13 4.25v-.5a1.5 1.5 0 0 0-1.5-1.5h-.75V1.5A.75.75 0 0 0 10 .75Z" />
+                  <path fill-rule="evenodd" d="M5.5 6.5a1 1 0 0 0-1 1V17a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V7.5a1 1 0 0 0-1-1h-1V8a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V6.5h-2Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Inventario</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.stock_minimo.id_for_label }}" class="label">Stock mínimo</label>
+                {{ form.stock_minimo }}
+              </div>
+              <div>
+                <label for="{{ form.stock_maximo.id_for_label }}" class="label">Stock máximo</label>
+                {{ form.stock_maximo }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-5 pt-4 border-t border-gray-200/80">
+      <a href="{% url 'products:product-list' %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
+<script src="{% static 'js/modules/forms/quick-create.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

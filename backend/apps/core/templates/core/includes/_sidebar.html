@@ -1,0 +1,114 @@
+{% load static %}
+<div id="sidebar" class="sidebar-overlay hidden" role="dialog" aria-modal="true" aria-label="Menú de navegación">
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar-panel -translate-x-full flex flex-col" id="sidebar-panel">
+
+    <div class="sidebar-header">
+      <a href="{% url 'home' %}" class="flex items-center gap-2.5">
+        <img src="{% static 'src/logo.png' %}" class="h-7 w-7 object-contain" alt="El Tordillo" width="28" height="28" />
+        <span class="text-base font-bold text-gray-800">El Tordillo</span>
+        <span class="badge-muted">SIT</span>
+      </a>
+      <button type="button" class="btn-icon" id="sidebar-close" aria-label="Cerrar menú">
+        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <nav class="flex-1 py-2">
+      <div class="sidebar-section">Inventario</div>
+      <a href="{% url 'products:product-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#7ED957]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11.644 1.59a.75.75 0 0 1 .712 0l9.75 5.25a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.712 0l-9.75-5.25a.75.75 0 0 1 0-1.32l9.75-5.25Z" />
+          <path d="m3.265 10.602 7.668 4.129a2.25 2.25 0 0 0 2.134 0l7.668-4.13 1.37.739a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.71 0l-9.75-5.25a.75.75 0 0 1 0-1.32l1.37-.738Z" />
+          <path d="m10.933 19.231-7.668-4.13-1.37.739a.75.75 0 0 0 0 1.32l9.75 5.25c.221.12.489.12.71 0l9.75-5.25a.75.75 0 0 0 0-1.32l-1.37-.738-7.668 4.13a2.25 2.25 0 0 1-2.134-.001Z" />
+        </svg>
+        Productos
+      </a>
+      <a href="{% url 'products:product-create' %}" class="sidebar-sublink">Crear producto</a>
+      <a href="{% url 'products:category-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#3BA9FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M5.25 2.25a3 3 0 0 0-3 3v4.318a3 3 0 0 0 .879 2.121l9.58 9.581c.92.92 2.39.92 3.31 0l4.318-4.318a2.25 2.25 0 0 0 0-3.31l-9.58-9.581a3 3 0 0 0-2.122-.879H5.25ZM6.375 7.5a1.125 1.125 0 1 0 0-2.25 1.125 1.125 0 0 0 0 2.25Z" clip-rule="evenodd" />
+        </svg>
+        Categorías
+      </a>
+      <a href="{% url 'products:category-create' %}" class="sidebar-sublink">Crear categoría</a>
+      <a href="{% url 'products:subcategory-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#60A5FA]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M2.25 4.125c0-1.036.84-1.875 1.875-1.875h5.25c1.036 0 1.875.84 1.875 1.875V17.25a4.5 4.5 0 1 1-9 0V4.125Zm4.5 14.25a1.125 1.125 0 1 0 0-2.25 1.125 1.125 0 0 0 0 2.25Z" clip-rule="evenodd" />
+          <path d="M10.719 21.75h9.156c1.036 0 1.875-.84 1.875-1.875v-5.25c0-1.036-.84-1.875-1.875-1.875h-2.156a4.477 4.477 0 0 1-.938 2.344l-1.06 1.06a.75.75 0 0 1-.345.197 4.502 4.502 0 0 1-4.657 5.399Z" />
+        </svg>
+        Subcategorías
+      </a>
+      <a href="{% url 'products:subcategory-create' %}" class="sidebar-sublink">Crear subcategoría</a>
+      <a href="{% url 'products:brand-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#22C55E]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M5.25 2.25A2.25 2.25 0 0 0 3 4.5v15A2.25 2.25 0 0 0 5.25 21.75h13.5A2.25 2.25 0 0 0 21 19.5v-15a2.25 2.25 0 0 0-2.25-2.25H5.25Zm2.625 4.5a.75.75 0 0 0 0 1.5h8.25a.75.75 0 0 0 0-1.5h-8.25Zm0 4.5a.75.75 0 0 0 0 1.5h8.25a.75.75 0 0 0 0-1.5h-8.25Zm0 4.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z" clip-rule="evenodd" />
+        </svg>
+        Marcas
+      </a>
+      <a href="{% url 'products:brand-create' %}" class="sidebar-sublink">Crear marca</a>
+      <a href="{% url 'products:supplier-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#14B8A6]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M1.5 6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v.372A6.489 6.489 0 0 0 12 6.25a6.489 6.489 0 0 0-1.5.122V6a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 1.5 6v6A1.5 1.5 0 0 0 3 13.5h3.414a6.47 6.47 0 0 0 .765 1.5H3A3 3 0 0 1 0 12V6a3 3 0 0 1 1.5-2.598Z" clip-rule="evenodd" />
+          <path d="M12 8a5 5 0 1 0 3.536 8.536A5 5 0 0 0 12 8Zm0 1.5a.75.75 0 0 1 .75.75v1.75h1.75a.75.75 0 0 1 0 1.5h-1.75v1.75a.75.75 0 0 1-1.5 0v-1.75H9.5a.75.75 0 0 1 0-1.5h1.75V10.25A.75.75 0 0 1 12 9.5Z" />
+        </svg>
+        Proveedores
+      </a>
+      <a href="{% url 'products:supplier-create' %}" class="sidebar-sublink">Crear proveedor</a>
+      <a href="{% url 'products:unit-list' %}" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#4A87FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.25 7.5a.75.75 0 0 1 .75-.75h18a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75ZM5.25 11.25a.75.75 0 0 1 .75-.75H18a.75.75 0 0 1 0 1.5H6a.75.75 0 0 1-.75-.75Zm-3 3.75a.75.75 0 0 1 .75-.75h12a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm10.19 2.68a.75.75 0 0 1 1.06 0l1.19 1.19 2.81-2.81a.75.75 0 1 1 1.06 1.06l-3.34 3.34a.75.75 0 0 1-1.06 0l-1.72-1.72a.75.75 0 0 1 0-1.06Z" />
+        </svg>
+        Unidades de medida
+      </a>
+      <a href="{% url 'products:unit-create' %}" class="sidebar-sublink">Crear unidad</a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#FF7A70]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11.584 2.376a.75.75 0 0 1 .832 0l9 6a.75.75 0 0 1-.832 1.248L12 3.901 3.416 9.624a.75.75 0 0 1-.832-1.248l9-6Z" />
+          <path fill-rule="evenodd" d="M20.25 10.332v9.918H21a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1 0-1.5h.75v-9.918a.75.75 0 0 1 .634-.74A49.109 49.109 0 0 1 12 9c2.59 0 5.134.202 7.616.592a.75.75 0 0 1 .634.74Zm-7.5 2.418a.75.75 0 0 0-1.5 0v6.75a.75.75 0 0 0 1.5 0v-6.75Zm3-.75a.75.75 0 0 1 .75.75v6.75a.75.75 0 0 1-1.5 0v-6.75a.75.75 0 0 1 .75-.75ZM9 12.75a.75.75 0 0 0-1.5 0v6.75a.75.75 0 0 0 1.5 0v-6.75Z" clip-rule="evenodd" />
+        </svg>
+        Almacenes
+      </a>
+
+      <div class="sidebar-section">Operaciones</div>
+      <a href="#" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#9B7DFF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M7.5 6v.75H5.513c-.96 0-1.764.724-1.865 1.679l-1.263 12A1.875 1.875 0 0 0 4.25 22.5h15.5a1.875 1.875 0 0 0 1.865-2.071l-1.263-12a1.875 1.875 0 0 0-1.865-1.679H16.5V6a4.5 4.5 0 1 0-9 0ZM12 3a3 3 0 0 0-3 3v.75h6V6a3 3 0 0 0-3-3Zm-3 8.25a3 3 0 1 0 6 0v-.75a.75.75 0 0 1 1.5 0v.75a4.5 4.5 0 1 1-9 0v-.75a.75.75 0 0 1 1.5 0v.75Z" clip-rule="evenodd" />
+        </svg>
+        Punto de Venta
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#12A57F]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM3.75 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM16.5 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Z" />
+        </svg>
+        Compras
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-5 h-5 text-[#39E5E0]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 7.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" />
+          <path fill-rule="evenodd" d="M1.5 4.875C1.5 3.839 2.34 3 3.375 3h17.25c1.035 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 16.125V4.875ZM12 6a3.75 3.75 0 1 0 0 7.5A3.75 3.75 0 0 0 12 6Z" clip-rule="evenodd" />
+        </svg>
+        Ventas
+      </a>
+
+      <div class="sidebar-section">Sistema</div>
+      <a href="#" class="sidebar-link">
+        <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.855 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clip-rule="evenodd" />
+        </svg>
+        Configuración
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-3">
+        <img src="{% static 'src/logo.png' %}" class="h-6 w-6 object-contain opacity-30" alt="" width="24" height="24" />
+        <span class="text-xs text-gray-400">SIT El Tordillo v1.0</span>
+      </div>
+    </div>
+
+  </aside>
+</div>

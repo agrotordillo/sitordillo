@@ -73,7 +73,7 @@ class NotificationSystem {
     return create(
       "div",
       {
-        className: `notification p-4 rounded-lg shadow-lg border transform transition-all duration-300 
+        className: `notification p-4 rounded-xl shadow-lg border transform transition-all duration-300 
                        ${config.bg} ${config.border} ${config.text}
                        opacity-0 translate-x-full`,
       },
@@ -88,7 +88,7 @@ class NotificationSystem {
             "button",
             {
               className: "ml-4 text-gray-500 hover:text-gray-700",
-              onclick: () => this.remove(this),
+              onclick: (e) => this.remove(e.target.closest(".notification")),
             },
             ["×"]
           ),

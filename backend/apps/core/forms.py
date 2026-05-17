@@ -1,9 +1,11 @@
-# django imports
 from django import forms
-from django.core.exceptions import ValidationError
+
 
 class BaseModelForm(forms.ModelForm):
-    
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            css_class = "input"
+            existing = field.widget.attrs.get("class", "").strip()
+            field.widget.attrs["class"] = f"{existing} {css_class}".strip()

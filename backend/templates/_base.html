@@ -1,29 +1,28 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="es-mx">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="| El Tordillo - Sistema de gestión de inventario" />
-  <meta name="keywords" content="El Tordillo, Gestión, Sistema, Inventarios" />
-  <title>{% block title %}El Tordillo{% endblock title %}</title>
+  <meta name="description" content="SIT | El Tordillo - Sistema de gestión de inventario" />
+  <meta name="keywords" content="inventario, productos, almacenes, punto de venta, El Tordillo, SIT" />
+  <title>{% block title %}Inicio{% endblock title %} | El Tordillo</title>
   <link rel="stylesheet" href="{% static 'src/output.css' %}" />
 </head>
 
-<body>
-  {% include "core/includes/layouts/_navbar.html" %}
-  {% block content %}
-  <div class="fixed inset-0 flex items-center justify-center pointer-events-none select-none opacity-25">
-    <img height="" width="" src="{% static 'src/logo.png' %}" alt="Logo El Tordillo"
-      class="w-[320px] sm:w-[390px] mt-28 grayscale opacity-25" />
-  </div>
-  {% endblock content %}
+<body class="bg-gray-50">
+  {% include "core/includes/_topbar.html" %}
+  {% include "core/includes/_module_bar.html" %}
+  {% include "core/includes/_sidebar.html" %}
+
+  <main class="pt-30 sm:pt-31 pb-8 sm:pb-10 lg:pb-12">
+    {% block content %}{% endblock content %}
+  </main>
+
   <script type="module" src="{% static 'js/app.js' %}"></script>
   <script src="{% static 'src/flowbite.min.js' %}"></script>
-  {% block extra_js %}
-  {% endblock extra_js %}
+  {% block extra_js %}{% endblock extra_js %}
 </body>
 
 </html>
