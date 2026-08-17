@@ -90,34 +90,6 @@ class Marca(BaseAbstractModel):
         return self.nombre.strip()
 
 
-class Proveedor(BaseAbstractModel):
-    nombre = models.CharField(
-        max_length=150,
-        unique=True,
-        verbose_name="Nombre del proveedor",
-        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
-    )
-    descripcion = models.TextField(blank=True, null=True)
-
-    class Meta:
-        verbose_name = "Proveedor"
-        verbose_name_plural = "Proveedores"
-        ordering = ["nombre"]
-
-    def __str__(self):
-        return self.nombre
-
-    def get_folio_prefix(self):
-        return "PRV"
-
-    def get_slug_source(self):
-        return self.nombre
-
-    @property
-    def display_name(self):
-        return self.nombre.strip()
-
-
 class Almacen(BaseAbstractModel):
     nombre = models.CharField(max_length=200)
 
@@ -181,7 +153,7 @@ class Producto(BaseAbstractModel):
         verbose_name="Marca",
     )
     proveedor = models.ForeignKey(
-        Proveedor,
+        "proveedores.Proveedor",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

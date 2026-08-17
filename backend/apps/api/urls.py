@@ -3,7 +3,6 @@ from django.urls import path
 from .views.products import (
     BrandQuickCreateView,
     SubcategoriesByCategoryView,
-    SupplierQuickCreateView,
     UnitMeasureQuickCreateView,
 )
 
@@ -19,11 +18,6 @@ urlpatterns = [
         "products/brands/create/",
         BrandQuickCreateView.as_view(),
         name="brand-quick-create",
-    ),
-    path(
-        "products/suppliers/create/",
-        SupplierQuickCreateView.as_view(),
-        name="supplier-quick-create",
     ),
     path(
         "products/units/create/",

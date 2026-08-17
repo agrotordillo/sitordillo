@@ -3,7 +3,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.products.forms import BrandForm, SupplierForm, UnitMeasureForm
+from apps.products.forms import BrandForm, UnitMeasureForm
 from apps.products.models import Subcategoria
 from apps.api.serializers.products import OptionSerializer
 
@@ -31,18 +31,6 @@ class BrandQuickCreateView(APIView):
 
     def post(self, request):
         form = BrandForm(request.data)
-        if not form.is_valid():
-            return Response({"errors": form.errors}, status=400)
-        obj = form.save()
-        return Response({"value": obj.id, "label": obj.nombre}, status=201)
-
-
-class SupplierQuickCreateView(APIView):
-    """Alta rápida de Proveedor desde el formulario de producto."""
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        form = SupplierForm(request.data)
         if not form.is_valid():
             return Response({"errors": form.errors}, status=400)
         obj = form.save()

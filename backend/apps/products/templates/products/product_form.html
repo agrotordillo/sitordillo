@@ -88,21 +88,13 @@
               </div>
               <div>
                 <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor <span class="text-gray-400 font-normal">(opcional)</span></label>
-                <div class="flex items-center gap-2" x-data="quickCreate({
-                  target: '#id_proveedor',
-                  url: '{% url 'api:supplier-quick-create' %}',
-                  title: 'Nuevo proveedor',
-                  fields: [
-                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
-                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
-                  ]
-                })">
+                <div class="flex items-center gap-2">
                   {{ form.proveedor }}
-                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nuevo proveedor" title="Agregar nuevo proveedor">
+                  <a href="{% url 'proveedores:supplier-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo proveedor" title="Crear nuevo proveedor (se abre en una pestaña nueva)">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
-                  </button>
-                  {% include "products/includes/_quick_create_modal.html" %}
+                  </a>
                 </div>
+                <p class="mt-1.5 text-xs text-gray-400">El proveedor requiere RFC y régimen fiscal; se crea en una ficha completa aparte.</p>
               </div>
               <div>
                 <label for="{{ form.tipo.id_for_label }}" class="label">Tipo de producto</label>

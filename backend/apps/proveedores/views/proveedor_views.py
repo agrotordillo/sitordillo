@@ -3,15 +3,15 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
-from apps.products.models import Proveedor
-from apps.products.forms import SupplierForm
+from apps.proveedores.models import Proveedor
+from apps.proveedores.forms import ProveedorForm
 
 
 class SupplierCreateView(SuccessMessageMixin, CreateView):
     model = Proveedor
-    form_class = SupplierForm
-    template_name = "suppliers/supplier_form.html"
-    success_url = reverse_lazy("products:supplier-list")
+    form_class = ProveedorForm
+    template_name = "proveedores/proveedor_form.html"
+    success_url = reverse_lazy("proveedores:supplier-list")
     success_message = "Proveedor creado correctamente."
     extra_context = {"active_module": "suppliers"}
 
@@ -22,6 +22,6 @@ class SupplierCreateView(SuccessMessageMixin, CreateView):
 
 class SupplierListView(ListView):
     model = Proveedor
-    template_name = "suppliers/supplier_list.html"
+    template_name = "proveedores/proveedor_list.html"
     context_object_name = "suppliers"
     extra_context = {"active_module": "suppliers"}
