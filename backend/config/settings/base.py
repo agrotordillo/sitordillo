@@ -44,6 +44,7 @@ LOCAL_APPS = [
     'apps.fiscal',
     'apps.proveedores',
     'apps.products',
+    'apps.compras',
     'apps.api',
 ]
 

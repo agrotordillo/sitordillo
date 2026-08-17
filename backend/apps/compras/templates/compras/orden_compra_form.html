@@ -1,0 +1,121 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}Crear orden de compra{% endblock title %}
+{% block title_layout %}Crear orden de compra{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-8">
+
+    {# ─── Datos generales ───────────────────────────────────────────── #}
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos generales</h3>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
+          <div class="flex items-center gap-2">
+            {{ form.proveedor }}
+            <a href="{% url 'proveedores:supplier-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo proveedor" title="Crear nuevo proveedor (se abre en una pestaña nueva)">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+            </a>
+          </div>
+          {% if form.proveedor.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>
+          {{ form.estatus }}
+        </div>
+        <div>
+          <label for="{{ form.fecha_orden.id_for_label }}" class="label">Fecha de orden</label>
+          {{ form.fecha_orden }}
+          {% if form.fecha_orden.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_orden.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.fecha_entrega_estimada.id_for_label }}" class="label">Fecha de entrega estimada <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.fecha_entrega_estimada }}
+          {% if form.fecha_entrega_estimada.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_entrega_estimada.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.observaciones }}
+        </div>
+      </div>
+    </div>
+
+    {# ─── Productos ─────────────────────────────────────────────────── #}
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
+
+      {{ formset.management_form }}
+      {% if formset.non_form_errors %}
+      <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Precio unitario</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold text-right">Subtotal</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+            </tr>
+          </thead>
+          <tbody x-ref="rows" class="divide-y divide-gray-100">
+            {% for detalle_form in formset %}
+            {% include "compras/includes/_detalle_row.html" with form=detalle_form %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <template x-ref="emptyRow">{% include "compras/includes/_detalle_row.html" with form=formset.empty_form %}</template>
+
+      <button type="button" class="btn-secondary mt-3" @click="addRow()">
+        <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+        </svg>
+        Agregar línea
+      </button>
+
+      <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
+        <div class="text-sm text-gray-600">
+          Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-gray-400 text-right">Sin impuestos desglosados; se calculan en la fase de facturación.</p>
+    </div>
+
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}
