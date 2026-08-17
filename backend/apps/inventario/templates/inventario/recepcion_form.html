@@ -1,0 +1,69 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Recibir orden de compra{% endblock title %}
+{% block title_layout %}Recibir orden de compra {{ orden.folio }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Recibir {{ orden.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">Proveedor: <span class="font-medium text-gray-700">{{ orden.proveedor.display_name }}</span></p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <div class="grid gap-5">
+    {% for form, detalle in filas %}
+    <div class="border border-gray-100 rounded-xl p-4">
+      {{ form.detalle_id }}
+      <p class="text-sm font-semibold text-gray-800 mb-3">
+        {{ detalle.producto.nombre }}
+        <span class="text-xs font-normal text-gray-400">
+          — pendiente: {{ detalle.cantidad|floatformat:2 }} - {{ detalle.cantidad_recibida|floatformat:2 }} recibido
+        </span>
+      </p>
+      {% if form.non_field_errors %}
+      <p class="mb-2 text-xs text-red-600">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+      <div class="grid gap-4 sm:grid-cols-4">
+        <div>
+          <label for="{{ form.cantidad_recibir.id_for_label }}" class="label">Cantidad a recibir</label>
+          {{ form.cantidad_recibir }}
+          {% if form.cantidad_recibir.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad_recibir.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.almacen.id_for_label }}" class="label">Almacén</label>
+          {{ form.almacen }}
+          {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.numero_lote.id_for_label }}" class="label">Número de lote <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.numero_lote }}
+        </div>
+        <div>
+          <label for="{{ form.fecha_caducidad.id_for_label }}" class="label">Fecha de caducidad <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.fecha_caducidad }}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.costo_unitario.id_for_label }}" class="label">Costo unitario</label>
+          {{ form.costo_unitario }}
+          {% if form.costo_unitario.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.costo_unitario.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar recepción</button>
+  </div>
+</form>
+{% endblock main_content %}

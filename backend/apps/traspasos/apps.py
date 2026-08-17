@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class TraspasosConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.traspasos'
+    verbose_name = 'Traspasos'

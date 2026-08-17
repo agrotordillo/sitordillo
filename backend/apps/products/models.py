@@ -91,12 +91,29 @@ class Marca(BaseAbstractModel):
 
 
 class Almacen(BaseAbstractModel):
+    class Tipo(models.TextChoices):
+        CEDIS = "cedis", "CEDIS"
+        SUCURSAL = "sucursal", "Sucursal"
+
     nombre = models.CharField(max_length=200)
+    tipo = models.CharField(
+        max_length=10,
+        choices=Tipo.choices,
+        default=Tipo.SUCURSAL,
+        verbose_name="Tipo de almacén",
+    )
 
     class Meta:
         verbose_name = "Almacén"
         verbose_name_plural = "Almacenes"
         ordering = ["nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tipo"],
+                condition=models.Q(tipo="cedis"),
+                name="unico_cedis",
+            ),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -110,6 +127,13 @@ class Almacen(BaseAbstractModel):
     @property
     def display_name(self):
         return self.nombre.strip()
+
+    def clean(self):
+        super().clean()
+        if self.tipo == self.Tipo.CEDIS:
+            ya_existe = Almacen.objects.filter(tipo=self.Tipo.CEDIS).exclude(pk=self.pk).exists()
+            if ya_existe:
+                raise ValidationError({"tipo": "Ya existe un almacén CEDIS; solo puede haber uno."})
 
 
 class UnidadMedida(BaseAbstractModel):

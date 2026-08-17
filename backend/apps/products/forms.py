@@ -1,5 +1,5 @@
 from apps.core.forms import BaseModelForm
-from .models import Producto, Categoria, Subcategoria, Marca, UnidadMedida
+from .models import Producto, Categoria, Subcategoria, Marca, Almacen, UnidadMedida
 
 
 class ProductForm(BaseModelForm):
@@ -52,6 +52,12 @@ class BrandForm(BaseModelForm):
     class Meta:
         model = Marca
         fields = ["nombre", "descripcion"]
+
+
+class WarehouseForm(BaseModelForm):
+    class Meta:
+        model = Almacen
+        fields = ["nombre", "tipo"]
 
 
 class UnitMeasureForm(BaseModelForm):

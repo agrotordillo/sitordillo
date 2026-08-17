@@ -1,0 +1,42 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Existencias{% endblock title %}
+{% block title_layout %}Existencias por almacén{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Existencias</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">SKU</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Almacén</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Existencia total</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for row in existencias %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ row.producto__nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 font-mono text-xs hidden sm:table-cell">{{ row.producto__sku }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ row.almacen__nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">{{ row.total }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay existencias registradas todavía</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

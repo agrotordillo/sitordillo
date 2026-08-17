@@ -12,6 +12,8 @@ urlpatterns = [
     path("productos/", include("apps.products.urls", namespace="products")),
     path("proveedores/", include("apps.proveedores.urls", namespace="proveedores")),
     path("compras/", include("apps.compras.urls", namespace="compras")),
+    path("inventario/", include("apps.inventario.urls", namespace="inventario")),
+    path("traspasos/", include("apps.traspasos.urls", namespace="traspasos")),
     path('', TemplateView.as_view(template_name='core/home.html', extra_context={'active_module': 'home'}), name='home'),
 ]
 

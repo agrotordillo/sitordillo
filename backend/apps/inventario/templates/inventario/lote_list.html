@@ -1,0 +1,58 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Lotes{% endblock title %}
+{% block title_layout %}Lotes{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Lotes</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Almacén</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Número de lote</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Disponible</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Caducidad</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for lote in lotes %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400 hidden sm:table-cell">{{ lote.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ lote.producto.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ lote.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ lote.numero_lote|default:"-" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">{{ lote.cantidad_disponible }} / {{ lote.cantidad_inicial }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if lote.fecha_caducidad %}
+            {% if lote.esta_caducado %}
+            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">
+              <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>{{ lote.fecha_caducidad|date:"d/m/Y" }} · caducado
+            </span>
+            {% else %}
+            <span class="text-gray-500">{{ lote.fecha_caducidad|date:"d/m/Y" }}</span>
+            {% endif %}
+          {% else %}
+          <span class="text-gray-400">Sin caducidad</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay lotes con existencia disponible</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}
