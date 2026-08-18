@@ -1,7 +1,7 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% block title %}Crear orden de compra{% endblock title %}
-{% block title_layout %}Crear orden de compra{% endblock title_layout %}
+{% block title %}{% if object %}Editar orden de compra{% else %}Crear orden de compra{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar orden de compra{% else %}Crear orden de compra{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
@@ -9,7 +9,7 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Crear</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
@@ -37,6 +37,12 @@
               <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
             </a>
           </div>
+        </div>
+        <div>
+          <label for="{{ form.almacen_destino.id_for_label }}" class="label">Almacén destino</label>
+          {{ form.almacen_destino }}
+          <p class="mt-1 text-xs text-gray-400">El alta de la compra queda a nombre del CEDIS; elige aquí si la mercancía debe impactar el CEDIS o llega directo a una sucursal.</p>
+          {% if form.almacen_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen_destino.errors.0 }}</p>{% endif %}
         </div>
         <div>
           <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>

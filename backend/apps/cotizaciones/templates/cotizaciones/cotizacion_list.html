@@ -52,6 +52,7 @@
           {% if cotizacion.estatus == "convertida" %}
           <a href="{% url 'ventas:venta-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver venta {{ cotizacion.venta.folio }}</a>
           {% else %}
+          <a href="{% url 'cotizaciones:cotizacion-update' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
           <a href="{% url 'cotizaciones:cotizacion-convertir' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Convertir a venta</a>
           {% endif %}
         </td>

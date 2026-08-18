@@ -97,6 +97,7 @@ def recepcion_compra_view(request, pk):
                 "detalle_id": d.id,
                 "cantidad_recibir": d.cantidad - d.cantidad_recibida,
                 "costo_unitario": d.precio_unitario,
+                "almacen": orden.almacen_destino_id,
             }
             for d in pendientes
         ]

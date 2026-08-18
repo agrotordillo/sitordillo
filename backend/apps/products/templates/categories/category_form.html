@@ -1,6 +1,6 @@
 {% extends "core/layouts/_main_form_layout.html" %}
-{% block title %}Crear categoría{% endblock title %}
-{% block title_layout %}Crear categoría{% endblock title_layout %}
+{% block title %}{% if object %}Editar categoría{% else %}Crear categoría{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar categoría{% else %}Crear categoría{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
@@ -8,7 +8,7 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'products:category-list' %}" class="text-gray-400 hover:text-primary-600">Categorías</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Crear</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}

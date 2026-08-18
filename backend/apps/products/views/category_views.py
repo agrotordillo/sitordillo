@@ -1,4 +1,4 @@
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
@@ -13,6 +13,19 @@ class CategoryCreateView(SuccessMessageMixin, CreateView):
     template_name = "categories/category_form.html"
     success_url = reverse_lazy("products:category-list")
     success_message = "Categoría creada exitosamente."
+    extra_context = {"active_module": "categories"}
+
+    def form_invalid(self, form):
+        messages.error(self.request, "No fue posible guardar la categoría. Revisa los campos.")
+        return super().form_invalid(form)
+
+
+class CategoryUpdateView(SuccessMessageMixin, UpdateView):
+    model = Categoria
+    form_class = CategoryForm
+    template_name = "categories/category_form.html"
+    success_url = reverse_lazy("products:category-list")
+    success_message = "Categoría actualizada correctamente."
     extra_context = {"active_module": "categories"}
 
     def form_invalid(self, form):

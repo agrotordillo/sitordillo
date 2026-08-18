@@ -45,6 +45,11 @@ secrets.json
 *.key
 
 # =========================================
+#  Datos reales (dumps de clientes/proveedores, etc.)
+# =========================================
+/datos/
+
+# =========================================
 #  Node / Tailwind / DaisyUI
 # =========================================
 node_modules/

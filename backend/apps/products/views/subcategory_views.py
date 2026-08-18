@@ -1,4 +1,4 @@
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
@@ -13,6 +13,19 @@ class SubcategoryCreateView(SuccessMessageMixin, CreateView):
     template_name = "subcategories/subcategory_form.html"
     success_url = reverse_lazy("products:subcategory-list")
     success_message = "Subcategoría creada exitosamente."
+    extra_context = {"active_module": "subcategories"}
+
+    def form_invalid(self, form):
+        messages.error(self.request, "No fue posible guardar la subcategoría. Revisa los campos.")
+        return super().form_invalid(form)
+
+
+class SubcategoryUpdateView(SuccessMessageMixin, UpdateView):
+    model = Subcategoria
+    form_class = SubcategoryForm
+    template_name = "subcategories/subcategory_form.html"
+    success_url = reverse_lazy("products:subcategory-list")
+    success_message = "Subcategoría actualizada correctamente."
     extra_context = {"active_module": "subcategories"}
 
     def form_invalid(self, form):

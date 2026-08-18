@@ -3,7 +3,7 @@ from django.forms import inlineformset_factory
 
 from apps.core.forms import BaseModelForm
 from apps.fiscal.models import FormaPago
-from apps.products.models import Producto
+from apps.products.models import Almacen, Producto
 from apps.proveedores.models import Proveedor
 from .models import OrdenCompra, OrdenCompraDetalle, PromocionProveedor
 
@@ -13,6 +13,7 @@ class OrdenCompraForm(BaseModelForm):
         model = OrdenCompra
         fields = [
             "proveedor",
+            "almacen_destino",
             "fecha_orden",
             "fecha_entrega_estimada",
             "estatus",
@@ -39,6 +40,12 @@ class OrdenCompraForm(BaseModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
+        self.fields["almacen_destino"].queryset = Almacen.objects.filter(is_active=True)
+        self.fields["almacen_destino"].required = True
+        if not self.instance.pk:
+            self.fields["almacen_destino"].initial = Almacen.objects.filter(
+                is_active=True, tipo=Almacen.Tipo.CEDIS
+            ).first()
         self.fields["forma_pago"].queryset = FormaPago.objects.filter(is_active=True)
         self.fields["forma_pago"].required = False
         for campo in ("iva", "ieps"):

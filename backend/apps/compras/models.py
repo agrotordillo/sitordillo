@@ -126,6 +126,20 @@ class OrdenCompra(BaseAbstractModel):
         related_name="ordenes_compra",
         verbose_name="Proveedor",
     )
+    almacen_destino = models.ForeignKey(
+        "products.Almacen",
+        on_delete=models.PROTECT,
+        related_name="ordenes_compra_destino",
+        null=True,
+        blank=True,
+        verbose_name="Almacén destino",
+        help_text=(
+            "El alta de la compra siempre queda a nombre del CEDIS (ahí está la "
+            "relación comercial con el proveedor); este campo indica dónde debe "
+            "impactar físicamente la mercancía: el propio CEDIS, o una sucursal "
+            "cuando el proveedor entrega directo ahí."
+        ),
+    )
     fecha_orden = models.DateField(verbose_name="Fecha de orden")
     fecha_entrega_estimada = models.DateField(null=True, blank=True, verbose_name="Fecha de entrega estimada")
     estatus = models.CharField(
@@ -185,6 +199,7 @@ class OrdenCompra(BaseAbstractModel):
             models.Index(fields=["proveedor"]),
             models.Index(fields=["estatus"]),
             models.Index(fields=["fecha_orden"]),
+            models.Index(fields=["almacen_destino"]),
         ]
 
     def __str__(self):

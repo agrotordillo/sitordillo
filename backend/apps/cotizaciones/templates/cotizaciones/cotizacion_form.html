@@ -1,7 +1,7 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% block title %}Registrar cotización{% endblock title %}
-{% block title_layout %}Registrar cotización{% endblock title_layout %}
+{% block title %}{% if object %}Editar cotización{% else %}Registrar cotización{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar cotización{% else %}Registrar cotización{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
@@ -9,7 +9,7 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Crear</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
@@ -107,7 +107,7 @@
 
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
     <a href="{% url 'cotizaciones:cotizacion-list' %}" class="btn-secondary">Cancelar</a>
-    <button type="submit" class="btn-primary">Registrar cotización</button>
+    <button type="submit" class="btn-primary">{% if object %}Guardar cambios{% else %}Registrar cotización{% endif %}</button>
   </div>
 </form>
 {% endblock main_content %}
