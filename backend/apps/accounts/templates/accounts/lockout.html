@@ -1,0 +1,29 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-mx">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Acceso bloqueado | El Tordillo</title>
+  <link rel="stylesheet" href="{% static 'src/output.css' %}" />
+  <style>
+    .auth-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .auth-card { width: 100%; max-width: 24rem; }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <div class="auth-shell">
+    <div class="auth-card bg-white border rounded-xl shadow-lg p-6 text-center">
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">Acceso bloqueado temporalmente</h1>
+      <p class="text-sm text-gray-500 mb-6">
+        Se detectaron demasiados intentos fallidos de inicio de sesión. Por seguridad, este acceso
+        quedó bloqueado temporalmente. Intenta de nuevo más tarde.
+      </p>
+      <a href="{% url 'accounts:login' %}" class="btn-primary w-full">Volver al inicio de sesión</a>
+    </div>
+  </div>
+</body>
+
+</html>

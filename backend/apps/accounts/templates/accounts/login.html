@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-mx">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Iniciar sesión | El Tordillo</title>
+  <link rel="stylesheet" href="{% static 'src/output.css' %}" />
+  <style>
+    .auth-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .auth-card { width: 100%; max-width: 24rem; }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <div class="auth-shell">
+    <div class="auth-card bg-white border rounded-xl shadow-lg p-6">
+      <div class="flex items-center gap-2 mb-6">
+        <img src="{% static 'src/logo.png' %}" class="h-8 w-8 object-contain" alt="El Tordillo" width="32" height="32" />
+        <span class="text-base font-bold text-gray-800">El Tordillo</span>
+      </div>
+
+      <h1 class="text-2xl font-bold text-gray-800 mb-1">Iniciar sesión</h1>
+      <p class="text-sm text-gray-500 mb-6">Ingresa tus credenciales para continuar.</p>
+
+      {% if form.non_field_errors %}
+      <div class="flex gap-3 p-4 mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl" role="alert">
+        <div>
+          {% for error in form.non_field_errors %}
+          <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="label" for="{{ form.username.id_for_label }}">Usuario</label>
+          {{ form.username }}
+        </div>
+        <div class="mb-6">
+          <label class="label" for="{{ form.password.id_for_label }}">Contraseña</label>
+          {{ form.password }}
+        </div>
+        <input type="hidden" name="next" value="{{ next }}" />
+        <button type="submit" class="btn-primary w-full">Entrar</button>
+      </form>
+    </div>
+  </div>
+</body>
+
+</html>

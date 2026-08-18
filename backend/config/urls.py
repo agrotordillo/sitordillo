@@ -1,10 +1,15 @@
 # django imports
+from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
 
 urlpatterns = [
+    # Autenticación y administración
+    path("", include("apps.accounts.urls")),
+    path("admin/", admin.site.urls),
+
     # API
     path("api/", include("apps.api.urls", namespace="api")),
 
