@@ -32,12 +32,11 @@
         <div>
           <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
           <div class="flex items-center gap-2">
-            {{ form.proveedor }}
+            <div class="flex-1">{% include "proveedores/includes/_proveedor_search_field.html" %}</div>
             <a href="{% url 'proveedores:supplier-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo proveedor" title="Crear nuevo proveedor (se abre en una pestaña nueva)">
               <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
             </a>
           </div>
-          {% if form.proveedor.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
         </div>
         <div>
           <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>
@@ -56,6 +55,57 @@
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
           {{ form.observaciones }}
+        </div>
+      </div>
+    </div>
+
+    {# ─── Información fiscal y de pago ──────────────────────────────── #}
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Información fiscal y de pago</h3>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
+          {{ form.es_fiscal }}
+          <label for="{{ form.es_fiscal.id_for_label }}" class="label mb-0">Es fiscal</label>
+          {% if form.es_fiscal.errors %}<p class="text-xs text-red-600">{{ form.es_fiscal.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.documento.id_for_label }}" class="label">Documento <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.documento }}
+          <p class="mt-1 text-xs text-gray-400">Número de factura o folio de nota de venta.</p>
+          {% if form.documento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.documento.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.estado_pago.id_for_label }}" class="label">Estado de pago</label>
+          {{ form.estado_pago }}
+        </div>
+        <div>
+          <label for="{{ form.medio_pago.id_for_label }}" class="label">Medio de pago</label>
+          {{ form.medio_pago }}
+        </div>
+        <div>
+          <label for="{{ form.forma_pago.id_for_label }}" class="label">Método de pago <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.forma_pago }}
+          {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.iva.id_for_label }}" class="label">IVA</label>
+          {{ form.iva }}
+          {% if form.iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.iva.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.ieps.id_for_label }}" class="label">IEPS</label>
+          {{ form.ieps }}
+          {% if form.ieps.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.ieps.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.retencion_iva.id_for_label }}" class="label">Retención IVA</label>
+          {{ form.retencion_iva }}
+          {% if form.retencion_iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_iva.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.retencion_isr.id_for_label }}" class="label">Retención ISR</label>
+          {{ form.retencion_isr }}
+          {% if form.retencion_isr.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_isr.errors.0 }}</p>{% endif %}
         </div>
       </div>
     </div>
@@ -104,7 +154,7 @@
           Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
         </div>
       </div>
-      <p class="mt-1 text-xs text-gray-400 text-right">Sin impuestos desglosados; se calculan en la fase de facturación.</p>
+      <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos más IVA e IEPS, menos las retenciones capturadas arriba.</p>
     </div>
 
   </div>
@@ -118,5 +168,7 @@
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/promo-suggest.js' %}"></script>
+<script src="{% static 'js/modules/forms/proveedor-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

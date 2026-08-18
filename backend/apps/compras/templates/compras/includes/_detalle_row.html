@@ -1,8 +1,7 @@
 <tr class="formset-row">
   <td class="px-3 py-2">
     {{ form.id }}
-    {{ form.producto }}
-    {% if form.producto.errors %}<p class="mt-1 text-xs text-red-600">{{ form.producto.errors.0 }}</p>{% endif %}
+    {% include "products/includes/_producto_search_field.html" %}
   </td>
   <td class="px-3 py-2 w-28">
     {{ form.cantidad }}

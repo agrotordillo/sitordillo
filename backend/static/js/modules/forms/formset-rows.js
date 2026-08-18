@@ -8,6 +8,9 @@ document.addEventListener("alpine:init", () => {
       this._totalFormsInput = document.querySelector(config.totalFormsSelector);
 
       this._rows.querySelectorAll(".formset-row").forEach((row) => this._bindRow(row));
+      document.querySelectorAll(".fs-impuesto-suma, .fs-impuesto-resta").forEach((el) => {
+        el.addEventListener("input", () => this._recalculate());
+      });
       this._recalculate();
     },
 
@@ -59,7 +62,16 @@ document.addEventListener("alpine:init", () => {
 
         subtotal += rowTotal;
       });
-      this.total = subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+
+      let ajusteImpuestos = 0;
+      document.querySelectorAll(".fs-impuesto-suma").forEach((el) => {
+        ajusteImpuestos += parseFloat(el.value) || 0;
+      });
+      document.querySelectorAll(".fs-impuesto-resta").forEach((el) => {
+        ajusteImpuestos -= parseFloat(el.value) || 0;
+      });
+
+      this.total = (subtotal + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2 });
     },
   }));
 });

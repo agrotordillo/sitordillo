@@ -1,4 +1,4 @@
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
@@ -13,6 +13,19 @@ class SupplierCreateView(SuccessMessageMixin, CreateView):
     template_name = "proveedores/proveedor_form.html"
     success_url = reverse_lazy("proveedores:supplier-list")
     success_message = "Proveedor creado correctamente."
+    extra_context = {"active_module": "suppliers"}
+
+    def form_invalid(self, form):
+        messages.error(self.request, "No fue posible guardar el proveedor. Revisa los campos.")
+        return super().form_invalid(form)
+
+
+class SupplierUpdateView(SuccessMessageMixin, UpdateView):
+    model = Proveedor
+    form_class = ProveedorForm
+    template_name = "proveedores/proveedor_form.html"
+    success_url = reverse_lazy("proveedores:supplier-list")
+    success_message = "Proveedor actualizado correctamente."
     extra_context = {"active_module": "suppliers"}
 
     def form_invalid(self, form):

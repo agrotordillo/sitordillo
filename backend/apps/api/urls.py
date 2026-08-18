@@ -7,6 +7,7 @@ from .views.products import (
     UnitMeasureQuickCreateView,
 )
 from .views.compras import PromocionVigenteView
+from .views.proveedores import ProveedorBuscarView
 
 app_name = "api"
 
@@ -35,5 +36,10 @@ urlpatterns = [
         "compras/promocion-vigente/",
         PromocionVigenteView.as_view(),
         name="promocion-vigente",
+    ),
+    path(
+        "proveedores/buscar/",
+        ProveedorBuscarView.as_view(),
+        name="proveedor-buscar",
     ),
 ]

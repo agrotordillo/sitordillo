@@ -7,12 +7,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const fechaInput = document.getElementById("id_fecha_orden");
 
   rows.addEventListener("change", (event) => {
-    if (!event.target.matches('select[name$="-producto"]')) return;
+    if (!event.target.matches('input[name$="-producto"]')) return;
     checkPromo(event.target);
   });
 
-  async function checkPromo(productoSelect) {
-    const row = productoSelect.closest(".formset-row");
+  async function checkPromo(productoInput) {
+    const row = productoInput.closest(".formset-row");
     const hint = row?.querySelector(".promo-hint");
     if (hint) {
       hint.textContent = "";
@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const proveedorId = proveedorSelect?.value;
     const fecha = fechaInput?.value;
-    const productoId = productoSelect.value;
+    const productoId = productoInput.value;
     if (!proveedorId || !fecha || !productoId) return;
 
     try {

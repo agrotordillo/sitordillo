@@ -111,6 +111,15 @@ class OrdenCompra(BaseAbstractModel):
         RECIBIDA = "recibida", "Recibida"
         CANCELADA = "cancelada", "Cancelada"
 
+    class EstadoPago(models.TextChoices):
+        CONTADO = "contado", "Contado"
+        CREDITO = "credito", "Crédito"
+
+    class MedioPago(models.TextChoices):
+        CAJA = "caja", "Caja"
+        BANCO = "banco", "Banco"
+        INDEFINIDO = "indefinido", "Indefinido"
+
     proveedor = models.ForeignKey(
         "proveedores.Proveedor",
         on_delete=models.PROTECT,
@@ -125,12 +134,53 @@ class OrdenCompra(BaseAbstractModel):
         default=Estatus.BORRADOR,
         verbose_name="Estatus",
     )
+    es_fiscal = models.BooleanField(default=False, verbose_name="Es fiscal")
+    documento = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Documento",
+        help_text="Número de factura o folio de nota de venta del proveedor.",
+    )
+    estado_pago = models.CharField(
+        max_length=10,
+        choices=EstadoPago.choices,
+        default=EstadoPago.CONTADO,
+        verbose_name="Estado de pago",
+    )
+    medio_pago = models.CharField(
+        max_length=15,
+        choices=MedioPago.choices,
+        default=MedioPago.INDEFINIDO,
+        verbose_name="Medio de pago",
+    )
+    forma_pago = models.ForeignKey(
+        "fiscal.FormaPago",
+        on_delete=models.PROTECT,
+        related_name="ordenes_compra",
+        null=True,
+        blank=True,
+        verbose_name="Método de pago",
+    )
+    iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IVA")
+    ieps = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IEPS")
+    retencion_iva = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Retención IVA"
+    )
+    retencion_isr = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Retención ISR"
+    )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
     class Meta:
         verbose_name = "Orden de compra"
         verbose_name_plural = "Órdenes de compra"
         ordering = ["-fecha_orden", "-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(iva__gte=0), name="oc_iva_no_negativo"),
+            models.CheckConstraint(condition=models.Q(ieps__gte=0), name="oc_ieps_no_negativo"),
+            models.CheckConstraint(condition=models.Q(retencion_iva__gte=0), name="oc_retencion_iva_no_negativa"),
+            models.CheckConstraint(condition=models.Q(retencion_isr__gte=0), name="oc_retencion_isr_no_negativa"),
+        ]
         indexes = [
             models.Index(fields=["proveedor"]),
             models.Index(fields=["estatus"]),
@@ -156,8 +206,7 @@ class OrdenCompra(BaseAbstractModel):
 
     @property
     def total(self):
-        # Sin desglose de impuestos por ahora: se incorpora en la fase de Facturación.
-        return self.subtotal
+        return self.subtotal + self.iva + self.ieps - self.retencion_iva - self.retencion_isr
 
     def clean(self):
         super().clean()

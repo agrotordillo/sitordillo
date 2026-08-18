@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
 {% block title %}Nueva promoción de proveedor{% endblock title %}
 {% block title_layout %}Nueva promoción de proveedor{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -25,13 +26,11 @@
   <div class="grid gap-4 sm:grid-cols-2">
     <div>
       <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
-      {{ form.proveedor }}
-      {% if form.proveedor.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
+      {% include "proveedores/includes/_proveedor_search_field.html" %}
     </div>
     <div>
       <label for="{{ form.producto.id_for_label }}" class="label">Producto</label>
-      {{ form.producto }}
-      {% if form.producto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto.errors.0 }}</p>{% endif %}
+      {% include "products/includes/_producto_search_field.html" %}
     </div>
     <div>
       <label for="{{ form.tipo_descuento.id_for_label }}" class="label">Tipo de promoción</label>
@@ -71,3 +70,7 @@
   </div>
 </form>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/proveedor-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+{% endblock extra_js %}

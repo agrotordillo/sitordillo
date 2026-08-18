@@ -1,0 +1,7 @@
+{% load proveedor_extras %}
+<div class="proveedor-search relative" data-proveedor-search-url="{% url 'api:proveedor-buscar' %}">
+  {{ form.proveedor }}
+  <input type="text" class="input proveedor-search-input" placeholder="RFC, folio o nombre..." value="{{ form.proveedor.value|proveedor_label }}" autocomplete="off">
+  <div class="proveedor-search-results hidden absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto"></div>
+</div>
+{% if form.proveedor.errors %}<p class="mt-1 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
