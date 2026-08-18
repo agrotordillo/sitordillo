@@ -166,6 +166,10 @@ class Producto(BaseAbstractModel):
         INSUMO = "insumo", "Insumo"
         PAQUETE = "paquete", "Paquete/Combo"
 
+    class TipoIVA(models.TextChoices):
+        GRAVADO = "gravado", "Gravado"
+        EXENTO = "exento", "Exento"
+
     nombre = models.CharField(max_length=200, verbose_name="Nombre del producto")
     sku = models.CharField(max_length=30, unique=True, verbose_name="SKU")
     codigo_barras = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="Código de barras")
@@ -224,6 +228,45 @@ class Producto(BaseAbstractModel):
         verbose_name="Sucursal (solo para paquetes)",
         help_text="La sucursal que arma este paquete/combo. Solo aplica cuando el tipo es Paquete/Combo.",
     )
+    clave_prod_serv_sat = models.ForeignKey(
+        "fiscal.ClaveProdServSAT",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="productos",
+        verbose_name="Clave de producto o servicio SAT",
+        help_text="Requerida para poder facturar este producto (CFDI).",
+    )
+    clave_unidad_sat = models.ForeignKey(
+        "fiscal.ClaveUnidadSAT",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="productos",
+        verbose_name="Clave de unidad SAT",
+        help_text="Requerida para poder facturar este producto (CFDI).",
+    )
+    tipo_iva = models.CharField(
+        max_length=10,
+        choices=TipoIVA.choices,
+        default=TipoIVA.GRAVADO,
+        verbose_name="IVA",
+    )
+    tasa_iva = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("16.00"),
+        verbose_name="Tasa de IVA (%)",
+        help_text="Solo aplica cuando el IVA es Gravado; varía según el producto (16%, 8% zona fronteriza, etc.).",
+    )
+    aplica_ieps = models.BooleanField(default=False, verbose_name="Aplica IEPS")
+    tasa_ieps = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Tasa de IEPS (%)",
+    )
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
     notas = models.TextField(blank=True, verbose_name="Notas")
     precio_costo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de costo")
@@ -242,6 +285,11 @@ class Producto(BaseAbstractModel):
             models.CheckConstraint(condition=models.Q(stock_minimo__gte=0), name="producto_stock_minimo_no_negativo"),
             models.CheckConstraint(condition=models.Q(stock_maximo__gte=0), name="producto_stock_maximo_no_negativo"),
             models.CheckConstraint(condition=models.Q(stock_maximo__gte=models.F("stock_minimo")), name="producto_stock_maximo_mayor_igual_minimo"),
+            models.CheckConstraint(condition=models.Q(tasa_iva__gte=0), name="producto_tasa_iva_no_negativa"),
+            models.CheckConstraint(
+                condition=models.Q(tasa_ieps__isnull=True) | models.Q(tasa_ieps__gte=0),
+                name="producto_tasa_ieps_no_negativa",
+            ),
         ]
         indexes = [
             models.Index(fields=["sku"]),
@@ -292,6 +340,17 @@ class Producto(BaseAbstractModel):
                 raise ValidationError({"almacen": "Un paquete solo puede pertenecer a una sucursal, no al CEDIS."})
         elif self.almacen_id:
             raise ValidationError({"almacen": "Solo los paquetes/combos pueden pertenecer a una sucursal."})
+
+        if self.tipo_iva == self.TipoIVA.EXENTO:
+            self.tasa_iva = Decimal("0.00")
+        elif self.tasa_iva is None or self.tasa_iva <= 0:
+            raise ValidationError({"tasa_iva": "Indica la tasa de IVA para un producto gravado."})
+
+        if self.aplica_ieps:
+            if not self.tasa_ieps or self.tasa_ieps <= 0:
+                raise ValidationError({"tasa_ieps": "Indica la tasa de IEPS."})
+        elif self.tasa_ieps:
+            raise ValidationError({"aplica_ieps": "Activa 'Aplica IEPS' antes de definir su tasa."})
 
 
 class PaqueteComponente(BaseAbstractModel):

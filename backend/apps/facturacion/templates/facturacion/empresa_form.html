@@ -1,0 +1,70 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Datos de la empresa{% endblock title %}
+{% block title_layout %}Datos fiscales de la empresa{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Datos de la empresa</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">Estos son los datos fiscales que se usan como Emisor en cada CFDI.</p>
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.tipo_persona.id_for_label }}" class="label">Tipo de persona</label>
+      {{ form.tipo_persona }}
+      {% if form.tipo_persona.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tipo_persona.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.rfc.id_for_label }}" class="label">RFC</label>
+      {{ form.rfc }}
+      {% if form.rfc.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.rfc.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.nombre_fiscal.id_for_label }}" class="label">Nombre o razón social (fiscal)</label>
+      {{ form.nombre_fiscal }}
+    </div>
+    <div>
+      <label for="{{ form.nombre_comercial.id_for_label }}" class="label">Nombre comercial <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.nombre_comercial }}
+    </div>
+    <div>
+      <label for="{{ form.regimen_fiscal.id_for_label }}" class="label">Régimen fiscal</label>
+      {{ form.regimen_fiscal }}
+      {% if form.regimen_fiscal.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.regimen_fiscal.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.codigo_postal.id_for_label }}" class="label">Código postal (lugar de expedición)</label>
+      {{ form.codigo_postal }}
+    </div>
+    <div>
+      <label for="{{ form.telefono.id_for_label }}" class="label">Teléfono <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.telefono }}
+    </div>
+    <div>
+      <label for="{{ form.email.id_for_label }}" class="label">Correo electrónico <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.email }}
+    </div>
+    <div>
+      <label for="{{ form.serie_default.id_for_label }}" class="label">Serie de factura por omisión</label>
+      {{ form.serie_default }}
+    </div>
+  </div>
+  {% if empresa %}
+  <p class="mt-4 text-xs text-gray-400">Siguiente folio a asignar: {{ empresa.siguiente_folio }}</p>
+  {% endif %}
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

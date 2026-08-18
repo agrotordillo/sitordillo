@@ -1,0 +1,54 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}{{ titulo }}{% endblock title %}
+{% block title_layout %}{{ titulo }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:product-list' %}" class="text-gray-400 hover:text-primary-600">Productos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{{ titulo }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="get" class="flex gap-2 mb-6">
+  <input type="text" name="q" value="{{ q }}" placeholder="Buscar por palabra clave (ej. alimento, consulta, kilogramo)" class="input flex-1" autofocus>
+  <button type="submit" class="btn-primary">Buscar</button>
+</form>
+
+{% if q and not resultados %}
+<p class="text-sm text-gray-400">Sin resultados para "{{ q }}".</p>
+{% endif %}
+
+{% if resultados %}
+<div class="border border-gray-100 rounded-xl overflow-hidden">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2 font-semibold w-28">Clave</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Descripción</th>
+        <th scope="col" class="px-3 py-2 font-semibold w-24"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for r in resultados %}
+      <tr>
+        <td class="px-3 py-2 font-mono text-xs">{{ r.clave }}</td>
+        <td class="px-3 py-2">{{ r.etiqueta }}</td>
+        <td class="px-3 py-2 text-right">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="clave" value="{{ r.clave }}">
+            <input type="hidden" name="etiqueta" value="{{ r.etiqueta }}">
+            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Agregar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock main_content %}

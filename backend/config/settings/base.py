@@ -50,6 +50,7 @@ LOCAL_APPS = [
     'apps.traspasos',
     'apps.ventas',
     'apps.pagos',
+    'apps.facturacion',
     'apps.api',
 ]
 
@@ -120,6 +121,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+FACTURAMA_API_USER = env('FACTURAMA_API_USER', default='')
+FACTURAMA_API_PASSWORD = env('FACTURAMA_API_PASSWORD', default='')
+FACTURAMA_SANDBOX = env.bool('FACTURAMA_SANDBOX', default=True)
+FACTURAMA_BASE_URL = (
+    'https://apisandbox.facturama.mx' if FACTURAMA_SANDBOX else 'https://api.facturama.mx'
+)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'

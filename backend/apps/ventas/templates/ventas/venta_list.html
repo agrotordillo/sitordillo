@@ -40,7 +40,10 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ venta.almacen.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ venta.fecha_venta|date:"d/m/Y H:i" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+          {% if not venta.factura %}
+          <a href="{% url 'facturacion:factura-generar' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Facturar</a>
+          {% endif %}
           <a href="{% url 'ventas:venta-devolver' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Devolver</a>
         </td>
       </tr>

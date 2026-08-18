@@ -123,6 +123,24 @@
                   {% include "products/includes/_quick_create_modal.html" %}
                 </div>
               </div>
+              <div>
+                <label for="{{ form.clave_prod_serv_sat.id_for_label }}" class="label">Clave de producto/servicio SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
+                <div class="flex items-center gap-2">
+                  {{ form.clave_prod_serv_sat }}
+                  <a href="{% url 'facturacion:buscar-clave-prod-serv' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                  </a>
+                </div>
+              </div>
+              <div>
+                <label for="{{ form.clave_unidad_sat.id_for_label }}" class="label">Clave de unidad SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
+                <div class="flex items-center gap-2">
+                  {{ form.clave_unidad_sat }}
+                  <a href="{% url 'facturacion:buscar-clave-unidad' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                  </a>
+                </div>
+              </div>
             </div>
               </div>
             </div>
@@ -226,6 +244,63 @@
               <div>
                 <label for="{{ form.codigo_barras.id_for_label }}" class="label">Código de barras <span class="text-gray-400 font-normal">(opcional)</span></label>
                 {{ form.codigo_barras }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Impuestos ──────────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const tipoIva = document.getElementById('id_tipo_iva');
+            const tasaIva = document.getElementById('id_tasa_iva')?.value;
+            const ieps = document.getElementById('id_aplica_ieps')?.checked;
+            const ivaLabel = tipoIva?.value === 'exento' ? 'IVA exento' : `IVA ${tasaIva || 0}%`;
+            return ieps ? `${ivaLabel} · IEPS` : ivaLabel;
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 2h-11ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm5.03-.53a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 1 1-1.06-1.06l6.5-6.5a.75.75 0 0 1 1.06 0ZM15 13a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Impuestos</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.tipo_iva.id_for_label }}" class="label">IVA</label>
+                {{ form.tipo_iva }}
+              </div>
+              <div>
+                <label for="{{ form.tasa_iva.id_for_label }}" class="label">Tasa de IVA (%)</label>
+                {{ form.tasa_iva }}
+                {% if form.tasa_iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tasa_iva.errors.0 }}</p>{% endif %}
+              </div>
+              <div class="flex items-center gap-2 mt-6">
+                {{ form.aplica_ieps }}
+                <label for="{{ form.aplica_ieps.id_for_label }}" class="label mb-0">Aplica IEPS</label>
+              </div>
+              <div>
+                <label for="{{ form.tasa_ieps.id_for_label }}" class="label">Tasa de IEPS (%) <span class="text-gray-400 font-normal">(si aplica)</span></label>
+                {{ form.tasa_ieps }}
+                {% if form.tasa_ieps.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tasa_ieps.errors.0 }}</p>{% endif %}
               </div>
             </div>
               </div>

@@ -1,0 +1,79 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Facturas{% endblock title %}
+{% block title_layout %}Facturas{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Facturas</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'facturacion:empresa-config' %}" class="btn-secondary w-full sm:w-auto">Datos de la empresa</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Serie-Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Venta</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">UUID fiscal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for factura in facturas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-600">{{ factura.serie }}-{{ factura.numero_folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ factura.venta.cliente.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ factura.venta.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ factura.total|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 font-mono text-xs hidden md:table-cell">{{ factura.uuid_fiscal|default:"-" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium
+              {% if factura.estatus == 'timbrada' %}text-emerald-600
+              {% elif factura.estatus == 'cancelada' %}text-red-500
+              {% elif factura.estatus == 'error' %}text-red-500
+              {% else %}text-gray-500{% endif %}">
+              <span class="w-1.5 h-1.5 rounded-full
+                  {% if factura.estatus == 'timbrada' %}bg-emerald-500
+                  {% elif factura.estatus == 'cancelada' %}bg-red-400
+                  {% elif factura.estatus == 'error' %}bg-red-400
+                  {% else %}bg-gray-400{% endif %}"></span>
+              {{ factura.get_estatus_display }}
+          </span>
+          {% if factura.estatus == 'error' and factura.mensaje_error %}
+          <p class="text-xs text-red-500 mt-1 max-w-xs truncate" title="{{ factura.mensaje_error }}">{{ factura.mensaje_error }}</p>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+          {% if factura.estatus == 'borrador' or factura.estatus == 'error' %}
+          <form method="post" action="{% url 'facturacion:factura-timbrar' factura.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Timbrar</button>
+          </form>
+          {% elif factura.estatus == 'timbrada' %}
+          <form method="post" action="{% url 'facturacion:factura-cancelar' factura.pk %}" class="inline" onsubmit="return confirm('¿Cancelar esta factura timbrada?');">
+            {% csrf_token %}
+            <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cancelar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay facturas registradas. Se generan desde una Venta.</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}
