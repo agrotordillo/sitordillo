@@ -4,7 +4,7 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BaseModelForm
 from apps.products.models import Producto
 from apps.proveedores.models import Proveedor
-from .models import OrdenCompra, OrdenCompraDetalle
+from .models import OrdenCompra, OrdenCompraDetalle, PromocionProveedor
 
 
 class OrdenCompraForm(BaseModelForm):
@@ -48,3 +48,27 @@ OrdenCompraDetalleFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+
+class PromocionProveedorForm(BaseModelForm):
+    class Meta:
+        model = PromocionProveedor
+        fields = [
+            "proveedor",
+            "producto",
+            "tipo_descuento",
+            "descuento_porcentaje",
+            "precio_promocional",
+            "fecha_inicio",
+            "fecha_fin",
+            "observaciones",
+        ]
+        widgets = {
+            "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
+            "fecha_fin": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
+        self.fields["producto"].queryset = Producto.objects.filter(is_active=True)

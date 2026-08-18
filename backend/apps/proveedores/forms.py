@@ -15,6 +15,8 @@ class ProveedorForm(BaseModelForm):
             "limite_credito",
             "dias_credito",
             "descuento",
+            "descuento_pronto_pago",
+            "dias_pronto_pago",
             "contacto_nombre",
             "contacto_telefono",
             "contacto_email",

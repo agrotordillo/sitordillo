@@ -101,6 +101,16 @@
           {{ form.descuento }}
           {% if form.descuento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento.errors.0 }}</p>{% endif %}
         </div>
+        <div>
+          <label for="{{ form.descuento_pronto_pago.id_for_label }}" class="label">Descuento por pronto pago (%)</label>
+          {{ form.descuento_pronto_pago }}
+          {% if form.descuento_pronto_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento_pronto_pago.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.dias_pronto_pago.id_for_label }}" class="label">Días para pronto pago</label>
+          {{ form.dias_pronto_pago }}
+          {% if form.dias_pronto_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.dias_pronto_pago.errors.0 }}</p>{% endif %}
+        </div>
       </div>
     </div>
 

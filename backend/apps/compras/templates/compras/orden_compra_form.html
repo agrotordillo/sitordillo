@@ -82,7 +82,7 @@
               <th scope="col" class="px-3 py-2.5 font-semibold"></th>
             </tr>
           </thead>
-          <tbody x-ref="rows" class="divide-y divide-gray-100">
+          <tbody x-ref="rows" class="divide-y divide-gray-100" data-promo-url="{% url 'api:promocion-vigente' %}">
             {% for detalle_form in formset %}
             {% include "compras/includes/_detalle_row.html" with form=detalle_form %}
             {% endfor %}
@@ -117,5 +117,6 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/modules/forms/promo-suggest.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

@@ -33,6 +33,17 @@ class Proveedor(BaseAbstractModel):
     limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Límite de crédito")
     dias_credito = models.PositiveIntegerField(default=0, verbose_name="Días de crédito")
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="Descuento (%)")
+    descuento_pronto_pago = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        verbose_name="Descuento por pronto pago (%)",
+    )
+    dias_pronto_pago = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Días para pronto pago",
+        help_text="Si el pago se hace dentro de estos días desde la orden, aplica el descuento por pronto pago.",
+    )
     contacto_nombre = models.CharField(max_length=150, blank=True, verbose_name="Nombre de contacto")
     contacto_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono de contacto")
     contacto_email = models.EmailField(blank=True, verbose_name="Correo de contacto")
@@ -46,6 +57,10 @@ class Proveedor(BaseAbstractModel):
             models.CheckConstraint(
                 condition=models.Q(descuento__gte=0) & models.Q(descuento__lte=100),
                 name="proveedor_descuento_rango_valido",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(descuento_pronto_pago__gte=0) & models.Q(descuento_pronto_pago__lte=100),
+                name="proveedor_descuento_pronto_pago_rango_valido",
             ),
             models.CheckConstraint(
                 condition=models.Q(limite_credito__gte=0),
@@ -101,8 +116,26 @@ class Proveedor(BaseAbstractModel):
                 "tiene_credito": "Activa el crédito autorizado antes de definir límite o días de crédito.",
             })
 
+        if not self.tiene_credito and (self.descuento_pronto_pago or self.dias_pronto_pago):
+            raise ValidationError({
+                "tiene_credito": "El pronto pago solo aplica a proveedores con crédito autorizado.",
+            })
+
+        if bool(self.descuento_pronto_pago) != bool(self.dias_pronto_pago):
+            raise ValidationError({
+                "dias_pronto_pago": "El descuento y los días de pronto pago deben capturarse juntos, o dejarse ambos en cero.",
+            })
+
+        if self.dias_pronto_pago and self.dias_credito and self.dias_pronto_pago > self.dias_credito:
+            raise ValidationError({
+                "dias_pronto_pago": "Los días de pronto pago no pueden ser mayores a los días de crédito.",
+            })
+
         if self.descuento < 0 or self.descuento > 100:
             raise ValidationError({"descuento": "El descuento debe estar entre 0 y 100."})
+
+        if self.descuento_pronto_pago < 0 or self.descuento_pronto_pago > 100:
+            raise ValidationError({"descuento_pronto_pago": "El descuento por pronto pago debe estar entre 0 y 100."})
 
         if self.limite_credito < 0:
             raise ValidationError({"limite_credito": "El límite de crédito no puede ser negativo."})

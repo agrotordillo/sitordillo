@@ -4,6 +4,105 @@ from django.db import models
 from apps.core.models import BaseAbstractModel
 
 
+class PromocionProveedor(BaseAbstractModel):
+    class TipoDescuento(models.TextChoices):
+        PORCENTAJE = "porcentaje", "% de descuento"
+        PRECIO_FIJO = "precio_fijo", "Precio promocional fijo"
+
+    proveedor = models.ForeignKey(
+        "proveedores.Proveedor",
+        on_delete=models.PROTECT,
+        related_name="promociones",
+        verbose_name="Proveedor",
+    )
+    producto = models.ForeignKey(
+        "products.Producto",
+        on_delete=models.PROTECT,
+        related_name="promociones_proveedor",
+        verbose_name="Producto",
+    )
+    tipo_descuento = models.CharField(
+        max_length=15,
+        choices=TipoDescuento.choices,
+        verbose_name="Tipo de promoción",
+    )
+    descuento_porcentaje = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Descuento (%)"
+    )
+    precio_promocional = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Precio promocional"
+    )
+    fecha_inicio = models.DateField(verbose_name="Fecha de inicio")
+    fecha_fin = models.DateField(verbose_name="Fecha de fin")
+    observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Promoción de proveedor"
+        verbose_name_plural = "Promociones de proveedor"
+        ordering = ["-fecha_inicio"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(fecha_fin__gte=models.F("fecha_inicio")),
+                name="promo_fecha_fin_no_anterior_inicio",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["proveedor", "producto"]),
+            models.Index(fields=["fecha_inicio", "fecha_fin"]),
+        ]
+
+    def __str__(self):
+        return f"{self.producto.nombre} · {self.proveedor.display_name} ({self.fecha_inicio} a {self.fecha_fin})"
+
+    def get_folio_prefix(self):
+        return "PROMO"
+
+    def get_slug_source(self):
+        return f"{self.proveedor_id}-{self.producto_id}-{self.fecha_inicio}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    def vigente_en(self, fecha):
+        return self.fecha_inicio <= fecha <= self.fecha_fin
+
+    def precio_para(self, precio_base):
+        if self.tipo_descuento == self.TipoDescuento.PRECIO_FIJO:
+            return self.precio_promocional
+        precio_base = precio_base or Decimal("0")
+        precio = precio_base * (Decimal("1") - self.descuento_porcentaje / Decimal("100"))
+        return precio.quantize(Decimal("0.01"))
+
+    def clean(self):
+        super().clean()
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValidationError({"fecha_fin": "La fecha de fin no puede ser anterior a la fecha de inicio."})
+
+        if self.tipo_descuento == self.TipoDescuento.PORCENTAJE:
+            if not self.descuento_porcentaje:
+                raise ValidationError({"descuento_porcentaje": "Indica el porcentaje de descuento."})
+            if self.descuento_porcentaje <= 0 or self.descuento_porcentaje > 100:
+                raise ValidationError({"descuento_porcentaje": "El descuento debe estar entre 0 y 100."})
+            self.precio_promocional = None
+        elif self.tipo_descuento == self.TipoDescuento.PRECIO_FIJO:
+            if not self.precio_promocional or self.precio_promocional <= 0:
+                raise ValidationError({"precio_promocional": "Indica el precio promocional."})
+            self.descuento_porcentaje = None
+
+        if self.proveedor_id and self.producto_id and self.fecha_inicio and self.fecha_fin:
+            traslape = PromocionProveedor.objects.filter(
+                proveedor_id=self.proveedor_id,
+                producto_id=self.producto_id,
+                fecha_inicio__lte=self.fecha_fin,
+                fecha_fin__gte=self.fecha_inicio,
+            ).exclude(pk=self.pk)
+            if traslape.exists():
+                raise ValidationError(
+                    "Ya existe una promoción de este producto con este proveedor que se traslapa en fechas."
+                )
+
+
 class OrdenCompra(BaseAbstractModel):
     class Estatus(models.TextChoices):
         BORRADOR = "borrador", "Borrador"

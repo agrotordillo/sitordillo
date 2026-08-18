@@ -5,6 +5,7 @@ from .views.products import (
     SubcategoriesByCategoryView,
     UnitMeasureQuickCreateView,
 )
+from .views.compras import PromocionVigenteView
 
 app_name = "api"
 
@@ -23,5 +24,10 @@ urlpatterns = [
         "products/units/create/",
         UnitMeasureQuickCreateView.as_view(),
         name="unit-quick-create",
+    ),
+    path(
+        "compras/promocion-vigente/",
+        PromocionVigenteView.as_view(),
+        name="promocion-vigente",
     ),
 ]

@@ -1,0 +1,72 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Promociones de proveedor{% endblock title %}
+{% block title_layout %}Promociones de proveedor{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Promociones</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'compras:promocion-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nueva promoción
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Promoción</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Vigencia</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for promo in promociones %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ promo.producto.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-600">{{ promo.proveedor.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-600">
+          {% if promo.tipo_descuento == 'porcentaje' %}
+          -{{ promo.descuento_porcentaje }}%
+          {% else %}
+          ${{ promo.precio_promocional }}
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ promo.fecha_inicio|date:"d/m/Y" }} – {{ promo.fecha_fin|date:"d/m/Y" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% now "Y-m-d" as hoy %}
+          {% if promo.fecha_inicio|date:"Y-m-d" <= hoy and promo.fecha_fin|date:"Y-m-d" >= hoy %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Vigente
+          </span>
+          {% else %}
+          <span class="text-gray-400 text-xs">Fuera de vigencia</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay promociones registradas</p>
+            <a href="{% url 'compras:promocion-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

@@ -1,0 +1,73 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Nueva promoción de proveedor{% endblock title %}
+{% block title_layout %}Nueva promoción de proveedor{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:promocion-list' %}" class="text-gray-400 hover:text-primary-600">Promociones</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
+      {{ form.proveedor }}
+      {% if form.proveedor.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.producto.id_for_label }}" class="label">Producto</label>
+      {{ form.producto }}
+      {% if form.producto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.tipo_descuento.id_for_label }}" class="label">Tipo de promoción</label>
+      {{ form.tipo_descuento }}
+      {% if form.tipo_descuento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tipo_descuento.errors.0 }}</p>{% endif %}
+    </div>
+    <div></div>
+    <div>
+      <label for="{{ form.descuento_porcentaje.id_for_label }}" class="label">Descuento (%) <span class="text-gray-400 font-normal">(si el tipo es "% de descuento")</span></label>
+      {{ form.descuento_porcentaje }}
+      {% if form.descuento_porcentaje.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento_porcentaje.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.precio_promocional.id_for_label }}" class="label">Precio promocional <span class="text-gray-400 font-normal">(si el tipo es "precio fijo")</span></label>
+      {{ form.precio_promocional }}
+      {% if form.precio_promocional.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.precio_promocional.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.fecha_inicio.id_for_label }}" class="label">Fecha de inicio</label>
+      {{ form.fecha_inicio }}
+      {% if form.fecha_inicio.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_inicio.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.fecha_fin.id_for_label }}" class="label">Fecha de fin</label>
+      {{ form.fecha_fin }}
+      {% if form.fecha_fin.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_fin.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'compras:promocion-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}
