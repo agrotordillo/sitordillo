@@ -43,6 +43,7 @@ LOCAL_APPS = [
     'apps.core',
     'apps.fiscal',
     'apps.proveedores',
+    'apps.clientes',
     'apps.products',
     'apps.compras',
     'apps.inventario',

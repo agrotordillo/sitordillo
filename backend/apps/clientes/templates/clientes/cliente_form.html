@@ -1,0 +1,118 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Crear cliente{% endblock title %}
+{% block title_layout %}Crear cliente{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'clientes:cliente-list' %}" class="text-gray-400 hover:text-primary-600">Clientes</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-8">
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos generales</h3>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="sm:col-span-2">
+          <label for="{{ form.nombre.id_for_label }}" class="label">Nombre del cliente</label>
+          {{ form.nombre }}
+          {% if form.nombre.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.nombre.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.tipo_persona.id_for_label }}" class="label">Tipo de persona <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.tipo_persona }}
+        </div>
+        <div>
+          <label for="{{ form.contacto_telefono.id_for_label }}" class="label">Teléfono <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.contacto_telefono }}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.contacto_email.id_for_label }}" class="label">Correo electrónico <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.contacto_email }}
+          {% if form.contacto_email.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.contacto_email.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos fiscales <span class="text-gray-400 font-normal">(opcionales — solo si el cliente pedirá factura)</span></h3>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.rfc.id_for_label }}" class="label">RFC</label>
+          {{ form.rfc }}
+          {% if form.rfc.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.rfc.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.nombre_fiscal.id_for_label }}" class="label">Nombre o razón social (fiscal)</label>
+          {{ form.nombre_fiscal }}
+          {% if form.nombre_fiscal.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.nombre_fiscal.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.regimen_fiscal.id_for_label }}" class="label">Régimen fiscal</label>
+          {{ form.regimen_fiscal }}
+          {% if form.regimen_fiscal.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.regimen_fiscal.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.uso_cfdi.id_for_label }}" class="label">Uso de CFDI</label>
+          {{ form.uso_cfdi }}
+          {% if form.uso_cfdi.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.uso_cfdi.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.codigo_postal.id_for_label }}" class="label">Código postal fiscal</label>
+          {{ form.codigo_postal }}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Condiciones comerciales</h3>
+      <div class="grid gap-4 sm:grid-cols-4">
+        <div class="flex items-center gap-2 sm:col-span-4">
+          {{ form.tiene_credito }}
+          <label for="{{ form.tiene_credito.id_for_label }}" class="label mb-0">Crédito autorizado</label>
+          {% if form.tiene_credito.errors %}<p class="text-xs text-red-600">{{ form.tiene_credito.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.limite_credito.id_for_label }}" class="label">Límite de crédito</label>
+          {{ form.limite_credito }}
+          {% if form.limite_credito.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.limite_credito.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.dias_credito.id_for_label }}" class="label">Días de crédito</label>
+          {{ form.dias_credito }}
+        </div>
+        <div>
+          <label for="{{ form.descuento.id_for_label }}" class="label">Descuento (%)</label>
+          {{ form.descuento }}
+          {% if form.descuento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Observaciones</h3>
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'clientes:cliente-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

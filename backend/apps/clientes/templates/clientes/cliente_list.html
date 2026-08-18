@@ -1,0 +1,78 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Clientes{% endblock title %}
+{% block title_layout %}Clientes{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Clientes</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'clientes:cliente-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nuevo cliente
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">RFC</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Contacto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Facturable</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for cliente in clientes %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400 hidden sm:table-cell">{{ cliente.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ cliente.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 font-mono text-xs hidden md:table-cell">{{ cliente.rfc|default:"-" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ cliente.contacto_telefono|default:cliente.contacto_email|default:"-" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if cliente.facturable %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Sí
+          </span>
+          {% else %}
+          <span class="text-gray-400 text-xs">Público en general</span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if cliente.is_active %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Activo
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Inactivo
+          </span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <svg class="w-10 h-10 text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+            <p class="text-sm text-gray-400">No hay clientes registrados</p>
+            <a href="{% url 'clientes:cliente-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

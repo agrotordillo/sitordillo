@@ -5,83 +5,107 @@ from apps.core.models import BaseAbstractModel
 from apps.core.validators import RFC_PATTERN
 
 
-class Proveedor(BaseAbstractModel):
+class Cliente(BaseAbstractModel):
     class TipoPersona(models.TextChoices):
         FISICA = "fisica", "Persona física"
         MORAL = "moral", "Persona moral"
 
+    nombre = models.CharField(max_length=200, verbose_name="Nombre del cliente")
     tipo_persona = models.CharField(
         max_length=10,
         choices=TipoPersona.choices,
+        blank=True,
         verbose_name="Tipo de persona",
     )
     rfc = models.CharField(
         max_length=13,
         unique=True,
+        null=True,
+        blank=True,
         verbose_name="RFC",
         error_messages={"unique": "Ya existe un %(model_name)s con este RFC."},
     )
-    nombre_fiscal = models.CharField(max_length=255, verbose_name="Nombre o razón social (fiscal)")
-    nombre_comercial = models.CharField(max_length=255, blank=True, verbose_name="Nombre comercial")
+    nombre_fiscal = models.CharField(max_length=255, blank=True, verbose_name="Nombre o razón social (fiscal)")
     regimen_fiscal = models.ForeignKey(
         "fiscal.RegimenFiscal",
         on_delete=models.PROTECT,
-        related_name="proveedores",
+        null=True,
+        blank=True,
+        related_name="clientes",
         verbose_name="Régimen fiscal",
     )
+    uso_cfdi = models.ForeignKey(
+        "fiscal.UsoCFDI",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="clientes",
+        verbose_name="Uso de CFDI",
+    )
+    codigo_postal = models.CharField(max_length=5, blank=True, verbose_name="Código postal fiscal")
+    contacto_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono")
+    contacto_email = models.EmailField(blank=True, verbose_name="Correo electrónico")
+    # Crédito que la veterinaria le otorga a este cliente (cuentas por cobrar),
+    # no confundir con el crédito que otorgan los proveedores (apps.proveedores.Proveedor).
     tiene_credito = models.BooleanField(default=False, verbose_name="Crédito autorizado")
     limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Límite de crédito")
     dias_credito = models.PositiveIntegerField(default=0, verbose_name="Días de crédito")
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="Descuento (%)")
-    contacto_nombre = models.CharField(max_length=150, blank=True, verbose_name="Nombre de contacto")
-    contacto_telefono = models.CharField(max_length=20, blank=True, verbose_name="Teléfono de contacto")
-    contacto_email = models.EmailField(blank=True, verbose_name="Correo de contacto")
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
     class Meta:
-        verbose_name = "Proveedor"
-        verbose_name_plural = "Proveedores"
-        ordering = ["nombre_fiscal"]
+        verbose_name = "Cliente"
+        verbose_name_plural = "Clientes"
+        ordering = ["nombre"]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(descuento__gte=0) & models.Q(descuento__lte=100),
-                name="proveedor_descuento_rango_valido",
+                name="cliente_descuento_rango_valido",
             ),
             models.CheckConstraint(
                 condition=models.Q(limite_credito__gte=0),
-                name="proveedor_limite_credito_no_negativo",
+                name="cliente_limite_credito_no_negativo",
             ),
         ]
         indexes = [
+            models.Index(fields=["nombre"]),
             models.Index(fields=["rfc"]),
-            models.Index(fields=["nombre_fiscal"]),
-            models.Index(fields=["regimen_fiscal"]),
         ]
 
     def __str__(self):
-        return f"{self.nombre_comercial or self.nombre_fiscal} ({self.rfc})"
+        return f"{self.nombre} ({self.rfc})" if self.rfc else self.nombre
 
     def get_folio_prefix(self):
-        return "PRV"
+        return "CLI"
 
     def get_slug_source(self):
-        return self.nombre_comercial or self.nombre_fiscal
+        return self.nombre
 
     @property
     def display_name(self):
-        return (self.nombre_comercial or self.nombre_fiscal).strip()
+        return self.nombre.strip()
 
     @property
-    def nombre(self):
-        # Compatibilidad con OptionSerializer (source="nombre") usado en selects rápidos.
-        return self.display_name
+    def facturable(self):
+        return bool(self.rfc and self.nombre_fiscal and self.regimen_fiscal_id and self.uso_cfdi_id)
 
     def clean(self):
         super().clean()
-        if self.rfc:
-            self.rfc = self.rfc.upper().strip()
 
-        if self.tipo_persona and self.rfc:
+        # RFC vacío se normaliza a None (no "") para que la unicidad no choque
+        # entre varios clientes "público en general" sin RFC.
+        self.rfc = (self.rfc or "").upper().strip() or None
+
+        campos_fiscales = [self.rfc, self.nombre_fiscal, self.regimen_fiscal_id, self.uso_cfdi_id, self.codigo_postal]
+        if any(campos_fiscales) and not all(campos_fiscales):
+            raise ValidationError(
+                "Para poder facturarle a este cliente se necesitan todos los datos fiscales: "
+                "RFC, nombre fiscal, régimen fiscal, uso de CFDI y código postal."
+            )
+
+        if self.rfc:
+            if not self.tipo_persona:
+                raise ValidationError({"tipo_persona": "Indica el tipo de persona para validar el RFC."})
             longitud_esperada = 13 if self.tipo_persona == self.TipoPersona.FISICA else 12
             if len(self.rfc) != longitud_esperada:
                 raise ValidationError({
@@ -95,6 +119,12 @@ class Proveedor(BaseAbstractModel):
                 raise ValidationError({"regimen_fiscal": "Este régimen fiscal no aplica para personas físicas."})
             if self.tipo_persona == self.TipoPersona.MORAL and not self.regimen_fiscal.aplica_moral:
                 raise ValidationError({"regimen_fiscal": "Este régimen fiscal no aplica para personas morales."})
+
+        if self.uso_cfdi_id:
+            if self.tipo_persona == self.TipoPersona.FISICA and not self.uso_cfdi.aplica_fisica:
+                raise ValidationError({"uso_cfdi": "Este uso de CFDI no aplica para personas físicas."})
+            if self.tipo_persona == self.TipoPersona.MORAL and not self.uso_cfdi.aplica_moral:
+                raise ValidationError({"uso_cfdi": "Este uso de CFDI no aplica para personas morales."})
 
         if not self.tiene_credito and (self.limite_credito or self.dias_credito):
             raise ValidationError({
