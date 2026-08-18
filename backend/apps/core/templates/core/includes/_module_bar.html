@@ -52,7 +52,7 @@
       <span class="hidden sm:inline">Compras</span>
     </a>
 
-    <a href="#"
+    <a href="{% url 'ventas:venta-list' %}"
       class="{% if active_module == 'sales' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'sales' %}text-primary-600{% else %}text-[#39E5E0]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 7.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" />

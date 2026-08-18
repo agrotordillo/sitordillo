@@ -38,7 +38,7 @@ document.addEventListener("alpine:init", () => {
     },
 
     _bindRow(row) {
-      row.querySelectorAll(".fs-cantidad, .fs-precio").forEach((el) => {
+      row.querySelectorAll(".fs-cantidad, .fs-precio, .fs-descuento").forEach((el) => {
         el.addEventListener("input", () => this._recalculate());
       });
     },
@@ -49,7 +49,10 @@ document.addEventListener("alpine:init", () => {
         if (row.dataset.removed === "true") return;
         const qty = parseFloat(row.querySelector(".fs-cantidad")?.value) || 0;
         const price = parseFloat(row.querySelector(".fs-precio")?.value) || 0;
-        const rowTotal = qty * price;
+        // .fs-descuento es opcional (% 0-100); si la fila no lo trae, no afecta el total.
+        const descuentoEl = row.querySelector(".fs-descuento");
+        const descuento = descuentoEl ? parseFloat(descuentoEl.value) || 0 : 0;
+        const rowTotal = qty * price * (1 - descuento / 100);
 
         const totalEl = row.querySelector(".fs-row-total");
         if (totalEl) totalEl.textContent = rowTotal.toLocaleString("es-MX", { minimumFractionDigits: 2 });

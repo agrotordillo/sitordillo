@@ -87,6 +87,7 @@ class MovimientoInventario(BaseAbstractModel):
         AJUSTE = "ajuste", "Ajuste"
         MERMA = "merma", "Merma"
         TRASPASO = "traspaso", "Traspaso"
+        DEVOLUCION = "devolucion", "Devolución de cliente"
 
     lote = models.ForeignKey(
         Lote,

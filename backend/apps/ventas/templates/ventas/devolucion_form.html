@@ -1,0 +1,61 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Registrar devolución{% endblock title %}
+{% block title_layout %}Devolución de la venta {{ venta.folio }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'ventas:venta-list' %}" class="text-gray-400 hover:text-primary-600">Ventas</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Devolver {{ venta.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">Cliente: <span class="font-medium text-gray-700">{{ venta.cliente.display_name }}</span></p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <div class="grid gap-5">
+    {% for form, detalle in filas %}
+    <div class="border border-gray-100 rounded-xl p-4">
+      {{ form.venta_detalle_id }}
+      <p class="text-sm font-semibold text-gray-800 mb-3">
+        {{ detalle.producto.nombre }}
+        <span class="text-xs font-normal text-gray-400">
+          — vendido: {{ detalle.cantidad|floatformat:2 }}, ya devuelto: {{ detalle.cantidad_devuelta|floatformat:2 }}
+        </span>
+      </p>
+      {% if form.non_field_errors %}
+      <p class="mb-2 text-xs text-red-600">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label for="{{ form.cantidad.id_for_label }}" class="label">Cantidad a devolver</label>
+          {{ form.cantidad }}
+          {% if form.cantidad.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="flex items-center gap-2 mt-6">
+          {{ form.reingresa_a_inventario }}
+          <label for="{{ form.reingresa_a_inventario.id_for_label }}" class="label mb-0">Reingresa a inventario</label>
+        </div>
+      </div>
+      <p class="mt-1.5 text-xs text-gray-400">Si no reingresa, el producto se registra como merma y no vuelve al stock.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-6">
+    <label for="motivo" class="label">Motivo <span class="text-gray-400 font-normal">(opcional)</span></label>
+    <textarea id="motivo" name="motivo" rows="3" class="input" placeholder="Razón de la devolución"></textarea>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'ventas:venta-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar devolución</button>
+  </div>
+</form>
+{% endblock main_content %}

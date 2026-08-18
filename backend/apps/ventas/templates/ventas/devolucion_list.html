@@ -1,0 +1,46 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Devoluciones{% endblock title %}
+{% block title_layout %}Devoluciones de clientes{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'ventas:venta-list' %}" class="text-gray-400 hover:text-primary-600">Ventas</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Devoluciones</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Venta original</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Motivo</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for devolucion in devoluciones %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ devolucion.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ devolucion.venta.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-600">{{ devolucion.venta.cliente.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ devolucion.fecha|date:"d/m/Y" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 max-w-xs truncate hidden md:table-cell">{{ devolucion.motivo|default:"-" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay devoluciones registradas</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

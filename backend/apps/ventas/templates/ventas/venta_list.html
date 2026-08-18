@@ -1,0 +1,60 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Ventas{% endblock title %}
+{% block title_layout %}Ventas{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Ventas</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'ventas:devolucion-list' %}" class="btn-secondary w-full sm:w-auto">Devoluciones</a>
+<a href="{% url 'ventas:venta-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nueva venta
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for venta in ventas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ venta.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ venta.cliente.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ venta.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ venta.fecha_venta|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          <a href="{% url 'ventas:venta-devolver' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Devolver</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay ventas registradas</p>
+            <a href="{% url 'ventas:venta-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}
