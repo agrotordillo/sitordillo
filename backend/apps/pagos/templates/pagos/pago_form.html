@@ -1,0 +1,92 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Registrar pago{% endblock title %}
+{% block title_layout %}Registrar pago{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'pagos:cuenta-list' %}" class="text-gray-400 hover:text-primary-600">Cuentas por pagar</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Registrar pago</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="mb-4 grid gap-1 text-sm text-gray-600">
+  <p>Proveedor: <span class="font-medium text-gray-800">{{ cuenta.proveedor.display_name }}</span></p>
+  <p>Orden de compra: <span class="font-medium text-gray-800">{{ cuenta.orden_compra.folio }}</span></p>
+  <p>Saldo pendiente: <span class="font-semibold text-gray-800">${{ cuenta.saldo_pendiente|floatformat:2 }}</span> de ${{ cuenta.monto_total|floatformat:2 }}</p>
+  {% if cuenta.fecha_limite_pronto_pago %}
+  <p class="text-emerald-600">
+    Pronto pago del {{ cuenta.proveedor.descuento_pronto_pago }}% disponible si se paga a más tardar el {{ cuenta.fecha_limite_pronto_pago|date:"d/m/Y" }}.
+  </p>
+  {% endif %}
+</div>
+
+{% if cuenta.pagos.all %}
+<div class="mb-6 border border-gray-100 rounded-xl overflow-hidden">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2 font-semibold">Fecha</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Monto pagado</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Descuento</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Forma de pago</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for pago in cuenta.pagos.all %}
+      <tr>
+        <td class="px-3 py-2">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+        <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
+        <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|floatformat:2 }}{% else %}-{% endif %}</td>
+        <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.fecha_pago.id_for_label }}" class="label">Fecha de pago</label>
+      {{ form.fecha_pago }}
+      {% if form.fecha_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_pago.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.monto_pagado.id_for_label }}" class="label">Monto pagado</label>
+      {{ form.monto_pagado }}
+      {% if form.monto_pagado.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.monto_pagado.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
+      {{ form.forma_pago }}
+      {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
+    </div>
+    {% if cuenta.fecha_limite_pronto_pago %}
+    <div class="flex items-center gap-2 mt-6">
+      {{ form.aplica_descuento_pronto_pago }}
+      <label for="{{ form.aplica_descuento_pronto_pago.id_for_label }}" class="label mb-0">Aplicar descuento por pronto pago</label>
+      {% if form.aplica_descuento_pronto_pago.errors %}<p class="text-xs text-red-600">{{ form.aplica_descuento_pronto_pago.errors.0 }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <div class="sm:col-span-2">
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'pagos:cuenta-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar pago</button>
+  </div>
+</form>
+{% endblock main_content %}

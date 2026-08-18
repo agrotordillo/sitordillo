@@ -1,0 +1,49 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Generar cuenta por pagar{% endblock title %}
+{% block title_layout %}Generar cuenta por pagar{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Generar cuenta por pagar</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Orden <span class="font-medium text-gray-700">{{ orden.folio }}</span> ·
+  Proveedor <span class="font-medium text-gray-700">{{ orden.proveedor.display_name }}</span> ·
+  Total <span class="font-medium text-gray-700">${{ orden.total|floatformat:2 }}</span>
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4">
+    <div>
+      <label for="{{ form.fecha_emision.id_for_label }}" class="label">Fecha de emisión</label>
+      {{ form.fecha_emision }}
+      {% if form.fecha_emision.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_emision.errors.0 }}</p>{% endif %}
+      <p class="mt-1.5 text-xs text-gray-400">
+        Vencimiento: {{ orden.proveedor.dias_credito }} días después de esta fecha.
+        {% if orden.proveedor.dias_pronto_pago %}Pronto pago ({{ orden.proveedor.descuento_pronto_pago }}%): {{ orden.proveedor.dias_pronto_pago }} días.{% endif %}
+      </p>
+    </div>
+    <div>
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Generar cuenta por pagar</button>
+  </div>
+</form>
+{% endblock main_content %}

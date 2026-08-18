@@ -1,0 +1,74 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Cuentas por pagar{% endblock title %}
+{% block title_layout %}Cuentas por pagar{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Cuentas por pagar</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Orden</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Vencimiento</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Saldo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for cuenta in cuentas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ cuenta.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ cuenta.proveedor.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ cuenta.orden_compra.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell">
+          <span class="{% if cuenta.esta_vencida %}text-red-600 font-medium{% else %}text-gray-500{% endif %}">
+            {{ cuenta.fecha_vencimiento|date:"d/m/Y" }}{% if cuenta.esta_vencida %} · vencida{% endif %}
+          </span>
+          {% if cuenta.fecha_limite_pronto_pago %}
+          <p class="text-xs text-emerald-600">Pronto pago hasta {{ cuenta.fecha_limite_pronto_pago|date:"d/m/Y" }}</p>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ cuenta.saldo_pendiente|floatformat:2 }} <span class="text-gray-400 font-normal">/ ${{ cuenta.monto_total|floatformat:2 }}</span></td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium
+              {% if cuenta.estatus == 'pagada' %}text-emerald-600
+              {% elif cuenta.estatus == 'cancelada' %}text-red-500
+              {% elif cuenta.estatus == 'parcial' %}text-amber-600
+              {% else %}text-gray-500{% endif %}">
+              <span class="w-1.5 h-1.5 rounded-full
+                  {% if cuenta.estatus == 'pagada' %}bg-emerald-500
+                  {% elif cuenta.estatus == 'cancelada' %}bg-red-400
+                  {% elif cuenta.estatus == 'parcial' %}bg-amber-500
+                  {% else %}bg-gray-400{% endif %}"></span>
+              {{ cuenta.get_estatus_display }}
+          </span>
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          {% if cuenta.estatus == 'pendiente' or cuenta.estatus == 'parcial' %}
+          <a href="{% url 'pagos:pago-registrar' cuenta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Registrar pago</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay cuentas por pagar registradas</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

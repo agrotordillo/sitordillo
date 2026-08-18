@@ -16,6 +16,7 @@ urlpatterns = [
     path("inventario/", include("apps.inventario.urls", namespace="inventario")),
     path("traspasos/", include("apps.traspasos.urls", namespace="traspasos")),
     path("ventas/", include("apps.ventas.urls", namespace="ventas")),
+    path("pagos/", include("apps.pagos.urls", namespace="pagos")),
     path('', TemplateView.as_view(template_name='core/home.html', extra_context={'active_module': 'home'}), name='home'),
 ]
 

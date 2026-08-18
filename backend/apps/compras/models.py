@@ -217,7 +217,8 @@ class OrdenCompraDetalle(BaseAbstractModel):
 
     @property
     def subtotal(self):
-        return (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
+        bruto = (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
+        return bruto.quantize(Decimal("0.01"))
 
     def clean(self):
         super().clean()

@@ -54,9 +54,14 @@
                         {{ orden.get_estatus_display }}
                     </span>
                 </td>
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
                     {% if orden.estatus != 'recibida' and orden.estatus != 'cancelada' %}
                     <a href="{% url 'compras:orden-recibir' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</a>
+                    {% endif %}
+                    {% if orden.estatus == 'parcial' or orden.estatus == 'recibida' %}
+                        {% if not orden.cuenta_por_pagar %}
+                        <a href="{% url 'pagos:cuenta-generar' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Generar cuenta por pagar</a>
+                        {% endif %}
                     {% endif %}
                 </td>
             </tr>

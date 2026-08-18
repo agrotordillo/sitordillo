@@ -124,7 +124,8 @@ class VentaDetalle(BaseAbstractModel):
     @property
     def subtotal(self):
         bruto = (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
-        return bruto * (Decimal("1") - (self.descuento or Decimal("0")) / Decimal("100"))
+        neto = bruto * (Decimal("1") - (self.descuento or Decimal("0")) / Decimal("100"))
+        return neto.quantize(Decimal("0.01"))
 
     @property
     def cantidad_devuelta(self):
