@@ -1,5 +1,7 @@
+from django.forms import inlineformset_factory
+
 from apps.core.forms import BaseModelForm
-from .models import Producto, Categoria, Subcategoria, Marca, Almacen, UnidadMedida
+from .models import Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente, UnidadMedida
 
 
 class ProductForm(BaseModelForm):
@@ -15,6 +17,7 @@ class ProductForm(BaseModelForm):
             "subcategoria",
             "tipo",
             "unidad_medida",
+            "almacen",
             "descripcion",
             "notas",
             "precio_costo",
@@ -25,6 +28,7 @@ class ProductForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
         cat_id = self.data.get("categoria") if self.is_bound else None
         if not cat_id and self.instance.pk:
             cat_id = self.instance.categoria_id
@@ -64,3 +68,30 @@ class UnitMeasureForm(BaseModelForm):
     class Meta:
         model = UnidadMedida
         fields = ["nombre", "abreviatura"]
+
+
+class PaqueteComponenteForm(BaseModelForm):
+    class Meta:
+        model = PaqueteComponente
+        fields = ["producto_componente", "cantidad"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["producto_componente"].queryset = Producto.objects.filter(
+            is_active=True
+        ).exclude(tipo=Producto.TipoProducto.PAQUETE)
+        self.fields["cantidad"].widget.attrs.update({
+            "class": (self.fields["cantidad"].widget.attrs.get("class", "") + " fs-cantidad").strip(),
+            "step": "0.01",
+            "min": "0.01",
+        })
+
+
+PaqueteComponenteFormSet = inlineformset_factory(
+    Producto,
+    PaqueteComponente,
+    form=PaqueteComponenteForm,
+    fk_name="paquete",
+    extra=1,
+    can_delete=True,
+)

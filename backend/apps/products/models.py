@@ -164,6 +164,7 @@ class Producto(BaseAbstractModel):
         PRODUCTO = "producto", "Producto"
         SERVICIO = "servicio", "Servicio"
         INSUMO = "insumo", "Insumo"
+        PAQUETE = "paquete", "Paquete/Combo"
 
     nombre = models.CharField(max_length=200, verbose_name="Nombre del producto")
     sku = models.CharField(max_length=30, unique=True, verbose_name="SKU")
@@ -214,6 +215,15 @@ class Producto(BaseAbstractModel):
         related_name="productos",
         verbose_name="Unidad de medida",
     )
+    almacen = models.ForeignKey(
+        Almacen,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="paquetes",
+        verbose_name="Sucursal (solo para paquetes)",
+        help_text="La sucursal que arma este paquete/combo. Solo aplica cuando el tipo es Paquete/Combo.",
+    )
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
     notas = models.TextField(blank=True, verbose_name="Notas")
     precio_costo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de costo")
@@ -256,6 +266,10 @@ class Producto(BaseAbstractModel):
     def display_name(self):
         return self.nombre.strip()
 
+    @property
+    def es_paquete(self):
+        return self.tipo == self.TipoProducto.PAQUETE
+
     def clean(self):
         super().clean()
         if self.subcategoria and self.categoria and self.subcategoria.categoria_id != self.categoria_id:
@@ -270,3 +284,70 @@ class Producto(BaseAbstractModel):
             raise ValidationError({"stock_maximo": "El stock máximo no puede ser negativo."})
         if self.stock_maximo < self.stock_minimo:
             raise ValidationError({"stock_maximo": "El stock máximo debe ser mayor o igual al stock mínimo."})
+
+        if self.tipo == self.TipoProducto.PAQUETE:
+            if not self.almacen_id:
+                raise ValidationError({"almacen": "Indica la sucursal que arma este paquete."})
+            if self.almacen.tipo != Almacen.Tipo.SUCURSAL:
+                raise ValidationError({"almacen": "Un paquete solo puede pertenecer a una sucursal, no al CEDIS."})
+        elif self.almacen_id:
+            raise ValidationError({"almacen": "Solo los paquetes/combos pueden pertenecer a una sucursal."})
+
+
+class PaqueteComponente(BaseAbstractModel):
+    """Producto (tipo=paquete) y los productos reales que lo componen.
+    El paquete se vende como una sola línea; al momento de la venta se
+    descuenta inventario de cada componente, no del paquete en sí."""
+
+    paquete = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name="componentes",
+        verbose_name="Paquete",
+    )
+    producto_componente = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        related_name="usado_en_paquetes",
+        verbose_name="Producto componente",
+    )
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad por paquete")
+
+    class Meta:
+        verbose_name = "Componente de paquete"
+        verbose_name_plural = "Componentes de paquete"
+        ordering = ["paquete", "producto_componente__nombre"]
+        constraints = [
+            models.UniqueConstraint(fields=["paquete", "producto_componente"], name="unico_componente_por_paquete"),
+            models.CheckConstraint(condition=models.Q(cantidad__gt=0), name="paquete_componente_cantidad_positiva"),
+        ]
+        indexes = [
+            models.Index(fields=["paquete"]),
+            models.Index(fields=["producto_componente"]),
+        ]
+
+    def __str__(self):
+        return f"{self.producto_componente.nombre} x{self.cantidad} (en {self.paquete.nombre})"
+
+    def get_folio_prefix(self):
+        return "PQC"
+
+    def get_slug_source(self):
+        return f"{self.paquete_id}-{self.producto_componente_id}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    def clean(self):
+        super().clean()
+        if self.paquete_id and self.paquete.tipo != Producto.TipoProducto.PAQUETE:
+            raise ValidationError({"paquete": "Este producto no es de tipo Paquete/Combo."})
+        if self.producto_componente_id and self.producto_componente.tipo == Producto.TipoProducto.PAQUETE:
+            raise ValidationError({
+                "producto_componente": "Un paquete no puede tener como componente a otro paquete.",
+            })
+        if self.paquete_id and self.producto_componente_id and self.paquete_id == self.producto_componente_id:
+            raise ValidationError({"producto_componente": "Un paquete no puede incluirse a sí mismo como componente."})
+        if self.cantidad is not None and self.cantidad <= 0:
+            raise ValidationError({"cantidad": "La cantidad debe ser mayor a cero."})

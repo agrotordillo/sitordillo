@@ -27,7 +27,11 @@ class TraspasoDetalleForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["producto"].queryset = Producto.objects.filter(is_active=True)
+        # Un paquete no tiene lote propio que traspasar; se traspasan sus
+        # componentes por separado.
+        self.fields["producto"].queryset = Producto.objects.filter(is_active=True).exclude(
+            tipo=Producto.TipoProducto.PAQUETE
+        )
         self.fields["cantidad"].widget.attrs.update({
             "class": (self.fields["cantidad"].widget.attrs.get("class", "") + " fs-cantidad").strip(),
             "step": "0.01",

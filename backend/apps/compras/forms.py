@@ -28,7 +28,11 @@ class OrdenCompraDetalleForm(BaseModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["producto"].queryset = Producto.objects.filter(is_active=True)
+        # Un paquete no se compra a un proveedor: se ensambla internamente
+        # a partir de productos que sí se compran.
+        self.fields["producto"].queryset = Producto.objects.filter(is_active=True).exclude(
+            tipo=Producto.TipoProducto.PAQUETE
+        )
         self.fields["cantidad"].widget.attrs.update({
             "class": (self.fields["cantidad"].widget.attrs.get("class", "") + " fs-cantidad").strip(),
             "step": "0.01",
@@ -71,4 +75,6 @@ class PromocionProveedorForm(BaseModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
-        self.fields["producto"].queryset = Producto.objects.filter(is_active=True)
+        self.fields["producto"].queryset = Producto.objects.filter(is_active=True).exclude(
+            tipo=Producto.TipoProducto.PAQUETE
+        )

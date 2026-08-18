@@ -101,6 +101,11 @@
                 {{ form.tipo }}
               </div>
               <div>
+                <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal <span class="text-gray-400 font-normal">(solo para paquetes/combos)</span></label>
+                {{ form.almacen }}
+                {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
                 <label for="{{ form.unidad_medida.id_for_label }}" class="label">Unidad de medida <span class="text-gray-400 font-normal">(opcional)</span></label>
                 <div class="flex items-center gap-2" x-data="quickCreate({
                   target: '#id_unidad_medida',

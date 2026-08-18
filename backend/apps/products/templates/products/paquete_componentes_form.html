@@ -1,0 +1,66 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}Componentes del paquete{% endblock title %}
+{% block title_layout %}Componentes de {{ paquete.nombre }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:product-list' %}" class="text-gray-400 hover:text-primary-600">Productos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Componentes de {{ paquete.nombre }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Define qué productos reales incluye este paquete y en qué cantidad. Al venderse el paquete,
+  el inventario se descuenta de cada componente (FIFO/FEFO), no del paquete en sí.
+</p>
+
+<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_componentes-TOTAL_FORMS' })">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+    <table class="w-full text-sm text-left text-gray-600">
+      <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th scope="col" class="px-3 py-2.5 font-semibold">Producto componente</th>
+          <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad por paquete</th>
+          <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+        </tr>
+      </thead>
+      <tbody x-ref="rows" class="divide-y divide-gray-100">
+        {% for componente_form in formset %}
+        {% include "products/includes/_componente_row.html" with form=componente_form %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <template x-ref="emptyRow">{% include "products/includes/_componente_row.html" with form=formset.empty_form %}</template>
+
+  <button type="button" class="btn-secondary mt-3" @click="addRow()">
+    <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+    </svg>
+    Agregar componente
+  </button>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'products:product-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}
