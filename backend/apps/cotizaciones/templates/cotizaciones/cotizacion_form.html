@@ -1,13 +1,13 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% block title %}Registrar venta{% endblock title %}
-{% block title_layout %}Registrar venta{% endblock title_layout %}
+{% block title %}Registrar cotización{% endblock title %}
+{% block title_layout %}Registrar cotización{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
     <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
     <li class="text-gray-300">/</li>
-    <li><a href="{% url 'ventas:venta-list' %}" class="text-gray-400 hover:text-primary-600">Ventas</a></li>
+    <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
     <li class="text-gray-300">/</li>
     <li class="text-gray-500 font-medium">Crear</li>
   </ol>
@@ -44,14 +44,9 @@
           {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
         </div>
         <div>
-          <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
-          {{ form.forma_pago }}
-          {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.fecha_venta.id_for_label }}" class="label">Fecha y hora</label>
-          {{ form.fecha_venta }}
-          {% if form.fecha_venta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_venta.errors.0 }}</p>{% endif %}
+          <label for="{{ form.fecha_cotizacion.id_for_label }}" class="label">Fecha y hora</label>
+          {{ form.fecha_cotizacion }}
+          {% if form.fecha_cotizacion.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_cotizacion.errors.0 }}</p>{% endif %}
         </div>
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
@@ -62,7 +57,7 @@
 
     <div>
       <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
-      <p class="text-xs text-gray-400 mb-3">El inventario se descuenta al guardar (FIFO/FEFO), validando que haya existencia suficiente en la sucursal seleccionada.</p>
+      <p class="text-xs text-gray-400 mb-3">Esta cotización no descuenta inventario. Al guardar se genera un folio que el cliente puede llevar a caja para convertirla en venta.</p>
 
       {{ formset.management_form }}
       {% if formset.non_form_errors %}
@@ -106,14 +101,13 @@
           Total: <span class="font-semibold text-gray-800" x-text="total"></span>
         </div>
       </div>
-      <p class="mt-1 text-xs text-gray-400 text-right">Sin impuestos desglosados; se calculan en la fase de facturación.</p>
     </div>
 
   </div>
 
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
-    <a href="{% url 'ventas:venta-list' %}" class="btn-secondary">Cancelar</a>
-    <button type="submit" class="btn-primary">Registrar venta</button>
+    <a href="{% url 'cotizaciones:cotizacion-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar cotización</button>
   </div>
 </form>
 {% endblock main_content %}

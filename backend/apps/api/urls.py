@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views.products import (
     BrandQuickCreateView,
+    ProductoBuscarView,
     SubcategoriesByCategoryView,
     UnitMeasureQuickCreateView,
 )
@@ -24,6 +25,11 @@ urlpatterns = [
         "products/units/create/",
         UnitMeasureQuickCreateView.as_view(),
         name="unit-quick-create",
+    ),
+    path(
+        "products/buscar/",
+        ProductoBuscarView.as_view(),
+        name="producto-buscar",
     ),
     path(
         "compras/promocion-vigente/",

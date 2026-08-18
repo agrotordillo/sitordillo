@@ -1,0 +1,72 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Cotizaciones{% endblock title %}
+{% block title_layout %}Cotizaciones{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Cotizaciones</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'cotizaciones:cotizacion-buscar' %}" class="btn-secondary w-full sm:w-auto">Convertir por folio</a>
+<a href="{% url 'cotizaciones:cotizacion-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nueva cotización
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for cotizacion in cotizaciones %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ cotizacion.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ cotizacion.cliente.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ cotizacion.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ cotizacion.fecha_cotizacion|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ cotizacion.total|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if cotizacion.estatus == "convertida" %}
+          <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">Convertida</span>
+          {% else %}
+          <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">Abierta</span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+          {% if cotizacion.estatus == "convertida" %}
+          <a href="{% url 'ventas:venta-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver venta {{ cotizacion.venta.folio }}</a>
+          {% else %}
+          <a href="{% url 'cotizaciones:cotizacion-convertir' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Convertir a venta</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay cotizaciones registradas</p>
+            <a href="{% url 'cotizaciones:cotizacion-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

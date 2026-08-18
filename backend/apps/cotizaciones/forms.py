@@ -4,32 +4,32 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BaseModelForm
 from apps.clientes.models import Cliente
 from apps.products.models import Almacen, Producto
-from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle
+from .models import Cotizacion, CotizacionDetalle
 
 
-class VentaForm(BaseModelForm):
+class CotizacionForm(BaseModelForm):
     class Meta:
-        model = Venta
-        fields = ["cliente", "almacen", "forma_pago", "fecha_venta", "observaciones"]
+        model = Cotizacion
+        fields = ["cliente", "almacen", "fecha_cotizacion", "observaciones"]
         widgets = {
-            "fecha_venta": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "fecha_cotizacion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["cliente"].queryset = Cliente.objects.filter(is_active=True)
         self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
-        self.fields["fecha_venta"].input_formats = ["%Y-%m-%dT%H:%M"]
+        self.fields["fecha_cotizacion"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 
-class VentaDetalleForm(BaseModelForm):
+class CotizacionDetalleForm(BaseModelForm):
     class Meta:
-        model = VentaDetalle
+        model = CotizacionDetalle
         fields = ["producto", "cantidad", "precio_unitario", "descuento", "estrategia_salida"]
         widgets = {
-            # Con ~300 mil productos, un <select> normal es inviable: se
-            # busca por texto (ver producto-search.js) y este campo solo
-            # guarda el id elegido.
+            # Mismo patrón de búsqueda por texto que en Ventas (ver
+            # producto-search.js): el <select> no es viable con ~300 mil
+            # productos.
             "producto": forms.HiddenInput,
         }
 
@@ -54,36 +54,20 @@ class VentaDetalleForm(BaseModelForm):
         })
 
 
-VentaDetalleFormSet = inlineformset_factory(
-    Venta,
-    VentaDetalle,
-    form=VentaDetalleForm,
+CotizacionDetalleFormSet = inlineformset_factory(
+    Cotizacion,
+    CotizacionDetalle,
+    form=CotizacionDetalleForm,
     extra=1,
     can_delete=True,
 )
 
 
-class DevolucionClienteForm(BaseModelForm):
-    class Meta:
-        model = DevolucionCliente
-        fields = ["fecha", "motivo"]
-        widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class DevolucionLineaForm(forms.Form):
-    venta_detalle_id = forms.IntegerField(widget=forms.HiddenInput)
-    cantidad = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0)
-    reingresa_a_inventario = forms.BooleanField(required=False, initial=True)
+class BuscarFolioForm(forms.Form):
+    folio = forms.CharField(label="Folio de cotización", max_length=32)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name, field in self.fields.items():
-            if name == "venta_detalle_id" or isinstance(field.widget, forms.CheckboxInput):
-                continue
-            existing = field.widget.attrs.get("class", "").strip()
-            field.widget.attrs["class"] = f"{existing} input".strip()
-
-
-DevolucionFormSet = forms.formset_factory(DevolucionLineaForm, extra=0)
+        self.fields["folio"].widget.attrs["class"] = "input"
+        self.fields["folio"].widget.attrs["placeholder"] = "Ej. COT-XXXXXXXX"
+        self.fields["folio"].widget.attrs["autofocus"] = True

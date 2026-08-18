@@ -1,0 +1,26 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Convertir cotización{% endblock title %}
+{% block title_layout %}Convertir cotización{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Convertir por folio</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block primary_container_class %}container-primary max-w-lg{% endblock primary_container_class %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">Captura el folio que el cliente trae de mostrador para recuperar su cotización y convertirla en venta.</p>
+<form method="get" class="flex items-end gap-2">
+  <div class="flex-1">
+    <label for="{{ form.folio.id_for_label }}" class="label">{{ form.folio.label }}</label>
+    {{ form.folio }}
+    {% if form.folio.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.folio.errors.0 }}</p>{% endif %}
+  </div>
+  <button type="submit" class="btn-primary">Buscar</button>
+</form>
+{% endblock main_content %}

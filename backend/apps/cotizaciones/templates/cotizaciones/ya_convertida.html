@@ -1,0 +1,25 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Cotización ya convertida{% endblock title %}
+{% block title_layout %}Cotización ya convertida{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{{ cotizacion.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block primary_container_class %}container-primary max-w-lg{% endblock primary_container_class %}
+{% block main_content %}
+<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-4">
+  La cotización {{ cotizacion.folio }} ya fue convertida a la venta
+  {% if cotizacion.venta %}<strong>{{ cotizacion.venta.folio }}</strong>{% else %}correspondiente{% endif %}.
+</div>
+<div class="flex gap-2">
+  <a href="{% url 'ventas:venta-list' %}" class="btn-primary">Ir a Ventas</a>
+  <a href="{% url 'cotizaciones:cotizacion-list' %}" class="btn-secondary">Volver a cotizaciones</a>
+</div>
+{% endblock main_content %}

@@ -1,19 +1,23 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% block title %}Registrar venta{% endblock title %}
-{% block title_layout %}Registrar venta{% endblock title_layout %}
+{% block title %}Convertir cotización a venta{% endblock title %}
+{% block title_layout %}Convertir cotización a venta{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
     <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
     <li class="text-gray-300">/</li>
-    <li><a href="{% url 'ventas:venta-list' %}" class="text-gray-400 hover:text-primary-600">Ventas</a></li>
+    <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Crear</li>
+    <li class="text-gray-500 font-medium">Convertir {{ cotizacion.folio }}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
+<div class="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-700 mb-6">
+  Datos traídos de la cotización <strong>{{ cotizacion.folio }}</strong> ({{ cotizacion.cliente.display_name }}). Puedes editarlos antes de confirmar la venta.
+</div>
+
 <form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
 
@@ -30,12 +34,7 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="{{ form.cliente.id_for_label }}" class="label">Cliente</label>
-          <div class="flex items-center gap-2">
-            {{ form.cliente }}
-            <a href="{% url 'clientes:cliente-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo cliente" title="Crear nuevo cliente (se abre en una pestaña nueva)">
-              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
-            </a>
-          </div>
+          {{ form.cliente }}
           {% if form.cliente.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cliente.errors.0 }}</p>{% endif %}
         </div>
         <div>
@@ -62,7 +61,7 @@
 
     <div>
       <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
-      <p class="text-xs text-gray-400 mb-3">El inventario se descuenta al guardar (FIFO/FEFO), validando que haya existencia suficiente en la sucursal seleccionada.</p>
+      <p class="text-xs text-gray-400 mb-3">El inventario se descuenta al confirmar (FIFO/FEFO), validando que haya existencia suficiente en la sucursal seleccionada.</p>
 
       {{ formset.management_form }}
       {% if formset.non_form_errors %}
@@ -112,8 +111,8 @@
   </div>
 
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
-    <a href="{% url 'ventas:venta-list' %}" class="btn-secondary">Cancelar</a>
-    <button type="submit" class="btn-primary">Registrar venta</button>
+    <a href="{% url 'cotizaciones:cotizacion-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Confirmar venta</button>
   </div>
 </form>
 {% endblock main_content %}
