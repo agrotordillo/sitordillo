@@ -1,6 +1,7 @@
 from django.db.models import Sum
 from django.views.generic import ListView
 
+from apps.compras.models import OrdenCompra
 from apps.inventario.models import Lote
 
 
@@ -11,13 +12,24 @@ class LoteListView(ListView):
     extra_context = {"active_module": "warehouses"}
 
     def get_queryset(self):
-        return (
+        queryset = (
             super()
             .get_queryset()
             .filter(cantidad_disponible__gt=0)
-            .select_related("producto", "almacen")
+            .select_related("producto", "almacen", "orden_compra_detalle__orden_compra")
             .order_by("fecha_caducidad", "fecha_ingreso")
         )
+        orden_id = self.request.GET.get("orden")
+        if orden_id:
+            queryset = queryset.filter(orden_compra_detalle__orden_compra_id=orden_id)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        orden_id = self.request.GET.get("orden")
+        if orden_id:
+            context["orden"] = OrdenCompra.objects.filter(pk=orden_id).first()
+        return context
 
 
 class ExistenciaListView(ListView):

@@ -77,6 +77,7 @@
                     <a href="{% url 'compras:orden-recibir' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</a>
                     {% endif %}
                     {% if orden.estatus == 'parcial' or orden.estatus == 'recibida' %}
+                    <a href="{% url 'inventario:lote-list' %}?orden={{ orden.pk }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver lotes</a>
                         {% if not orden.cuenta_por_pagar %}
                         <a href="{% url 'pagos:cuenta-generar' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Generar cuenta por pagar</a>
                         {% endif %}

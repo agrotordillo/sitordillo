@@ -11,6 +11,12 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
+{% if orden %}
+<div class="mb-4 flex items-center justify-between rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm">
+  <span class="text-primary-700">Mostrando solo los lotes de la orden <strong>{{ orden.folio }}</strong> ({{ orden.proveedor.display_name }}).</span>
+  <a href="{% url 'inventario:lote-list' %}" class="font-medium text-primary-600 hover:text-primary-700">Ver todos los lotes</a>
+</div>
+{% endif %}
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
@@ -52,7 +58,9 @@
       {% empty %}
       <tr>
         <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
-          <p class="text-sm text-gray-400">No hay lotes con existencia disponible</p>
+          <p class="text-sm text-gray-400">
+            {% if orden %}Esta orden no tiene lotes con existencia disponible (puede que ya se hayan corregido o consumido).{% else %}No hay lotes con existencia disponible{% endif %}
+          </p>
         </td>
       </tr>
       {% endfor %}
