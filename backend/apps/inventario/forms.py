@@ -8,7 +8,7 @@ class RecepcionLineaForm(forms.Form):
     detalle_id = forms.IntegerField(widget=forms.HiddenInput)
     cantidad_recibir = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0)
     numero_lote = forms.CharField(max_length=50, required=False)
-    fecha_caducidad = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    fecha_caducidad = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
     costo_unitario = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0)
     almacen = forms.ModelChoiceField(queryset=Almacen.objects.filter(is_active=True))
 

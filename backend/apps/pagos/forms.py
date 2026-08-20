@@ -5,7 +5,7 @@ from .models import Pago
 
 
 class GenerarCuentaForm(forms.Form):
-    fecha_emision = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    fecha_emision = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
     observaciones = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
 
     def __init__(self, *args, **kwargs):
@@ -20,5 +20,5 @@ class PagoForm(BaseModelForm):
         model = Pago
         fields = ["fecha_pago", "monto_pagado", "forma_pago", "aplica_descuento_pronto_pago", "observaciones"]
         widgets = {
-            "fecha_pago": forms.DateInput(attrs={"type": "date"}),
+            "fecha_pago": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }

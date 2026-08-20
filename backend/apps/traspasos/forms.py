@@ -11,7 +11,7 @@ class TraspasoForm(BaseModelForm):
         model = Traspaso
         fields = ["almacen_origen", "almacen_destino", "fecha_envio", "observaciones"]
         widgets = {
-            "fecha_envio": forms.DateInput(attrs={"type": "date"}),
+            "fecha_envio": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
     def __init__(self, *args, **kwargs):

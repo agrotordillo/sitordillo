@@ -33,8 +33,8 @@ class OrdenCompraForm(BaseModelForm):
             # por texto (ver proveedor-search.js) y este campo solo guarda
             # el id elegido.
             "proveedor": forms.HiddenInput,
-            "fecha_orden": forms.DateInput(attrs={"type": "date"}),
-            "fecha_entrega_estimada": forms.DateInput(attrs={"type": "date"}),
+            "fecha_orden": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "fecha_entrega_estimada": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
     def __init__(self, *args, **kwargs):
@@ -80,6 +80,10 @@ class OrdenCompraDetalleForm(BaseModelForm):
         self.fields["producto"].queryset = Producto.objects.filter(is_active=True).exclude(
             tipo=Producto.TipoProducto.PAQUETE
         )
+        if self.instance.producto_id:
+            # Precarga el costo anterior para que precio-alerta.js pueda
+            # comparar sin esperar a que el usuario reseleccione el producto.
+            self.fields["producto"].widget.attrs["data-precio-costo"] = str(self.instance.producto.precio_costo)
         self.fields["cantidad"].widget.attrs.update({
             "class": (self.fields["cantidad"].widget.attrs.get("class", "") + " fs-cantidad").strip(),
             "step": "0.01",
@@ -117,8 +121,8 @@ class PromocionProveedorForm(BaseModelForm):
         widgets = {
             "proveedor": forms.HiddenInput,
             "producto": forms.HiddenInput,
-            "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
-            "fecha_fin": forms.DateInput(attrs={"type": "date"}),
+            "fecha_inicio": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "fecha_fin": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
     def __init__(self, *args, **kwargs):

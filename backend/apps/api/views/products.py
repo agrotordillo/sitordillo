@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.db.models import Q
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
@@ -46,7 +48,7 @@ class ProductoBuscarView(APIView):
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
-        if not q:
+        if len(q) < 3:
             return Response([])
 
         productos = (
@@ -66,10 +68,39 @@ class ProductoBuscarView(APIView):
                 "sku": p.sku,
                 "nombre": p.nombre,
                 "precio_venta": str(p.precio_venta),
+                "precio_costo": str(p.precio_costo),
             }
             for p in productos
         ]
         return Response(data)
+
+
+class ProductoActualizarCostoView(APIView):
+    """Actualiza el precio de costo de un producto desde la orden de compra,
+    cuando el precio pagado al proveedor supera el costo anterior registrado."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        producto_id = request.data.get("producto")
+        precio_costo = request.data.get("precio_costo")
+        if not producto_id or precio_costo is None:
+            return Response({"detail": "Faltan datos."}, status=400)
+
+        try:
+            producto = Producto.objects.get(pk=producto_id)
+        except (Producto.DoesNotExist, ValueError):
+            return Response({"detail": "Producto no encontrado."}, status=404)
+
+        try:
+            nuevo_costo = Decimal(str(precio_costo))
+        except InvalidOperation:
+            return Response({"detail": "Precio de costo inválido."}, status=400)
+        if nuevo_costo < 0:
+            return Response({"detail": "El precio de costo no puede ser negativo."}, status=400)
+
+        producto.precio_costo = nuevo_costo
+        producto.save(update_fields=["precio_costo"])
+        return Response({"precio_costo": str(producto.precio_costo)})
 
 
 class UnitMeasureQuickCreateView(APIView):

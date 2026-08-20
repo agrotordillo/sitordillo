@@ -68,7 +68,7 @@ class DevolucionClienteForm(BaseModelForm):
         model = DevolucionCliente
         fields = ["fecha", "motivo"]
         widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "fecha": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
 

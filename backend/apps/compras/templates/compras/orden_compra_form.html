@@ -1,5 +1,6 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
+{% block primary_container_class %}container-form-wide{% endblock primary_container_class %}
 {% block title %}{% if object %}Editar orden de compra{% else %}Crear orden de compra{% endif %}{% endblock title %}
 {% block title_layout %}{% if object %}Editar orden de compra{% else %}Crear orden de compra{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -23,157 +24,306 @@
   </div>
   {% endif %}
 
-  <div class="grid gap-8">
+  <div class="product-form-cards">
+    <div class="form-card-layout">
+      {# Columna izquierda: proveedor, entrega y observaciones #}
+      <div class="form-card-col">
 
-    {# ─── Datos generales ───────────────────────────────────────────── #}
-    <div>
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos generales</h3>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
-          <div class="flex items-center gap-2">
-            <div class="flex-1">{% include "proveedores/includes/_proveedor_search_field.html" %}</div>
-            <a href="{% url 'proveedores:supplier-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo proveedor" title="Crear nuevo proveedor (se abre en una pestaña nueva)">
-              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
-            </a>
+        {# ─── Datos generales ──────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const nombre = document.querySelector('.proveedor-search-input')?.value?.trim();
+            return nombre ? nombre : 'Sin proveedor asignado';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 2h-11ZM6 6.75a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 6.75Zm0 3.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 10Zm0 3.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Datos generales</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="sm:col-span-2">
+                <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1">{% include "proveedores/includes/_proveedor_search_field.html" %}</div>
+                  <a href="{% url 'proveedores:supplier-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo proveedor" title="Crear nuevo proveedor (se abre en una pestaña nueva)">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </a>
+                </div>
+              </div>
+              <div>
+                <label for="{{ form.almacen_destino.id_for_label }}" class="label">Almacén destino</label>
+                {{ form.almacen_destino }}
+                <p class="mt-1.5 text-xs text-gray-400">El alta de la compra queda a nombre del CEDIS; elige aquí si la mercancía debe impactar el CEDIS o llega directo a una sucursal.</p>
+                {% if form.almacen_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen_destino.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>
+                {{ form.estatus }}
+              </div>
+              <div>
+                <label for="{{ form.fecha_orden.id_for_label }}" class="label">Fecha de orden</label>
+                {{ form.fecha_orden }}
+                {% if form.fecha_orden.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_orden.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.fecha_entrega_estimada.id_for_label }}" class="label">Fecha de entrega estimada <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.fecha_entrega_estimada }}
+                {% if form.fecha_entrega_estimada.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_entrega_estimada.errors.0 }}</p>{% endif %}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Observaciones ───────────────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: false,
+          get summary() {
+            const obs = document.getElementById('id_observaciones')?.value?.trim();
+            return obs ? 'Con observaciones' : 'Sin observaciones';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Observaciones</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="sm:col-span-2">
+                <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.observaciones }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      {# Columna derecha: facturación, pago e impuestos #}
+      <div class="form-card-col">
+
+        {# ─── Información fiscal y de pago ──────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: true,
+          get summary() {
+            const fiscal = document.getElementById('id_es_fiscal')?.checked;
+            const estado = document.getElementById('id_estado_pago');
+            const estadoLabel = estado?.selectedOptions[0]?.text;
+            return fiscal ? `Fiscal · ${estadoLabel || ''}` : `No fiscal · ${estadoLabel || ''}`;
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h2.93a4.5 4.5 0 0 0-1.96-3.5h-1.72ZM5 7.5a3.5 3.5 0 0 1 7 0v5a3.5 3.5 0 0 1-7 0v-5Zm9.5 4.95v2.55c0 .414.336.75.75.75h2.93a4.5 4.5 0 0 0-1.96-3.5h-1.72Zm-2.5 0a4.5 4.5 0 0 0-1.96 3.5h2.96a.75.75 0 0 0 .75-.75v-2.75H12Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Información fiscal y de pago</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="flex items-center gap-2 sm:col-span-2">
+                {{ form.es_fiscal }}
+                <label for="{{ form.es_fiscal.id_for_label }}" class="label mb-0">Es fiscal</label>
+                {% if form.es_fiscal.errors %}<p class="text-xs text-red-600">{{ form.es_fiscal.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.documento.id_for_label }}" class="label">Documento <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.documento }}
+                <p class="mt-1.5 text-xs text-gray-400">Número de factura o folio de nota de venta.</p>
+                {% if form.documento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.documento.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.estado_pago.id_for_label }}" class="label">Estado de pago</label>
+                {{ form.estado_pago }}
+              </div>
+              <div>
+                <label for="{{ form.medio_pago.id_for_label }}" class="label">Medio de pago</label>
+                {{ form.medio_pago }}
+              </div>
+              <div>
+                <label for="{{ form.forma_pago.id_for_label }}" class="label">Método de pago <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.forma_pago }}
+                {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Impuestos y retenciones ───────────────────────────────────── #}
+        <section class="form-card" x-data="{ open: true }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 2h-11ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm5.03-.53a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 1 1-1.06-1.06l6.5-6.5a.75.75 0 0 1 1.06 0ZM15 13a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Impuestos y retenciones</h3>
+                <p x-show="!open" x-cloak class="form-card-summary">IVA, IEPS y retenciones de la orden</p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div>
+                <label for="{{ form.iva.id_for_label }}" class="label">IVA</label>
+                {{ form.iva }}
+                {% if form.iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.iva.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.ieps.id_for_label }}" class="label">IEPS</label>
+                {{ form.ieps }}
+                {% if form.ieps.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.ieps.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.retencion_iva.id_for_label }}" class="label">Retención IVA</label>
+                {{ form.retencion_iva }}
+                {% if form.retencion_iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_iva.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.retencion_isr.id_for_label }}" class="label">Retención ISR</label>
+                {{ form.retencion_isr }}
+                {% if form.retencion_isr.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_isr.errors.0 }}</p>{% endif %}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    {# ─── Productos ───────────────────────────────────────────────────── #}
+    <section class="form-card mt-4">
+      <header class="form-card-header">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="form-card-icon">
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v.443c-3.033.184-5.5 2.407-5.5 5.307v6.086a.75.75 0 0 0 1.5 0V8.5a4 4 0 0 1 4-4h.5a4 4 0 0 1 4 4v6.086a.75.75 0 0 0 1.5 0V8.5c0-2.9-2.467-5.123-5.5-5.307V2.75Z" />
+            </svg>
+          </span>
+          <div class="min-w-0">
+            <h3 class="form-card-title">Productos</h3>
           </div>
         </div>
-        <div>
-          <label for="{{ form.almacen_destino.id_for_label }}" class="label">Almacén destino</label>
-          {{ form.almacen_destino }}
-          <p class="mt-1 text-xs text-gray-400">El alta de la compra queda a nombre del CEDIS; elige aquí si la mercancía debe impactar el CEDIS o llega directo a una sucursal.</p>
-          {% if form.almacen_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen_destino.errors.0 }}</p>{% endif %}
+      </header>
+      <div class="form-card-body">
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+        <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
         </div>
-        <div>
-          <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>
-          {{ form.estatus }}
+        {% endif %}
+
+        <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+          <table class="w-full text-sm text-left text-gray-600">
+            <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+                <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad</th>
+                <th scope="col" class="px-3 py-2.5 font-semibold">Precio unitario</th>
+                <th scope="col" class="px-3 py-2.5 font-semibold text-right">Subtotal</th>
+                <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+              </tr>
+            </thead>
+            <tbody x-ref="rows" class="divide-y divide-gray-100" data-promo-url="{% url 'api:promocion-vigente' %}">
+              {% for detalle_form in formset %}
+              {% include "compras/includes/_detalle_row.html" with form=detalle_form %}
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-        <div>
-          <label for="{{ form.fecha_orden.id_for_label }}" class="label">Fecha de orden</label>
-          {{ form.fecha_orden }}
-          {% if form.fecha_orden.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_orden.errors.0 }}</p>{% endif %}
+
+        <template x-ref="emptyRow">{% include "compras/includes/_detalle_row.html" with form=formset.empty_form %}</template>
+
+        <button type="button" class="btn-secondary mt-3" @click="addRow()">
+          <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+          </svg>
+          Agregar línea
+        </button>
+
+        <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
+          <div class="text-sm text-gray-600">
+            Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
+          </div>
         </div>
-        <div>
-          <label for="{{ form.fecha_entrega_estimada.id_for_label }}" class="label">Fecha de entrega estimada <span class="text-gray-400 font-normal">(opcional)</span></label>
-          {{ form.fecha_entrega_estimada }}
-          {% if form.fecha_entrega_estimada.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_entrega_estimada.errors.0 }}</p>{% endif %}
-        </div>
-        <div class="sm:col-span-2">
-          <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
-          {{ form.observaciones }}
-        </div>
+        <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos más IVA e IEPS, menos las retenciones capturadas arriba.</p>
       </div>
+    </section>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-5 pt-4 border-t border-gray-200/80">
+      <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-primary">Guardar</button>
     </div>
-
-    {# ─── Información fiscal y de pago ──────────────────────────────── #}
-    <div>
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">Información fiscal y de pago</h3>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
-          {{ form.es_fiscal }}
-          <label for="{{ form.es_fiscal.id_for_label }}" class="label mb-0">Es fiscal</label>
-          {% if form.es_fiscal.errors %}<p class="text-xs text-red-600">{{ form.es_fiscal.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.documento.id_for_label }}" class="label">Documento <span class="text-gray-400 font-normal">(opcional)</span></label>
-          {{ form.documento }}
-          <p class="mt-1 text-xs text-gray-400">Número de factura o folio de nota de venta.</p>
-          {% if form.documento.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.documento.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.estado_pago.id_for_label }}" class="label">Estado de pago</label>
-          {{ form.estado_pago }}
-        </div>
-        <div>
-          <label for="{{ form.medio_pago.id_for_label }}" class="label">Medio de pago</label>
-          {{ form.medio_pago }}
-        </div>
-        <div>
-          <label for="{{ form.forma_pago.id_for_label }}" class="label">Método de pago <span class="text-gray-400 font-normal">(opcional)</span></label>
-          {{ form.forma_pago }}
-          {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.iva.id_for_label }}" class="label">IVA</label>
-          {{ form.iva }}
-          {% if form.iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.iva.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.ieps.id_for_label }}" class="label">IEPS</label>
-          {{ form.ieps }}
-          {% if form.ieps.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.ieps.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.retencion_iva.id_for_label }}" class="label">Retención IVA</label>
-          {{ form.retencion_iva }}
-          {% if form.retencion_iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_iva.errors.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label for="{{ form.retencion_isr.id_for_label }}" class="label">Retención ISR</label>
-          {{ form.retencion_isr }}
-          {% if form.retencion_isr.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_isr.errors.0 }}</p>{% endif %}
-        </div>
-      </div>
-    </div>
-
-    {# ─── Productos ─────────────────────────────────────────────────── #}
-    <div>
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
-
-      {{ formset.management_form }}
-      {% if formset.non_form_errors %}
-      <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
-      </div>
-      {% endif %}
-
-      <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
-        <table class="w-full text-sm text-left text-gray-600">
-          <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Precio unitario</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold text-right">Subtotal</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold"></th>
-            </tr>
-          </thead>
-          <tbody x-ref="rows" class="divide-y divide-gray-100" data-promo-url="{% url 'api:promocion-vigente' %}">
-            {% for detalle_form in formset %}
-            {% include "compras/includes/_detalle_row.html" with form=detalle_form %}
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <template x-ref="emptyRow">{% include "compras/includes/_detalle_row.html" with form=formset.empty_form %}</template>
-
-      <button type="button" class="btn-secondary mt-3" @click="addRow()">
-        <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-        </svg>
-        Agregar línea
-      </button>
-
-      <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
-        <div class="text-sm text-gray-600">
-          Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
-        </div>
-      </div>
-      <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos más IVA e IEPS, menos las retenciones capturadas arriba.</p>
-    </div>
-
-  </div>
-
-  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
-    <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
-    <button type="submit" class="btn-primary">Guardar</button>
   </div>
 </form>
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/promo-suggest.js' %}"></script>
+<script src="{% static 'js/modules/forms/precio-alerta.js' %}"></script>
 <script src="{% static 'js/modules/forms/proveedor-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>

@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.db import transaction
 from django.urls import reverse_lazy
@@ -16,9 +17,24 @@ class OrdenCompraListView(ListView):
     template_name = "compras/orden_compra_list.html"
     context_object_name = "ordenes"
     extra_context = {"active_module": "purchases"}
+    paginate_by = 25
 
     def get_queryset(self):
-        return super().get_queryset().select_related("proveedor").prefetch_related("detalles")
+        queryset = super().get_queryset().select_related("proveedor").prefetch_related("detalles")
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(folio__icontains=q)
+                | Q(proveedor__nombre_fiscal__icontains=q)
+                | Q(proveedor__nombre_comercial__icontains=q)
+                | Q(proveedor__rfc__icontains=q)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["q"] = self.request.GET.get("q", "").strip()
+        return context
 
 
 class OrdenCompraCreateView(CreateView):
