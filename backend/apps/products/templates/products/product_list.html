@@ -11,30 +11,51 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<a href="{% url 'products:product-create' %}" class="btn-primary w-full sm:w-auto">
-  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-  </svg>
-  Nuevo producto
-</a>
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+  <form method="get" class="flex items-center gap-2">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por folio, SKU o nombre..." class="input w-full sm:w-64">
+    <button type="submit" class="btn-icon-outline" aria-label="Buscar" title="Buscar">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+    {% if q %}
+    <a href="{% url 'products:product-list' %}" class="btn-icon-outline" aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+    {% endif %}
+  </form>
+  <a href="{% url 'products:product-create' %}" class="btn-primary w-full sm:w-auto">
+    <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+    </svg>
+    Nuevo producto
+  </a>
+</div>
 {% endblock table_actions %}
 {% block main_content %}
 <div class="relative overflow-x-auto">
     <table class="w-full text-sm text-left text-gray-600">
         <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
             <tr>
-                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Folio</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">SKU</th>
                 <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
                 <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Tipo</th>
                 <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
-                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha de creación</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Público</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Medio mayoreo</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Mayoreo</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Sub distribuidor</th>
+                <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Promoción</th>
                 <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for product in products %}
             <tr class="hover:bg-gray-50/50 transition-colors">
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400 hidden sm:table-cell">{{ product.folio }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-500">{{ product.sku }}</td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ product.nombre }}</td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">
                     {{ product.get_tipo_display }}{% if product.es_paquete %} · {{ product.almacen.nombre }}{% endif %}
@@ -50,12 +71,17 @@
                     </span>
                     {% endif %}
                 </td>
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 hidden md:table-cell">{{ product.created_at|date:"d/m/Y H:i" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 hidden lg:table-cell">{{ product.precio_publico|default:"—" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 hidden lg:table-cell">{{ product.precio_medio_mayoreo|default:"—" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 hidden lg:table-cell">{{ product.precio_mayoreo|default:"—" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 hidden lg:table-cell">{{ product.precio_sub_distribuidor|default:"—" }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 hidden lg:table-cell">{{ product.precio_promocion|default:"—" }}</td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
                     <div class="flex items-center justify-end gap-3">
                         {% if product.es_paquete %}
                         <a href="{% url 'products:paquete-componentes' product.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Componentes</a>
                         {% endif %}
+                        <a href="{% url 'products:producto-precios' product.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Precios</a>
                         <a href="{% url 'products:product-update' product.pk %}" class="btn-icon-outline" aria-label="Editar producto" title="Editar producto">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
@@ -67,13 +93,18 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+                <td colspan="10" class="px-4 sm:px-6 py-12 text-center">
                     <div class="flex flex-col items-center gap-2">
                         <svg class="w-10 h-10 text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
                         </svg>
+                        {% if q %}
+                        <p class="text-sm text-gray-400">No hay productos que coincidan con "{{ q }}"</p>
+                        <a href="{% url 'products:product-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar búsqueda</a>
+                        {% else %}
                         <p class="text-sm text-gray-400">No hay productos registrados</p>
                         <a href="{% url 'products:product-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
+                        {% endif %}
                     </div>
                 </td>
             </tr>
@@ -81,4 +112,19 @@
         </tbody>
     </table>
 </div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+    <p class="text-sm text-gray-400">
+        Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} producto{{ paginator.count|pluralize }}
+    </p>
+    <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Anterior</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Siguiente</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock main_content %}

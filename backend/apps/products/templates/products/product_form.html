@@ -28,7 +28,7 @@
 
   <div class="product-form-cards">
     <div class="form-card-layout">
-      {# Columna izquierda: general, clasificación, identificación e información adicional #}
+      {# Columna izquierda: identidad, clasificación e impuestos #}
       <div class="form-card-col">
 
         {# ─── Información general ──────────────────────────────────────── #}
@@ -69,6 +69,10 @@
                 {{ form.nombre }}
               </div>
               <div>
+                <label for="{{ form.tipo.id_for_label }}" class="label">Tipo de producto</label>
+                {{ form.tipo }}
+              </div>
+              <div>
                 <label for="{{ form.marca.id_for_label }}" class="label">Marca <span class="text-gray-400 font-normal">(opcional)</span></label>
                 <div class="flex items-center gap-2" x-data="quickCreate({
                   target: '#id_marca',
@@ -95,51 +99,6 @@
                   </a>
                 </div>
                 <p class="mt-1.5 text-xs text-gray-400">El proveedor requiere RFC y régimen fiscal; se crea en una ficha completa aparte.</p>
-              </div>
-              <div>
-                <label for="{{ form.tipo.id_for_label }}" class="label">Tipo de producto</label>
-                {{ form.tipo }}
-              </div>
-              <div>
-                <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal <span class="text-gray-400 font-normal">(solo para paquetes/combos)</span></label>
-                {{ form.almacen }}
-                {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
-              </div>
-              <div>
-                <label for="{{ form.unidad_medida.id_for_label }}" class="label">Unidad de medida <span class="text-gray-400 font-normal">(opcional)</span></label>
-                <div class="flex items-center gap-2" x-data="quickCreate({
-                  target: '#id_unidad_medida',
-                  url: '{% url 'api:unit-quick-create' %}',
-                  title: 'Nueva unidad de medida',
-                  fields: [
-                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
-                    { name: 'abreviatura', label: 'Abreviatura', required: true }
-                  ]
-                })">
-                  {{ form.unidad_medida }}
-                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva unidad de medida" title="Agregar nueva unidad de medida">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
-                  </button>
-                  {% include "products/includes/_quick_create_modal.html" %}
-                </div>
-              </div>
-              <div>
-                <label for="{{ form.clave_prod_serv_sat.id_for_label }}" class="label">Clave de producto/servicio SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
-                <div class="flex items-center gap-2">
-                  {{ form.clave_prod_serv_sat }}
-                  <a href="{% url 'facturacion:buscar-clave-prod-serv' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-                  </a>
-                </div>
-              </div>
-              <div>
-                <label for="{{ form.clave_unidad_sat.id_for_label }}" class="label">Clave de unidad SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
-                <div class="flex items-center gap-2">
-                  {{ form.clave_unidad_sat }}
-                  <a href="{% url 'facturacion:buscar-clave-unidad' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-                  </a>
-                </div>
               </div>
             </div>
               </div>
@@ -197,53 +156,28 @@
                   Cargando subcategorías…
                 </p>
               </div>
-            </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {# ─── Identificación ──────────────────────────────────────────── #}
-        <section class="form-card" x-data="{
-          open: true,
-          get summary() {
-            const sku = document.getElementById('id_sku')?.value?.trim();
-            const cb = document.getElementById('id_codigo_barras')?.value?.trim();
-            const parts = [];
-            if (sku) parts.push(`SKU: ${sku}`);
-            if (cb) parts.push(`CB: ${cb}`);
-            return parts.length ? parts.join(' · ') : 'Sin códigos asignados';
-          }
-        }">
-          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
-            <div class="flex items-center gap-3 min-w-0">
-              <span class="form-card-icon">
-                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM6.5 4.75A.75.75 0 0 1 7.25 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM10 4.75A.75.75 0 0 1 10.75 4h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V4.75ZM15 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75Z" />
-                </svg>
-              </span>
-              <div class="min-w-0">
-                <h3 class="form-card-title">Identificación</h3>
-                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
-              </div>
-            </div>
-            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
-              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </header>
-          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
-            <div class="form-card-body-anim-inner">
-              <div class="form-card-body">
-            <div class="form-card-grid">
               <div>
-                <label for="{{ form.sku.id_for_label }}" class="label">SKU</label>
-                {{ form.sku }}
+                <label for="{{ form.unidad_medida.id_for_label }}" class="label">Unidad de medida <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_unidad_medida',
+                  url: '{% url 'api:unit-quick-create' %}',
+                  title: 'Nueva unidad de medida',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'abreviatura', label: 'Abreviatura', required: true }
+                  ]
+                })">
+                  {{ form.unidad_medida }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva unidad de medida" title="Agregar nueva unidad de medida">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
               </div>
               <div>
-                <label for="{{ form.codigo_barras.id_for_label }}" class="label">Código de barras <span class="text-gray-400 font-normal">(opcional)</span></label>
-                {{ form.codigo_barras }}
+                <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal <span class="text-gray-400 font-normal">(solo para paquetes/combos)</span></label>
+                {{ form.almacen }}
+                {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
               </div>
             </div>
               </div>
@@ -308,27 +242,32 @@
           </div>
         </section>
 
-        {# ─── Información adicional ───────────────────────────────────── #}
+      </div>
+
+      {# Columna derecha: códigos, precios, inventario e información adicional #}
+      <div class="form-card-col">
+
+        {# ─── Identificación ──────────────────────────────────────────── #}
         <section class="form-card" x-data="{
-          open: false,
+          open: true,
           get summary() {
-            const desc = document.getElementById('id_descripcion')?.value?.trim();
-            const notas = document.getElementById('id_notas')?.value?.trim();
+            const sku = document.getElementById('id_sku')?.value?.trim();
+            const cb = document.getElementById('id_codigo_barras')?.value?.trim();
             const parts = [];
-            if (desc) parts.push('Descripción');
-            if (notas) parts.push('Notas');
-            return parts.length ? `Con ${parts.join(' y ').toLowerCase()}` : 'Sin información adicional';
+            if (sku) parts.push(`SKU: ${sku}`);
+            if (cb) parts.push(`CB: ${cb}`);
+            return parts.length ? parts.join(' · ') : 'Sin códigos asignados';
           }
         }">
           <header class="form-card-header" @click="open = !open" :aria-expanded="open">
             <div class="flex items-center gap-3 min-w-0">
               <span class="form-card-icon">
                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                  <path d="M3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM6.5 4.75A.75.75 0 0 1 7.25 4h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75ZM10 4.75A.75.75 0 0 1 10.75 4h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V4.75ZM15 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V4.75Z" />
                 </svg>
               </span>
               <div class="min-w-0">
-                <h3 class="form-card-title">Información adicional</h3>
+                <h3 class="form-card-title">Identificación</h3>
                 <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
               </div>
             </div>
@@ -342,24 +281,37 @@
             <div class="form-card-body-anim-inner">
               <div class="form-card-body">
             <div class="form-card-grid">
-              <div class="sm:col-span-2">
-                <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
-                {{ form.descripcion }}
+              <div>
+                <label for="{{ form.sku.id_for_label }}" class="label">SKU</label>
+                {{ form.sku }}
               </div>
-              <div class="sm:col-span-2">
-                <label for="{{ form.notas.id_for_label }}" class="label">Notas <span class="text-gray-400 font-normal">(opcional)</span></label>
-                {{ form.notas }}
+              <div>
+                <label for="{{ form.codigo_barras.id_for_label }}" class="label">Código de barras <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.codigo_barras }}
+              </div>
+              <div>
+                <label for="{{ form.clave_prod_serv_sat.id_for_label }}" class="label">Clave de producto/servicio SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
+                <div class="flex items-center gap-2">
+                  {{ form.clave_prod_serv_sat }}
+                  <a href="{% url 'facturacion:buscar-clave-prod-serv' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                  </a>
+                </div>
+              </div>
+              <div>
+                <label for="{{ form.clave_unidad_sat.id_for_label }}" class="label">Clave de unidad SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
+                <div class="flex items-center gap-2">
+                  {{ form.clave_unidad_sat }}
+                  <a href="{% url 'facturacion:buscar-clave-unidad' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                  </a>
+                </div>
               </div>
             </div>
               </div>
             </div>
           </div>
         </section>
-
-      </div>
-
-      {# Columna derecha: precios e inventario #}
-      <div class="form-card-col">
 
         {# ─── Precios ─────────────────────────────────────────────────── #}
         <section class="form-card" x-data="{
@@ -449,6 +401,54 @@
               <div>
                 <label for="{{ form.stock_maximo.id_for_label }}" class="label">Stock máximo</label>
                 {{ form.stock_maximo }}
+              </div>
+            </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# ─── Información adicional ───────────────────────────────────── #}
+        <section class="form-card" x-data="{
+          open: false,
+          get summary() {
+            const desc = document.getElementById('id_descripcion')?.value?.trim();
+            const notas = document.getElementById('id_notas')?.value?.trim();
+            const parts = [];
+            if (desc) parts.push('Descripción');
+            if (notas) parts.push('Notas');
+            return parts.length ? `Con ${parts.join(' y ').toLowerCase()}` : 'Sin información adicional';
+          }
+        }">
+          <header class="form-card-header" @click="open = !open" :aria-expanded="open">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="form-card-icon">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                </svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="form-card-title">Información adicional</h3>
+                <p x-show="!open" x-cloak x-text="summary" class="form-card-summary"></p>
+              </div>
+            </div>
+            <button type="button" class="form-card-toggle" :aria-label="open ? 'Colapsar' : 'Expandir'">
+              <svg class="form-card-toggle-chevron w-4 h-4" :class="{ '-rotate-180': !open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </header>
+          <div class="form-card-body-anim" :class="{ 'form-card-body-anim--open': open }">
+            <div class="form-card-body-anim-inner">
+              <div class="form-card-body">
+            <div class="form-card-grid">
+              <div class="sm:col-span-2">
+                <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.descripcion }}
+              </div>
+              <div class="sm:col-span-2">
+                <label for="{{ form.notas.id_for_label }}" class="label">Notas <span class="text-gray-400 font-normal">(opcional)</span></label>
+                {{ form.notas }}
               </div>
             </div>
               </div>

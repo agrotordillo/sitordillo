@@ -1,7 +1,10 @@
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from apps.core.forms import BaseModelForm
-from .models import Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente, UnidadMedida
+from .models import (
+    Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente,
+    UnidadMedida, ProductoPrecio,
+)
 
 
 class ProductForm(BaseModelForm):
@@ -98,6 +101,47 @@ PaqueteComponenteFormSet = inlineformset_factory(
     PaqueteComponente,
     form=PaqueteComponenteForm,
     fk_name="paquete",
+    extra=1,
+    can_delete=True,
+)
+
+
+class ProductoPrecioForm(BaseModelForm):
+    class Meta:
+        model = ProductoPrecio
+        fields = ["lista_precio", "almacen", "utilidad_pct", "precio_con_impuesto"]
+
+
+class ProductoPrecioBaseFormSet(BaseInlineFormSet):
+    """El UniqueConstraint de ProductoPrecio (producto, lista_precio, almacen)
+    tiene `condition`, y Django no valida constraints condicionales a nivel
+    de formulario (solo a nivel de base de datos) — sin este clean(), un
+    duplicado pasaría is_valid() y tronaría hasta el .save() con un
+    IntegrityError crudo."""
+
+    def clean(self):
+        super().clean()
+        vistos = set()
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+                continue
+            lista = form.cleaned_data.get("lista_precio")
+            if lista is None:
+                continue
+            almacen = form.cleaned_data.get("almacen")
+            key = (lista.id, almacen.id if almacen else None)
+            if key in vistos:
+                sucursal = f" en {almacen.nombre}" if almacen else " (general)"
+                form.add_error("lista_precio", f"Ya hay otro precio de {lista.nombre}{sucursal} en esta lista.")
+            vistos.add(key)
+
+
+ProductoPrecioFormSet = inlineformset_factory(
+    Producto,
+    ProductoPrecio,
+    form=ProductoPrecioForm,
+    formset=ProductoPrecioBaseFormSet,
+    fk_name="producto",
     extra=1,
     can_delete=True,
 )

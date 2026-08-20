@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
@@ -53,6 +53,34 @@ class Subcategoria(BaseAbstractModel):
 
     def get_folio_prefix(self):
         return "SUB"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+
+class Linea(BaseAbstractModel):
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name="Nombre de la línea",
+        unique=True,
+        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
+    )
+    descripcion = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Línea"
+        verbose_name_plural = "Líneas"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "LIN"
 
     def get_slug_source(self):
         return self.nombre
@@ -159,6 +187,34 @@ class UnidadMedida(BaseAbstractModel):
         return self.nombre.strip()
 
 
+class ListaPrecio(BaseAbstractModel):
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre de la lista de precios",
+        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
+    )
+    orden = models.PositiveIntegerField(default=0, verbose_name="Orden de despliegue")
+
+    class Meta:
+        verbose_name = "Lista de precios"
+        verbose_name_plural = "Listas de precios"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "LSP"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+
 class Producto(BaseAbstractModel):
     class TipoProducto(models.TextChoices):
         PRODUCTO = "producto", "Producto"
@@ -169,6 +225,11 @@ class Producto(BaseAbstractModel):
     class TipoIVA(models.TextChoices):
         GRAVADO = "gravado", "Gravado"
         EXENTO = "exento", "Exento"
+
+    class Costeo(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        ULTIMO = "ultimo", "Último costo"
+        PROMEDIO = "promedio", "Costo promedio"
 
     nombre = models.CharField(max_length=200, verbose_name="Nombre del producto")
     sku = models.CharField(max_length=30, unique=True, verbose_name="SKU")
@@ -204,6 +265,14 @@ class Producto(BaseAbstractModel):
         blank=True,
         related_name="productos",
         verbose_name="Subcategoría",
+    )
+    linea = models.ForeignKey(
+        Linea,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="productos",
+        verbose_name="Línea",
     )
     tipo = models.CharField(
         max_length=20,
@@ -269,10 +338,25 @@ class Producto(BaseAbstractModel):
     )
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
     notas = models.TextField(blank=True, verbose_name="Notas")
+    costeo = models.CharField(
+        max_length=10,
+        choices=Costeo.choices,
+        default=Costeo.MANUAL,
+        verbose_name="Método de costeo",
+        help_text="Cómo se actualiza el costo del producto a partir de las compras.",
+    )
     precio_costo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de costo")
     precio_venta = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de venta")
     stock_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock mínimo")
     stock_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock máximo")
+    peso = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Peso (kg)")
+    dias_reserva = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Días de reserva",
+        help_text="Días que tarda el proveedor en entregar después del pedido.",
+    )
+    codigo_proveedor = models.CharField(max_length=50, blank=True, verbose_name="Código de proveedor")
+    imagen = models.ImageField(upload_to="productos/", null=True, blank=True, verbose_name="Imagen")
 
     class Meta:
         verbose_name = "Producto"
@@ -290,6 +374,10 @@ class Producto(BaseAbstractModel):
                 condition=models.Q(tasa_ieps__isnull=True) | models.Q(tasa_ieps__gte=0),
                 name="producto_tasa_ieps_no_negativa",
             ),
+            models.CheckConstraint(
+                condition=models.Q(peso__isnull=True) | models.Q(peso__gte=0),
+                name="producto_peso_no_negativo",
+            ),
         ]
         indexes = [
             models.Index(fields=["sku"]),
@@ -298,6 +386,7 @@ class Producto(BaseAbstractModel):
             models.Index(fields=["proveedor"]),
             models.Index(fields=["categoria"]),
             models.Index(fields=["subcategoria"]),
+            models.Index(fields=["linea"]),
             models.Index(fields=["tipo"]),
         ]
 
@@ -343,7 +432,9 @@ class Producto(BaseAbstractModel):
 
         if self.tipo_iva == self.TipoIVA.EXENTO:
             self.tasa_iva = Decimal("0.00")
-        elif self.tasa_iva is None or self.tasa_iva <= 0:
+        elif self.tasa_iva is None or self.tasa_iva < 0:
+            # Gravado admite tasa 0% ("tasa cero", Art. 2-A LIVA: productos
+            # agropecuarios, veterinarios, etc.) — distinto de Exento.
             raise ValidationError({"tasa_iva": "Indica la tasa de IVA para un producto gravado."})
 
         if self.aplica_ieps:
@@ -410,3 +501,112 @@ class PaqueteComponente(BaseAbstractModel):
             raise ValidationError({"producto_componente": "Un paquete no puede incluirse a sí mismo como componente."})
         if self.cantidad is not None and self.cantidad <= 0:
             raise ValidationError({"cantidad": "La cantidad debe ser mayor a cero."})
+
+
+class ProductoPrecio(BaseAbstractModel):
+    """Precio de un producto para una lista de precios y, opcionalmente,
+    una sucursal específica. Si `almacen` es nulo el precio es general
+    (aplica a cualquier sucursal); si se asigna, es un precio específico
+    para esa sucursal que tiene prioridad sobre el general de la misma
+    lista. `precio_con_impuesto` es la única fuente de verdad — sigue la
+    misma convención que VentaDetalle.precio_unitario y
+    facturacion.factura_service._desglosar_linea() (precio con impuestos
+    incluidos, se desglosa hacia atrás). `utilidad_pct` es solo una
+    referencia de captura, no se recalcula sola si cambia el costo."""
+
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name="precios",
+        verbose_name="Producto",
+    )
+    lista_precio = models.ForeignKey(
+        ListaPrecio,
+        on_delete=models.PROTECT,
+        related_name="precios_producto",
+        verbose_name="Lista de precios",
+    )
+    almacen = models.ForeignKey(
+        Almacen,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="precios_producto",
+        verbose_name="Sucursal",
+        help_text="Si se deja vacío, el precio aplica a todas las sucursales.",
+    )
+    utilidad_pct = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Porcentaje de utilidad",
+    )
+    precio_con_impuesto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Precio de venta (con impuesto)")
+
+    class Meta:
+        verbose_name = "Precio de producto"
+        verbose_name_plural = "Precios de producto"
+        ordering = ["producto__nombre", "lista_precio__orden"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["producto", "lista_precio", "almacen"],
+                condition=models.Q(almacen__isnull=False),
+                name="unico_precio_por_lista_y_sucursal",
+            ),
+            models.UniqueConstraint(
+                fields=["producto", "lista_precio"],
+                condition=models.Q(almacen__isnull=True),
+                name="unico_precio_por_lista_general",
+            ),
+            models.CheckConstraint(condition=models.Q(precio_con_impuesto__gte=0), name="producto_precio_con_impuesto_no_negativo"),
+        ]
+        indexes = [
+            models.Index(fields=["producto"]),
+            models.Index(fields=["lista_precio"]),
+            models.Index(fields=["almacen"]),
+        ]
+
+    def __str__(self):
+        sucursal = f" ({self.almacen.nombre})" if self.almacen_id else ""
+        return f"{self.producto.nombre} · {self.lista_precio.nombre}{sucursal}: {self.precio_con_impuesto}"
+
+    def get_folio_prefix(self):
+        return "PPR"
+
+    def get_slug_source(self):
+        return f"{self.producto_id}-{self.lista_precio_id}-{self.almacen_id or 'gral'}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def _tasa_iva(self):
+        return (self.producto.tasa_iva / Decimal("100")) if self.producto.tipo_iva == Producto.TipoIVA.GRAVADO else Decimal("0")
+
+    @property
+    def _tasa_ieps(self):
+        return (self.producto.tasa_ieps / Decimal("100")) if self.producto.aplica_ieps and self.producto.tasa_ieps else Decimal("0")
+
+    @property
+    def precio_sin_impuesto(self):
+        factor = (Decimal("1") + self._tasa_ieps) * (Decimal("1") + self._tasa_iva)
+        return (self.precio_con_impuesto / factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def importe_ieps(self):
+        return (self.precio_sin_impuesto * self._tasa_ieps).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def importe_iva(self):
+        return ((self.precio_sin_impuesto + self.importe_ieps) * self._tasa_iva).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def importe_utilidad(self):
+        return self.precio_sin_impuesto - self.producto.precio_costo
+
+    def clean(self):
+        super().clean()
+        if self.precio_con_impuesto is not None and self.precio_con_impuesto < 0:
+            raise ValidationError({"precio_con_impuesto": "El precio de venta no puede ser negativo."})

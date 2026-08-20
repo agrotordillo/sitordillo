@@ -7,6 +7,7 @@ from .views.brand_views import BrandCreateView, BrandListView
 from .views.warehouse_views import WarehouseCreateView, WarehouseListView, WarehouseUpdateView
 from .views.unit_measure_views import UnitMeasureCreateView, UnitMeasureListView
 from .views.paquete_views import paquete_componentes_view
+from .views.precio_views import producto_precios_view
 
 app_name = "products"
 
@@ -15,6 +16,7 @@ urlpatterns = [
     path("crear/", ProductCreateView.as_view(), name="product-create"),
     path("<int:pk>/editar/", ProductUpdateView.as_view(), name="product-update"),
     path("<int:pk>/paquete/", paquete_componentes_view, name="paquete-componentes"),
+    path("<int:pk>/precios/", producto_precios_view, name="producto-precios"),
     path("categorias/", CategoryListView.as_view(), name="category-list"),
     path("categorias/crear/", CategoryCreateView.as_view(), name="category-create"),
     path("categorias/<int:pk>/editar/", CategoryUpdateView.as_view(), name="category-update"),

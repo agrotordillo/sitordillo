@@ -50,6 +50,15 @@ class Cliente(BaseAbstractModel):
     tiene_credito = models.BooleanField(default=False, verbose_name="Crédito autorizado")
     limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Límite de crédito")
     dias_credito = models.PositiveIntegerField(default=0, verbose_name="Días de crédito")
+    lista_precio = models.ForeignKey(
+        "products.ListaPrecio",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clientes",
+        verbose_name="Lista de precios",
+        help_text="Lista de precios que se aplica por defecto a este cliente en ventas y cotizaciones.",
+    )
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="Descuento (%)")
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
