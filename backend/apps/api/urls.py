@@ -9,6 +9,7 @@ from .views.products import (
 )
 from .views.compras import PromocionVigenteView
 from .views.proveedores import ProveedorBuscarView
+from .views.fiscal import ClaveProdServBuscarView, ClaveUnidadBuscarView
 
 app_name = "api"
 
@@ -47,5 +48,15 @@ urlpatterns = [
         "proveedores/buscar/",
         ProveedorBuscarView.as_view(),
         name="proveedor-buscar",
+    ),
+    path(
+        "fiscal/claves-prod-serv/buscar/",
+        ClaveProdServBuscarView.as_view(),
+        name="clave-prod-serv-buscar",
+    ),
+    path(
+        "fiscal/claves-unidad/buscar/",
+        ClaveUnidadBuscarView.as_view(),
+        name="clave-unidad-buscar",
     ),
 ]

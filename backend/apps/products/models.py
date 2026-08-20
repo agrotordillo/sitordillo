@@ -443,6 +443,30 @@ class Producto(BaseAbstractModel):
         elif self.tasa_ieps:
             raise ValidationError({"aplica_ieps": "Activa 'Aplica IEPS' antes de definir su tasa."})
 
+    def save(self, *args, **kwargs):
+        costo_anterior = None
+        if self.pk:
+            costo_anterior = (
+                Producto.objects.filter(pk=self.pk).values_list("precio_costo", flat=True).first()
+            )
+        super().save(*args, **kwargs)
+        if costo_anterior is not None and costo_anterior != self.precio_costo:
+            self._recalcular_precios_por_utilidad()
+
+    def _recalcular_precios_por_utilidad(self):
+        """Cuando cambia el costo del producto, recalcula el precio de cada
+        lista que tenga un % de utilidad guardado (precio_sin_impuesto =
+        costo * (1 + utilidad% / 100)). Las filas sin % de utilidad son
+        precio manual y no se tocan."""
+        for precio in self.precios.filter(utilidad_pct__isnull=False):
+            precio.producto = self
+            factor = (Decimal("1") + precio._tasa_ieps) * (Decimal("1") + precio._tasa_iva)
+            precio_sin_impuesto = self.precio_costo * (Decimal("1") + precio.utilidad_pct / Decimal("100"))
+            precio.precio_con_impuesto = (precio_sin_impuesto * factor).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            precio.save(update_fields=["precio_con_impuesto"])
+
 
 class PaqueteComponente(BaseAbstractModel):
     """Producto (tipo=paquete) y los productos reales que lo componen.

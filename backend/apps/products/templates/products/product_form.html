@@ -292,8 +292,8 @@
               <div>
                 <label for="{{ form.clave_prod_serv_sat.id_for_label }}" class="label">Clave de producto/servicio SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
                 <div class="flex items-center gap-2">
-                  {{ form.clave_prod_serv_sat }}
-                  <a href="{% url 'facturacion:buscar-clave-prod-serv' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                  <div class="flex-1">{% include "products/includes/_clave_prod_serv_search_field.html" %}</div>
+                  <a href="{% url 'facturacion:buscar-clave-prod-serv' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT en Facturama" title="Si no la encuentras aquí, buscarla en Facturama (se abre en una pestaña nueva)">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
                   </a>
                 </div>
@@ -301,8 +301,8 @@
               <div>
                 <label for="{{ form.clave_unidad_sat.id_for_label }}" class="label">Clave de unidad SAT <span class="text-gray-400 font-normal">(opcional, requerida para facturar)</span></label>
                 <div class="flex items-center gap-2">
-                  {{ form.clave_unidad_sat }}
-                  <a href="{% url 'facturacion:buscar-clave-unidad' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT" title="Buscar clave SAT (se abre en una pestaña nueva)">
+                  <div class="flex-1">{% include "products/includes/_clave_unidad_search_field.html" %}</div>
+                  <a href="{% url 'facturacion:buscar-clave-unidad' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Buscar clave SAT en Facturama" title="Si no la encuentras aquí, buscarla en Facturama (se abre en una pestaña nueva)">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
                   </a>
                 </div>
@@ -469,5 +469,7 @@
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
 <script src="{% static 'js/modules/forms/quick-create.js' %}"></script>
+<script src="{% static 'js/modules/forms/clave-prod-serv-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/clave-unidad-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

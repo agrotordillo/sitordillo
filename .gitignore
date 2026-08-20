@@ -48,6 +48,7 @@ secrets.json
 #  Datos reales (dumps de clientes/proveedores, etc.)
 # =========================================
 /datos/
+backend/datos_dev_fiscal.json
 
 # =========================================
 #  Node / Tailwind / DaisyUI

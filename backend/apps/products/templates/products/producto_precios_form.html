@@ -30,7 +30,14 @@
   {% endif %}
 
   <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
-    <table class="w-full text-sm text-left text-gray-600">
+    <table
+      class="w-full text-sm text-left text-gray-600"
+      data-producto-costo="{{ producto.precio_costo|stringformat:'f' }}"
+      data-tasa-iva="{{ producto.tasa_iva|stringformat:'f' }}"
+      data-tipo-iva="{{ producto.tipo_iva }}"
+      data-tasa-ieps="{{ producto.tasa_ieps|default_if_none:0|stringformat:'f' }}"
+      data-aplica-ieps="{{ producto.aplica_ieps|yesno:'true,false' }}"
+    >
       <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
         <tr>
           <th scope="col" class="px-3 py-2.5 font-semibold">Lista de precios</th>
@@ -69,5 +76,6 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/modules/forms/precio-lista-calc.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

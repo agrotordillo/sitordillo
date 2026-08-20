@@ -1,30 +1,26 @@
 document.addEventListener("DOMContentLoaded", () => {
   const MIN_CHARS = 3;
-
-  // Debounce independiente por campo: con varias líneas de producto en la
-  // misma página (ej. formulario de orden de compra), un timer compartido
-  // hace que escribir en una fila cancele la búsqueda pendiente de otra.
   const debounceTimers = new WeakMap();
 
   document.addEventListener("input", (event) => {
-    if (!event.target.matches(".producto-search-input")) return;
+    if (!event.target.matches(".clave-prod-serv-search-input")) return;
     const input = event.target;
-    const wrapper = input.closest(".producto-search");
+    const wrapper = input.closest(".clave-prod-serv-search");
     if (!wrapper) return;
     clearTimeout(debounceTimers.get(input));
     debounceTimers.set(input, setTimeout(() => buscar(wrapper, input), 250));
   });
 
   document.addEventListener("click", (event) => {
-    document.querySelectorAll(".producto-search-results:not(.hidden)").forEach((el) => {
-      const wrapper = el.closest(".producto-search");
+    document.querySelectorAll(".clave-prod-serv-search-results:not(.hidden)").forEach((el) => {
+      const wrapper = el.closest(".clave-prod-serv-search");
       if (wrapper && !wrapper.contains(event.target)) el.classList.add("hidden");
     });
   });
 
   async function buscar(wrapper, input) {
-    const url = wrapper.dataset.productoSearchUrl;
-    const resultsEl = wrapper.querySelector(".producto-search-results");
+    const url = wrapper.dataset.claveProdServSearchUrl;
+    const resultsEl = wrapper.querySelector(".clave-prod-serv-search-results");
     const hiddenInput = wrapper.querySelector('input[type="hidden"]');
     const q = input.value.trim();
 
@@ -34,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (hiddenInput) hiddenInput.value = "";
       return;
     }
-
     if (q.length < MIN_CHARS) {
       resultsEl.classList.add("hidden");
       resultsEl.innerHTML = "";
@@ -49,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const items = await res.json();
       mostrarResultados(items, input, hiddenInput, resultsEl);
     } catch (err) {
-      if (window.App?.isDev) console.error("[producto-search]", err);
+      if (window.App?.isDev) console.error("[clave-prod-serv-search]", err);
     }
   }
 
@@ -71,25 +66,13 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.className = "flex w-full items-center gap-2 text-left px-3 py-2.5 text-sm hover:bg-primary-50 transition-colors";
       btn.innerHTML = `
         <span class="min-w-0 flex-1">
-          <span class="block truncate text-gray-800">${item.nombre}</span>
-          <span class="block text-xs text-gray-400 font-mono">${item.folio} · ${item.sku}</span>
+          <span class="block truncate text-gray-800">${item.descripcion}</span>
+          <span class="block text-xs text-gray-400 font-mono">${item.clave}</span>
         </span>`;
       btn.addEventListener("click", () => {
         hiddenInput.value = item.id;
-        hiddenInput.dataset.precioCosto = item.precio_costo;
-
-        // Sugiere el precio unitario de la línea de compra con el costo del
-        // producto (solo si el campo está vacío, para no pisar un precio ya
-        // capturado a mano).
-        const row = hiddenInput.closest(".formset-row");
-        const precioInput = row?.querySelector(".fs-precio");
-        if (precioInput && !precioInput.value && item.precio_costo) {
-          precioInput.value = item.precio_costo;
-          precioInput.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
-        input.value = `${item.folio} · ${item.nombre}`;
+        input.value = `${item.clave} · ${item.descripcion}`;
         resultsEl.classList.add("hidden");
       });
       resultsEl.appendChild(btn);

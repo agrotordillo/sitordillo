@@ -1,3 +1,4 @@
+from django import forms
 from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from apps.core.forms import BaseModelForm
@@ -34,6 +35,15 @@ class ProductForm(BaseModelForm):
             "stock_minimo",
             "stock_maximo",
         ]
+        widgets = {
+            # Los catálogos SAT tienen ~52 mil (prod/serv) y ~2,400 (unidad)
+            # registros: un <select> con todas las opciones era la causa de
+            # que el formulario tardara mucho en cargar al editar. Se
+            # reemplaza por búsqueda por texto (ver clave-prod-serv-search.js
+            # y clave-unidad-search.js).
+            "clave_prod_serv_sat": forms.HiddenInput,
+            "clave_unidad_sat": forms.HiddenInput,
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,6 +120,12 @@ class ProductoPrecioForm(BaseModelForm):
     class Meta:
         model = ProductoPrecio
         fields = ["lista_precio", "almacen", "utilidad_pct", "precio_con_impuesto"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for campo, extra_clase in (("utilidad_pct", "pp-utilidad"), ("precio_con_impuesto", "pp-precio")):
+            existing = self.fields[campo].widget.attrs.get("class", "").strip()
+            self.fields[campo].widget.attrs["class"] = f"{existing} {extra_clase}".strip()
 
 
 class ProductoPrecioBaseFormSet(BaseInlineFormSet):

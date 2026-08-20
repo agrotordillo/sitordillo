@@ -1,0 +1,7 @@
+{% load product_extras %}
+<div class="clave-unidad-search relative" data-clave-unidad-search-url="{% url 'api:clave-unidad-buscar' %}">
+  {{ form.clave_unidad_sat }}
+  <input type="text" class="input clave-unidad-search-input" placeholder="Clave o nombre de la unidad SAT..." value="{{ form.clave_unidad_sat.value|clave_unidad_label }}" autocomplete="off">
+  <div class="clave-unidad-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+</div>
+{% if form.clave_unidad_sat.errors %}<p class="mt-1 text-xs text-red-600">{{ form.clave_unidad_sat.errors.0 }}</p>{% endif %}

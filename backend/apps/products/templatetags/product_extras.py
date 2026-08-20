@@ -1,4 +1,5 @@
 from django import template
+from apps.fiscal.models import ClaveProdServSAT, ClaveUnidadSAT
 from apps.products.models import Producto
 
 register = template.Library()
@@ -16,3 +17,27 @@ def producto_label(value):
     except (Producto.DoesNotExist, ValueError, TypeError):
         return ""
     return f"{producto.folio} · {producto.nombre}"
+
+
+@register.filter
+def clave_prod_serv_label(value):
+    """Igual que producto_label, para la clave de producto/servicio SAT."""
+    if not value:
+        return ""
+    try:
+        clave = ClaveProdServSAT.objects.get(pk=value)
+    except (ClaveProdServSAT.DoesNotExist, ValueError, TypeError):
+        return ""
+    return f"{clave.clave} · {clave.descripcion}"
+
+
+@register.filter
+def clave_unidad_label(value):
+    """Igual que producto_label, para la clave de unidad SAT."""
+    if not value:
+        return ""
+    try:
+        clave = ClaveUnidadSAT.objects.get(pk=value)
+    except (ClaveUnidadSAT.DoesNotExist, ValueError, TypeError):
+        return ""
+    return f"{clave.clave} · {clave.nombre}"
