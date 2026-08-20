@@ -1,0 +1,79 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}Corregir lote{% endblock title %}
+{% block title_layout %}Corregir lote de {{ lote.producto.nombre }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:lote-list' %}" class="text-gray-400 hover:text-primary-600">Lotes</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Corregir</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Usa esto cuando se recibió el producto equivocado y <strong>nada de este lote se ha vendido o movido
+  todavía</strong>. Se anula la cantidad indicada de este lote y se traslada a un lote nuevo del producto
+  correcto (mismo almacén, costo y caducidad), ajustando las líneas de la orden de compra. Si ya se vendió
+  algo de este lote, no uses esta pantalla — contacta a soporte.
+</p>
+
+<div class="form-card mb-4">
+  <div class="form-card-body">
+    <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Producto actual</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.producto.nombre }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Almacén</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.almacen.nombre }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Disponible</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.cantidad_disponible }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Costo unitario</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.costo_unitario }}</dd>
+      </div>
+    </dl>
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.cantidad.id_for_label }}" class="label">Cantidad a corregir</label>
+      {{ form.cantidad }}
+      {% if form.cantidad.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.producto.id_for_label }}" class="label">Producto correcto</label>
+      {% include "products/includes/_producto_search_field.html" %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.motivo.id_for_label }}" class="label">Motivo <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.motivo }}
+    </div>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'inventario:lote-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Corregir</button>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+{% endblock extra_js %}

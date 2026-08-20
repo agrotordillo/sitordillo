@@ -9,8 +9,6 @@ from django.views.generic.edit import CreateView, UpdateView
 from apps.compras.models import OrdenCompra
 from apps.compras.forms import OrdenCompraForm, OrdenCompraDetalleFormSet
 
-ESTATUS_EDITABLES = (OrdenCompra.Estatus.BORRADOR, OrdenCompra.Estatus.ENVIADA)
-
 
 class OrdenCompraListView(ListView):
     model = OrdenCompra
@@ -77,16 +75,6 @@ class OrdenCompraUpdateView(UpdateView):
     success_url = reverse_lazy("compras:orden-list")
     success_message = "Orden de compra actualizada correctamente."
     extra_context = {"active_module": "purchases"}
-
-    def dispatch(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.estatus not in ESTATUS_EDITABLES:
-            messages.error(
-                request,
-                "Solo se puede editar una orden de compra en borrador o enviada, antes de recibir mercancía.",
-            )
-            return HttpResponseRedirect(reverse_lazy("compras:orden-list"))
-        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)

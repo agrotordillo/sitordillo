@@ -2,6 +2,13 @@
   <td class="px-3 py-2">
     {{ form.id }}
     {% include "products/includes/_producto_search_field.html" %}
+    {% if form.instance.pk and form.instance.cantidad_recibida > 0 %}
+    <p class="mt-1 text-xs text-amber-600">
+      ⚠ Ya se recibieron {{ form.instance.cantidad_recibida }} de esta línea. Cambiar producto, cantidad o
+      precio aquí no ajusta el inventario ya registrado (lotes/movimientos); si te equivocaste de producto,
+      corrige el inventario aparte.
+    </p>
+    {% endif %}
   </td>
   <td class="px-3 py-2 w-28">
     {{ form.cantidad }}
