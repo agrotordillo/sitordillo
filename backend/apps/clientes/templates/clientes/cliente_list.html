@@ -11,12 +11,29 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<a href="{% url 'clientes:cliente-create' %}" class="btn-primary w-full sm:w-auto">
-  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-  </svg>
-  Nuevo cliente
-</a>
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+  <form method="get" class="flex items-center gap-2">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por folio, RFC o nombre..." class="input w-full sm:w-64">
+    <button type="submit" class="btn-icon-outline" aria-label="Buscar" title="Buscar">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+    {% if q %}
+    <a href="{% url 'clientes:cliente-list' %}" class="btn-icon-outline" aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+    {% endif %}
+  </form>
+  <a href="{% url 'clientes:cliente-create' %}" class="btn-primary w-full sm:w-auto">
+    <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+    </svg>
+    Nuevo cliente
+  </a>
+</div>
 {% endblock table_actions %}
 {% block main_content %}
 <div class="relative overflow-x-auto">
@@ -75,8 +92,13 @@
             <svg class="w-10 h-10 text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
             </svg>
+            {% if q %}
+            <p class="text-sm text-gray-400">No hay clientes que coincidan con "{{ q }}"</p>
+            <a href="{% url 'clientes:cliente-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar búsqueda</a>
+            {% else %}
             <p class="text-sm text-gray-400">No hay clientes registrados</p>
             <a href="{% url 'clientes:cliente-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
+            {% endif %}
           </div>
         </td>
       </tr>
@@ -84,4 +106,19 @@
     </tbody>
   </table>
 </div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+    <p class="text-sm text-gray-400">
+        Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} cliente{{ paginator.count|pluralize }}
+    </p>
+    <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Anterior</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Siguiente</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock main_content %}
