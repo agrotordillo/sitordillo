@@ -179,3 +179,50 @@ def corregir_recepcion(lote_incorrecto, cantidad, producto_correcto, motivo=""):
     orden.save(update_fields=["estatus", "updated_at", "updated_by"])
 
     return lote_nuevo
+
+
+@transaction.atomic
+def registrar_merma_recepcion(lote, cantidad, motivo=""):
+    """Da de baja `cantidad` de un lote ligado a una orden de compra por
+    mercancía que llegó dañada. Es el caso típico de CEDIS: el proveedor
+    entrega con nota de remisión, después se detecta que parte llegó en mal
+    estado, y el proveedor acepta descontarlo y facturar solo por lo bueno.
+
+    No toca cantidad_recibida (sigue reflejando lo que físicamente llegó,
+    así que el estatus de la orden -recibida/parcial- no cambia); registra
+    la merma en un campo aparte (cantidad_merma) que reduce lo que esa línea
+    factura y paga (ver OrdenCompraDetalle.cantidad_facturable). Si la orden
+    ya tiene una cuenta por pagar generada, se recalcula su monto_total para
+    que quede en línea con la factura ajustada del proveedor; si esa cuenta
+    ya tiene pagos aplicados, se rechaza para no invalidar pagos existentes."""
+    detalle = lote.orden_compra_detalle
+    if detalle is None:
+        raise ValueError(
+            "Este lote no está ligado a una línea de orden de compra; no se puede reportar merma aquí."
+        )
+    if cantidad is None or cantidad <= 0:
+        raise ValueError("La cantidad dañada debe ser mayor a cero.")
+    if cantidad > lote.cantidad_disponible:
+        raise ValueError("No puedes dar de baja más de lo disponible en el lote.")
+
+    orden = detalle.orden_compra
+    cuenta = getattr(orden, "cuenta_por_pagar", None)
+    if cuenta is not None and cuenta.pagos.exists():
+        raise ValueError(
+            "Esta orden ya tiene pagos registrados en su cuenta por pagar; no se puede "
+            "ajustar automáticamente. Resuélvelo manualmente."
+        )
+
+    motivo_final = motivo or "Mercancía recibida en mal estado, descontada de la factura del proveedor"
+    registrar_movimiento(lote, MovimientoInventario.Tipo.MERMA, -cantidad, motivo=motivo_final)
+
+    detalle.cantidad_merma = (detalle.cantidad_merma or Decimal("0.00")) + cantidad
+    detalle.full_clean()
+    detalle.save(update_fields=["cantidad_merma", "updated_at", "updated_by"])
+
+    if cuenta is not None:
+        cuenta.monto_total = orden.total
+        cuenta.full_clean()
+        cuenta.save(update_fields=["monto_total", "updated_at", "updated_by"])
+
+    return detalle

@@ -52,7 +52,10 @@
           {% endif %}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
-          <a href="{% url 'inventario:lote-corregir' lote.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Corregir</a>
+          <div class="flex items-center justify-end gap-3">
+            <a href="{% url 'inventario:lote-merma' lote.pk %}" class="text-sm text-red-600 hover:text-red-700 font-medium">Reportar merma</a>
+            <a href="{% url 'inventario:lote-corregir' lote.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Corregir</a>
+          </div>
         </td>
       </tr>
       {% empty %}

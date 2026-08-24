@@ -59,3 +59,26 @@ class CorregirLoteForm(forms.Form):
         if self.lote and producto.pk == self.lote.producto_id:
             raise forms.ValidationError("Elige un producto distinto al que ya tiene el lote.")
         return producto
+
+
+class ReportarMermaForm(forms.Form):
+    """Da de baja mercancía de un lote recibido que llegó en mal estado (ver
+    apps.inventario.services.registrar_merma_recepcion)."""
+
+    cantidad = forms.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    motivo = forms.CharField(max_length=255, required=False)
+
+    def __init__(self, *args, lote=None, **kwargs):
+        self.lote = lote
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            existing = field.widget.attrs.get("class", "").strip()
+            field.widget.attrs["class"] = f"{existing} input".strip()
+
+    def clean_cantidad(self):
+        cantidad = self.cleaned_data["cantidad"]
+        if self.lote and cantidad > self.lote.cantidad_disponible:
+            raise forms.ValidationError(
+                f"No puedes dar de baja más de lo disponible en el lote ({self.lote.cantidad_disponible})."
+            )
+        return cantidad

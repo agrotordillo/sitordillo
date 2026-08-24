@@ -9,6 +9,11 @@
       corrige el inventario aparte.
     </p>
     {% endif %}
+    {% if form.instance.pk and form.instance.cantidad_merma > 0 %}
+    <p class="mt-1 text-xs text-red-600">
+      ⚠ Se dieron de baja {{ form.instance.cantidad_merma }} por mercancía dañada — no se factura esa cantidad.
+    </p>
+    {% endif %}
   </td>
   <td class="px-3 py-2 w-28">
     {{ form.cantidad }}

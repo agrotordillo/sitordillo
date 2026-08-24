@@ -252,6 +252,16 @@ class OrdenCompraDetalle(BaseAbstractModel):
         default=Decimal("0.00"),
         verbose_name="Cantidad recibida",
     )
+    cantidad_merma = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        verbose_name="Cantidad dañada (no facturable)",
+        help_text=(
+            "De lo recibido, cuánto se dio de baja por llegar en mal estado. El "
+            "proveedor descuenta esta cantidad de lo que factura y cobra."
+        ),
+    )
 
     class Meta:
         verbose_name = "Detalle de orden de compra"
@@ -260,6 +270,7 @@ class OrdenCompraDetalle(BaseAbstractModel):
             models.CheckConstraint(condition=models.Q(cantidad__gt=0), name="ocd_cantidad_positiva"),
             models.CheckConstraint(condition=models.Q(precio_unitario__gte=0), name="ocd_precio_unitario_no_negativo"),
             models.CheckConstraint(condition=models.Q(cantidad_recibida__gte=0), name="ocd_cantidad_recibida_no_negativa"),
+            models.CheckConstraint(condition=models.Q(cantidad_merma__gte=0), name="ocd_cantidad_merma_no_negativa"),
         ]
         indexes = [
             models.Index(fields=["orden_compra"]),
@@ -280,8 +291,19 @@ class OrdenCompraDetalle(BaseAbstractModel):
         return self.__str__()
 
     @property
+    def cantidad_facturable(self):
+        """Cantidad sobre la que realmente se factura y se paga al proveedor.
+        Antes de recibir nada, es la cantidad ordenada (mejor estimado). Una
+        vez que empezó a recibirse, es lo recibido menos lo dado de baja por
+        llegar dañado (cantidad_merma) — el proveedor descuenta esa merma de
+        su factura, así que no se paga por ella."""
+        if self.cantidad_recibida:
+            return max(Decimal("0.00"), self.cantidad_recibida - (self.cantidad_merma or Decimal("0.00")))
+        return self.cantidad or Decimal("0.00")
+
+    @property
     def subtotal(self):
-        bruto = (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
+        bruto = self.cantidad_facturable * (self.precio_unitario or Decimal("0"))
         return bruto.quantize(Decimal("0.01"))
 
     def clean(self):
@@ -297,4 +319,12 @@ class OrdenCompraDetalle(BaseAbstractModel):
         ):
             raise ValidationError({
                 "cantidad_recibida": "La cantidad recibida no puede ser mayor a la cantidad ordenada.",
+            })
+        if (
+            self.cantidad_merma is not None
+            and self.cantidad_recibida is not None
+            and self.cantidad_merma > self.cantidad_recibida
+        ):
+            raise ValidationError({
+                "cantidad_merma": "No puedes dar de baja más de lo que se recibió en esta línea.",
             })

@@ -1,0 +1,72 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Reportar merma{% endblock title %}
+{% block title_layout %}Reportar merma de {{ lote.producto.nombre }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:lote-list' %}" class="text-gray-400 hover:text-primary-600">Lotes</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Reportar merma</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Usa esto cuando parte de lo recibido llegó dañado y el proveedor acepta descontarlo de su factura
+  (por ejemplo: se recibieron 10 pzas por nota de remisión, 2 llegaron dañadas, y el proveedor factura
+  solo por 8). Se da de baja la cantidad indicada del inventario disponible de este lote, y se reduce lo
+  que se le pagará al proveedor por esta línea de la orden de compra. Si ya hay pagos registrados contra
+  esta orden, no se podrá ajustar aquí — resuélvelo manualmente.
+</p>
+
+<div class="form-card mb-4">
+  <div class="form-card-body">
+    <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Producto</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.producto.nombre }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Orden de compra</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.orden_compra_detalle.orden_compra.folio|default:"-" }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Disponible</dt>
+        <dd class="text-gray-800 font-medium">{{ lote.cantidad_disponible }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-400 text-xs uppercase tracking-wider">Costo unitario</dt>
+        <dd class="text-gray-800 font-medium">${{ lote.costo_unitario|floatformat:2 }}</dd>
+      </div>
+    </dl>
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.cantidad.id_for_label }}" class="label">Cantidad dañada</label>
+      {{ form.cantidad }}
+      {% if form.cantidad.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.motivo.id_for_label }}" class="label">Motivo <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.motivo }}
+    </div>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'inventario:lote-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar merma</button>
+  </div>
+</form>
+{% endblock main_content %}
