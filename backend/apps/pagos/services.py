@@ -1,5 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
+from django.conf import settings
+from django.core.mail import EmailMessage
 from django.db import transaction
 from django.utils import timezone
 
@@ -75,3 +77,33 @@ def registrar_pago(cuenta, fecha_pago, monto_pagado, forma_pago, aplica_descuent
     pago.save()
     cuenta.actualizar_estatus()
     return pago
+
+
+def enviar_comprobante_email(pago):
+    """Envía el comprobante de un pago por correo al contacto del proveedor.
+    Requiere que el pago tenga un archivo adjunto y que el proveedor tenga
+    correo de contacto registrado; propaga cualquier error de envío (SMTP
+    sin configurar, credenciales inválidas, etc.) para que la vista lo
+    muestre al usuario."""
+    if not pago.comprobante:
+        raise ValueError("Este pago no tiene comprobante adjunto.")
+
+    proveedor = pago.cuenta_por_pagar.proveedor
+    if not proveedor.contacto_email:
+        raise ValueError("Este proveedor no tiene correo de contacto registrado.")
+
+    cuenta = pago.cuenta_por_pagar
+    asunto = f"Comprobante de pago {pago.folio} · {proveedor.display_name}"
+    cuerpo = (
+        f"Se registró un pago de ${pago.monto_pagado} el {pago.fecha_pago:%d/%m/%Y}, "
+        f"correspondiente a la cuenta {cuenta.folio} (orden de compra {cuenta.orden_compra.folio}).\n\n"
+        "Se adjunta el comprobante correspondiente."
+    )
+    email = EmailMessage(
+        subject=asunto,
+        body=cuerpo,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[proveedor.contacto_email],
+    )
+    email.attach_file(pago.comprobante.path)
+    email.send()

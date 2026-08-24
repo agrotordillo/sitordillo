@@ -4,6 +4,33 @@ from django.db import models
 from apps.core.models import BaseAbstractModel
 
 
+class Banco(BaseAbstractModel):
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre del banco",
+        error_messages={"unique": "Ya existe un %(model_name)s con este nombre."},
+    )
+
+    class Meta:
+        verbose_name = "Banco"
+        verbose_name_plural = "Bancos"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "BAN"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+
 class CuentaPorPagar(BaseAbstractModel):
     class Estatus(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
@@ -112,6 +139,12 @@ class CuentaPorPagar(BaseAbstractModel):
 
 
 class Pago(BaseAbstractModel):
+    # Claves del catálogo oficial SAT c_FormaPago (fiscal.FormaPago) que
+    # requieren un dato adicional al registrar el pago.
+    CLAVE_TRANSFERENCIA = "03"
+    CLAVE_CHEQUE = "02"
+    CLAVE_COMPENSACION = "17"  # "Nota de crédito" del proveedor en la operación del negocio.
+
     cuenta_por_pagar = models.ForeignKey(
         CuentaPorPagar,
         on_delete=models.CASCADE,
@@ -125,6 +158,27 @@ class Pago(BaseAbstractModel):
         on_delete=models.PROTECT,
         related_name="pagos_proveedor",
         verbose_name="Forma de pago",
+    )
+    banco = models.ForeignKey(
+        Banco,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pagos",
+        verbose_name="Banco",
+        help_text="Requerido cuando la forma de pago es transferencia.",
+    )
+    numero_referencia = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Número de cheque o nota de crédito",
+        help_text="Requerido cuando la forma de pago es cheque nominativo o compensación (nota de crédito).",
+    )
+    comprobante = models.FileField(
+        upload_to="pagos/comprobantes/",
+        null=True,
+        blank=True,
+        verbose_name="Comprobante de pago",
     )
     aplica_descuento_pronto_pago = models.BooleanField(
         default=False, verbose_name="Aplica descuento por pronto pago"
@@ -164,6 +218,20 @@ class Pago(BaseAbstractModel):
         super().clean()
         if self.monto_pagado is not None and self.monto_pagado <= 0:
             raise ValidationError({"monto_pagado": "El monto pagado debe ser mayor a cero."})
+
+        if self.forma_pago_id:
+            clave = self.forma_pago.clave
+            if clave == self.CLAVE_TRANSFERENCIA and not self.banco_id:
+                raise ValidationError({"banco": "Indica el banco de la transferencia."})
+            if clave != self.CLAVE_TRANSFERENCIA and self.banco_id:
+                raise ValidationError({"banco": "El banco solo aplica cuando la forma de pago es transferencia."})
+            if clave in (self.CLAVE_CHEQUE, self.CLAVE_COMPENSACION) and not self.numero_referencia:
+                etiqueta = "cheque" if clave == self.CLAVE_CHEQUE else "nota de crédito"
+                raise ValidationError({"numero_referencia": f"Indica el número de {etiqueta}."})
+            if clave not in (self.CLAVE_CHEQUE, self.CLAVE_COMPENSACION) and self.numero_referencia:
+                raise ValidationError({
+                    "numero_referencia": "Este número solo aplica para cheque nominativo o compensación (nota de crédito).",
+                })
 
         if not self.cuenta_por_pagar_id:
             return

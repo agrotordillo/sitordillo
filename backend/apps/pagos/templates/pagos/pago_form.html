@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
 {% block title %}Registrar pago{% endblock title %}
 {% block title_layout %}Registrar pago{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -33,6 +34,8 @@
         <th scope="col" class="px-3 py-2 font-semibold">Monto pagado</th>
         <th scope="col" class="px-3 py-2 font-semibold">Descuento</th>
         <th scope="col" class="px-3 py-2 font-semibold">Forma de pago</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Referencia</th>
+        <th scope="col" class="px-3 py-2 font-semibold"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -41,7 +44,25 @@
         <td class="px-3 py-2">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
         <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
         <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|floatformat:2 }}{% else %}-{% endif %}</td>
-        <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}</td>
+        <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
+        <td class="px-3 py-2">{{ pago.numero_referencia|default:"-" }}</td>
+        <td class="px-3 py-2 text-right">
+          {% if pago.comprobante %}
+          <div class="flex items-center justify-end gap-3">
+            <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
+            <form method="post" action="{% url 'pagos:pago-enviar-correo' pago.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Enviar por correo</button>
+            </form>
+            <a
+              href="https://wa.me/{{ whatsapp_numero }}?text={{ pago.folio|urlencode }}%20-%20Comprobante%20de%20pago%20a%20{{ cuenta.proveedor.display_name|urlencode }}%20por%20%24{{ pago.monto_pagado|urlencode }}"
+              target="_blank" rel="noopener" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >Enviar por WhatsApp</a>
+          </div>
+          {% else %}
+          <span class="text-xs text-gray-400">Sin comprobante</span>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -49,7 +70,7 @@
 </div>
 {% endif %}
 
-<form method="post">
+<form method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -72,6 +93,21 @@
       {{ form.forma_pago }}
       {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
     </div>
+    <div id="campo-banco" class="hidden">
+      <label for="{{ form.banco.id_for_label }}" class="label">Banco</label>
+      {{ form.banco }}
+      {% if form.banco.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.banco.errors.0 }}</p>{% endif %}
+    </div>
+    <div id="campo-referencia" class="hidden">
+      <label for="{{ form.numero_referencia.id_for_label }}" class="label" id="label-referencia">Número de cheque o nota de crédito</label>
+      {{ form.numero_referencia }}
+      {% if form.numero_referencia.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.numero_referencia.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.comprobante.id_for_label }}" class="label">Comprobante de pago <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.comprobante }}
+      {% if form.comprobante.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.comprobante.errors.0 }}</p>{% endif %}
+    </div>
     {% if cuenta.fecha_limite_pronto_pago %}
     <div class="flex items-center gap-2 mt-6">
       {{ form.aplica_descuento_pronto_pago }}
@@ -90,3 +126,6 @@
   </div>
 </form>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/pago-form.js' %}"></script>
+{% endblock extra_js %}

@@ -21,6 +21,12 @@ class CuentaPorPagarListView(ListView):
             .get_queryset()
             .select_related("orden_compra", "orden_compra__proveedor")
             .prefetch_related("pagos")
+            .order_by(
+                "orden_compra__proveedor__nombre_comercial",
+                "orden_compra__proveedor__nombre_fiscal",
+                "orden_compra__proveedor_id",
+                "fecha_vencimiento",
+            )
         )
 
 

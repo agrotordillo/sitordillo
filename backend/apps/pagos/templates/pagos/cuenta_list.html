@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load static %}
 {% block title %}Cuentas por pagar{% endblock title %}
 {% block title_layout %}Cuentas por pagar{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -13,12 +14,20 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
+{% regroup cuentas by proveedor as cuentas_por_proveedor %}
+
+{% for group in cuentas_por_proveedor %}
+<form id="pago-multi-{{ group.grouper.pk }}" method="post" action="{% url 'pagos:pago-multiple-preparar' %}">
+  {% csrf_token %}
+</form>
+{% endfor %}
+
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold w-10"></th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Orden</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Vencimiento</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Saldo</th>
@@ -26,11 +35,32 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
       </tr>
     </thead>
+    {% for group in cuentas_por_proveedor %}
     <tbody class="divide-y divide-gray-100">
-      {% for cuenta in cuentas %}
+      <tr class="bg-gray-50/80">
+        <td colspan="7" class="px-4 sm:px-6 py-2">
+          <div class="flex items-center justify-between gap-3">
+            <span class="font-semibold text-gray-700">{{ group.grouper.display_name }}</span>
+            <button
+              type="submit" form="pago-multi-{{ group.grouper.pk }}" disabled
+              id="btn-pagar-{{ group.grouper.pk }}"
+              class="btn-secondary text-xs py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            >Pagar seleccionadas</button>
+          </div>
+        </td>
+      </tr>
+      {% for cuenta in group.list %}
       <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if cuenta.estatus == 'pendiente' or cuenta.estatus == 'parcial' %}
+          <input
+            type="checkbox" name="cuenta_ids" value="{{ cuenta.pk }}"
+            form="pago-multi-{{ group.grouper.pk }}" class="chk-cuenta"
+            data-group="{{ group.grouper.pk }}"
+          >
+          {% endif %}
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ cuenta.folio }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ cuenta.proveedor.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ cuenta.orden_compra.folio }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell">
           <span class="{% if cuenta.esta_vencida %}text-red-600 font-medium{% else %}text-gray-500{% endif %}">
@@ -61,14 +91,20 @@
           {% endif %}
         </td>
       </tr>
-      {% empty %}
+      {% endfor %}
+    </tbody>
+    {% empty %}
+    <tbody>
       <tr>
         <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
           <p class="text-sm text-gray-400">No hay cuentas por pagar registradas</p>
         </td>
       </tr>
-      {% endfor %}
     </tbody>
+    {% endfor %}
   </table>
 </div>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/pago-multi-select.js' %}"></script>
+{% endblock extra_js %}
