@@ -140,10 +140,15 @@ class CuentaPorPagar(BaseAbstractModel):
 
 class Pago(BaseAbstractModel):
     # Claves del catálogo oficial SAT c_FormaPago (fiscal.FormaPago) que
-    # requieren un dato adicional al registrar el pago.
+    # requieren o admiten un dato adicional al registrar el pago.
     CLAVE_TRANSFERENCIA = "03"
     CLAVE_CHEQUE = "02"
     CLAVE_COMPENSACION = "17"  # "Nota de crédito" del proveedor en la operación del negocio.
+    CLAVE_TARJETA_CREDITO = "04"
+    CLAVE_TARJETA_DEBITO = "28"
+    # El banco es obligatorio en transferencia y opcional (para reconciliar
+    # el estado de cuenta) en pago con tarjeta.
+    CLAVES_CON_BANCO = (CLAVE_TRANSFERENCIA, CLAVE_TARJETA_CREDITO, CLAVE_TARJETA_DEBITO)
 
     cuenta_por_pagar = models.ForeignKey(
         CuentaPorPagar,
@@ -166,7 +171,7 @@ class Pago(BaseAbstractModel):
         blank=True,
         related_name="pagos",
         verbose_name="Banco",
-        help_text="Requerido cuando la forma de pago es transferencia.",
+        help_text="Requerido para transferencia; opcional para pago con tarjeta de crédito o débito.",
     )
     numero_referencia = models.CharField(
         max_length=50,
@@ -223,8 +228,10 @@ class Pago(BaseAbstractModel):
             clave = self.forma_pago.clave
             if clave == self.CLAVE_TRANSFERENCIA and not self.banco_id:
                 raise ValidationError({"banco": "Indica el banco de la transferencia."})
-            if clave != self.CLAVE_TRANSFERENCIA and self.banco_id:
-                raise ValidationError({"banco": "El banco solo aplica cuando la forma de pago es transferencia."})
+            if clave not in self.CLAVES_CON_BANCO and self.banco_id:
+                raise ValidationError({
+                    "banco": "El banco solo aplica cuando la forma de pago es transferencia o pago con tarjeta.",
+                })
             if clave in (self.CLAVE_CHEQUE, self.CLAVE_COMPENSACION) and not self.numero_referencia:
                 etiqueta = "cheque" if clave == self.CLAVE_CHEQUE else "nota de crédito"
                 raise ValidationError({"numero_referencia": f"Indica el número de {etiqueta}."})

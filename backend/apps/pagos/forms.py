@@ -5,6 +5,12 @@ from apps.fiscal.models import FormaPago
 from .models import Banco, Pago
 
 
+class BancoForm(BaseModelForm):
+    class Meta:
+        model = Banco
+        fields = ["nombre"]
+
+
 class FormaPagoSelect(forms.Select):
     """Select de FormaPago con data-clave en cada <option>, para que
     pago-form.js muestre/oculte banco y número de referencia según la
@@ -63,8 +69,10 @@ class PagoMultipleForm(forms.Form):
             clave = forma_pago.clave
             if clave == Pago.CLAVE_TRANSFERENCIA and not banco:
                 self.add_error("banco", "Indica el banco de la transferencia.")
-            if clave != Pago.CLAVE_TRANSFERENCIA and banco:
-                self.add_error("banco", "El banco solo aplica cuando la forma de pago es transferencia.")
+            if clave not in Pago.CLAVES_CON_BANCO and banco:
+                self.add_error(
+                    "banco", "El banco solo aplica cuando la forma de pago es transferencia o pago con tarjeta."
+                )
             if clave in (Pago.CLAVE_CHEQUE, Pago.CLAVE_COMPENSACION) and not numero_referencia:
                 etiqueta = "cheque" if clave == Pago.CLAVE_CHEQUE else "nota de crédito"
                 self.add_error("numero_referencia", f"Indica el número de {etiqueta}.")
