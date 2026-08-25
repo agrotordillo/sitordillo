@@ -59,10 +59,11 @@ class Traspaso(BaseAbstractModel):
         super().clean()
         if self.almacen_origen_id and self.almacen_origen_id == self.almacen_destino_id:
             raise ValidationError({"almacen_destino": "El almacén destino debe ser distinto al de origen."})
-        if self.almacen_origen_id and self.almacen_origen.tipo != self.almacen_origen.Tipo.CEDIS:
-            raise ValidationError({"almacen_origen": "El almacén origen de un traspaso debe ser el CEDIS."})
-        if self.almacen_destino_id and self.almacen_destino.tipo != self.almacen_destino.Tipo.SUCURSAL:
-            raise ValidationError({"almacen_destino": "El almacén destino de un traspaso debe ser una sucursal."})
+        if self.almacen_destino_id and self.almacen_destino.tipo == self.almacen_destino.Tipo.CEDIS:
+            raise ValidationError({
+                "almacen_destino": "El almacén destino de un traspaso no puede ser el CEDIS. "
+                "El origen puede ser el CEDIS o una sucursal (traspaso entre sucursales).",
+            })
 
 
 class TraspasoDetalle(BaseAbstractModel):

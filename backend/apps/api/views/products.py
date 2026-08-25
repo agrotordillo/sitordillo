@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -43,7 +43,12 @@ class BrandQuickCreateView(APIView):
 class ProductoBuscarView(APIView):
     """Busca productos por folio, SKU, código de barras o nombre. Pensado
     para reemplazar un <select> en catálogos grandes (~300 mil productos),
-    donde renderizar todas las opciones no es viable."""
+    donde renderizar todas las opciones no es viable.
+
+    Con `?almacen=<id>` (usado por el buscador de traspasos) solo devuelve
+    productos con existencia disponible (>0) en ese almacén — no tiene
+    sentido ofrecer para traspaso algo que no está en stock ahí — e incluye
+    `disponible` con esa cantidad."""
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -51,16 +56,26 @@ class ProductoBuscarView(APIView):
         if len(q) < 3:
             return Response([])
 
-        productos = (
-            Producto.objects.filter(is_active=True)
-            .filter(
-                Q(folio__icontains=q)
-                | Q(sku__icontains=q)
-                | Q(codigo_barras__icontains=q)
-                | Q(nombre__icontains=q)
-            )
-            .order_by("nombre")[:20]
+        productos = Producto.objects.filter(is_active=True).filter(
+            Q(folio__icontains=q)
+            | Q(sku__icontains=q)
+            | Q(codigo_barras__icontains=q)
+            | Q(nombre__icontains=q)
         )
+
+        almacen_id = request.query_params.get("almacen", "").strip()
+        con_existencia = bool(almacen_id)
+        if con_existencia:
+            productos = productos.filter(
+                lotes__almacen_id=almacen_id, lotes__cantidad_disponible__gt=0
+            ).annotate(
+                disponible=Sum(
+                    "lotes__cantidad_disponible",
+                    filter=Q(lotes__almacen_id=almacen_id),
+                )
+            )
+
+        productos = productos.order_by("nombre")[:20]
         data = [
             {
                 "id": p.id,
@@ -69,6 +84,7 @@ class ProductoBuscarView(APIView):
                 "nombre": p.nombre,
                 "precio_venta": str(p.precio_venta),
                 "precio_costo": str(p.precio_costo),
+                **({"disponible": str(p.disponible)} if con_existencia else {}),
             }
             for p in productos
         ]

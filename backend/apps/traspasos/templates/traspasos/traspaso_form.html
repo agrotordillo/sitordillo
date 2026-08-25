@@ -29,7 +29,7 @@
       <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos generales</h3>
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
-          <label for="{{ form.almacen_origen.id_for_label }}" class="label">Almacén origen (CEDIS)</label>
+          <label for="{{ form.almacen_origen.id_for_label }}" class="label">Almacén origen</label>
           {{ form.almacen_origen }}
           {% if form.almacen_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen_origen.errors.0 }}</p>{% endif %}
         </div>
@@ -52,7 +52,7 @@
 
     <div>
       <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos a transferir</h3>
-      <p class="text-xs text-gray-400 mb-3">El traspaso se crea en borrador. El stock del CEDIS se descuenta (FIFO/FEFO) hasta que lo marques como "Enviado".</p>
+      <p class="text-xs text-gray-400 mb-3">El traspaso se crea en borrador. El stock del almacén origen se descuenta (FIFO/FEFO) hasta que lo marques como "Enviado".</p>
 
       {{ formset.management_form }}
       {% if formset.non_form_errors %}
@@ -99,5 +99,6 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}
