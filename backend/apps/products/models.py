@@ -164,6 +164,62 @@ class Almacen(BaseAbstractModel):
                 raise ValidationError({"tipo": "Ya existe un almacén CEDIS; solo puede haber uno."})
 
 
+class PuntoVenta(BaseAbstractModel):
+    """Caja o mostrador de una sucursal. Cada uno abrirá y cerrará su
+    propio turno de forma independiente (turnos: fase futura), y es de
+    tipo "cobro" (cajas donde se recibe el pago) o "pedido" (mostradores
+    donde se toma el pedido del cliente pero se cobra después en una
+    caja)."""
+
+    class Tipo(models.TextChoices):
+        COBRO = "cobro", "Cobro"
+        PEDIDO = "pedido", "Pedido"
+
+    almacen = models.ForeignKey(
+        Almacen,
+        on_delete=models.PROTECT,
+        related_name="puntos_venta",
+        verbose_name="Almacén",
+    )
+    codigo = models.CharField(max_length=20, verbose_name="Código")
+    nombre = models.CharField(max_length=200, verbose_name="Nombre")
+    tipo = models.CharField(
+        max_length=10,
+        choices=Tipo.choices,
+        default=Tipo.COBRO,
+        verbose_name="Tipo de punto de venta",
+    )
+
+    class Meta:
+        verbose_name = "Punto de venta"
+        verbose_name_plural = "Puntos de venta"
+        ordering = ["almacen", "codigo"]
+        constraints = [
+            models.UniqueConstraint(fields=["almacen", "codigo"], name="unico_codigo_por_almacen"),
+        ]
+        indexes = [
+            models.Index(fields=["almacen"]),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo} · {self.nombre} ({self.almacen.nombre})"
+
+    def get_folio_prefix(self):
+        return "PDV"
+
+    def get_slug_source(self):
+        return f"{self.almacen_id}-{self.codigo}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    def clean(self):
+        super().clean()
+        if self.almacen_id and self.almacen.tipo != Almacen.Tipo.SUCURSAL:
+            raise ValidationError({"almacen": "Los puntos de venta solo se configuran para sucursales, no para el CEDIS."})
+
+
 class UnidadMedida(BaseAbstractModel):
     nombre = models.CharField(max_length=80, unique=True, verbose_name="Nombre de la unidad")
     abreviatura = models.CharField(max_length=10, unique=True, verbose_name="Abreviatura")

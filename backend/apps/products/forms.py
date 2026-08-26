@@ -4,7 +4,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from apps.core.forms import BaseModelForm
 from .models import (
     Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente,
-    UnidadMedida, ProductoPrecio,
+    PuntoVenta, UnidadMedida, ProductoPrecio,
 )
 
 
@@ -81,6 +81,24 @@ class WarehouseForm(BaseModelForm):
     class Meta:
         model = Almacen
         fields = ["nombre", "tipo"]
+
+
+class PuntoVentaForm(BaseModelForm):
+    class Meta:
+        model = PuntoVenta
+        fields = ["codigo", "nombre", "tipo"]
+
+    def clean_codigo(self):
+        # "almacen" no es un campo del form (lo fija la vista según la URL),
+        # así que Django excluye la unicidad (almacen, codigo) de su
+        # validate_unique() automático — se valida aquí a mano.
+        codigo = self.cleaned_data["codigo"]
+        almacen_id = self.instance.almacen_id
+        if almacen_id:
+            duplicado = PuntoVenta.objects.filter(almacen_id=almacen_id, codigo=codigo).exclude(pk=self.instance.pk)
+            if duplicado.exists():
+                raise forms.ValidationError("Ya existe un punto de venta con este código en este almacén.")
+        return codigo
 
 
 class UnitMeasureForm(BaseModelForm):
