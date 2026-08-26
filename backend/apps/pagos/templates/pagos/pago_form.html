@@ -70,6 +70,11 @@
 </div>
 {% endif %}
 
+{% if sin_saldo %}
+<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+  Esta cuenta por pagar ya no tiene saldo pendiente. Aquí puedes consultar sus pagos y reenviar el comprobante.
+</div>
+{% else %}
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {% if form.non_field_errors %}
@@ -125,6 +130,7 @@
     <button type="submit" class="btn-primary">Registrar pago</button>
   </div>
 </form>
+{% endif %}
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/pago-form.js' %}"></script>

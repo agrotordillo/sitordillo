@@ -16,8 +16,9 @@ CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PAR
 
 def registrar_pago_view(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
+    sin_saldo = cuenta.estatus in (CuentaPorPagar.Estatus.PAGADA, CuentaPorPagar.Estatus.CANCELADA)
 
-    if cuenta.estatus in (CuentaPorPagar.Estatus.PAGADA, CuentaPorPagar.Estatus.CANCELADA):
+    if request.method == "POST" and sin_saldo:
         messages.info(request, "Esta cuenta por pagar ya no tiene saldo pendiente.")
         return redirect("pagos:cuenta-list")
 
@@ -47,6 +48,7 @@ def registrar_pago_view(request, pk):
         {
             "cuenta": cuenta,
             "form": form,
+            "sin_saldo": sin_saldo,
             "active_module": "purchases",
             "whatsapp_numero": settings.WHATSAPP_NUMERO_PAGOS,
         },

@@ -116,6 +116,8 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           {% if cuenta.estatus == 'pendiente' or cuenta.estatus == 'parcial' %}
           <a href="{% url 'pagos:pago-registrar' cuenta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Registrar pago</a>
+          {% elif cuenta.estatus == 'pagada' %}
+          <a href="{% url 'pagos:pago-registrar' cuenta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver pagos</a>
           {% endif %}
         </td>
       </tr>
