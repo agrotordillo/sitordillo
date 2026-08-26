@@ -1,0 +1,53 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}Pago registrado{% endblock title %}
+{% block title_layout %}Pago registrado · {{ proveedor.display_name }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'pagos:cuenta-list' %}" class="text-gray-400 hover:text-primary-600">Cuentas por pagar</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Pago registrado</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="mb-6 border border-gray-100 rounded-xl overflow-hidden">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2 font-semibold">Cuenta</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Documento</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Monto pagado</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Forma de pago</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for pago in pagos %}
+      <tr>
+        <td class="px-3 py-2">{{ pago.cuenta_por_pagar.folio }}</td>
+        <td class="px-3 py-2">{{ pago.cuenta_por_pagar.orden_compra.documento|default:"-" }}</td>
+        <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
+        <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="bg-gray-50 border-t border-gray-100">
+      <tr>
+        <td colspan="2" class="px-3 py-2 text-right font-semibold text-gray-700">Total pagado</td>
+        <td colspan="2" class="px-3 py-2 font-semibold text-gray-800">${{ total|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
+  <a href="{% url 'pagos:cuenta-list' %}" class="btn-secondary">Volver a Cuentas por pagar</a>
+  {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago_ids destinatario_inicial=proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path boton_label="Enviar por correo" boton_class="btn-primary" %}
+</div>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

@@ -1,0 +1,73 @@
+{% comment %}
+Requiere en el contexto: pago_ids (lista), destinatario_inicial,
+preview_documentos, preview_importe, preview_banco, preview_fecha, next_url.
+Opcional: boton_label (default "Enviar por correo"), boton_class. Cada
+instancia de este include tiene su propio scope Alpine (x-data), así que se
+puede incluir varias veces en la misma página sin conflicto.
+{% endcomment %}
+<div x-data="{ open: false }" class="inline-block">
+  <button type="button" @click="open = true" class="{{ boton_class|default:'text-sm text-primary-600 hover:text-primary-700 font-medium' }}">{{ boton_label|default:"Enviar por correo" }}</button>
+  <template x-teleport="body">
+    <div x-show="open" x-cloak>
+      <div
+        class="modal-backdrop"
+        @click="open = false"
+        x-transition:enter="motion-ui-fade-enter-active"
+        x-transition:enter-start="motion-ui-fade-enter-from"
+        x-transition:enter-end="motion-ui-fade-enter-to"
+        x-transition:leave="motion-ui-fade-leave-active"
+        x-transition:leave-start="motion-ui-fade-leave-from"
+        x-transition:leave-end="motion-ui-fade-leave-to"
+      ></div>
+      <div class="modal-shell" @keydown.escape.window="open = false">
+        <div
+          class="modal-panel"
+          @click.stop
+          x-transition:enter="motion-ui-panel-enter-active"
+          x-transition:enter-start="motion-ui-panel-enter-from"
+          x-transition:enter-end="motion-ui-panel-enter-to"
+          x-transition:leave="motion-ui-panel-leave-active"
+          x-transition:leave-start="motion-ui-panel-leave-from"
+          x-transition:leave-end="motion-ui-panel-leave-to"
+        >
+          <header class="modal-header">
+            <h3 class="text-sm font-semibold text-gray-800">Enviar comprobante por correo</h3>
+            <button type="button" class="btn-icon" @click="open = false" aria-label="Cerrar">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+            </button>
+          </header>
+          <form method="post" action="{% url 'pagos:pago-enviar-correo' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% for pid in pago_ids %}<input type="hidden" name="pago_ids" value="{{ pid }}">{% endfor %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+            <div class="modal-body grid gap-4">
+              <div>
+                <label class="label">Para</label>
+                <input type="email" name="destinatario" class="input" value="{{ destinatario_inicial }}" required>
+              </div>
+              <div>
+                <label class="label">CC <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <input type="text" name="cc" class="input" placeholder="correo1@ejemplo.com, correo2@ejemplo.com">
+              </div>
+              <div>
+                <label class="label">Adjuntar documentos</label>
+                <input type="file" name="adjuntos" class="input" multiple required>
+              </div>
+              <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-xs text-gray-500 space-y-0.5">
+                <p class="font-medium text-gray-600 mb-1">Vista previa del cuerpo del correo:</p>
+                <p>Documentos: <span class="text-gray-700">{{ preview_documentos }}</span></p>
+                <p>Importe total pagado: <span class="text-gray-700">{{ preview_importe }}</span></p>
+                <p>Banco de origen: <span class="text-gray-700">{{ preview_banco }}</span></p>
+                <p>Fecha de pago: <span class="text-gray-700">{{ preview_fecha }}</span></p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" @click="open = false">Cancelar</button>
+              <button type="submit" class="btn-primary">Enviar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>

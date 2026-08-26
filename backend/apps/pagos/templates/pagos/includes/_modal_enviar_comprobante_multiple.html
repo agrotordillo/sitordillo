@@ -1,0 +1,64 @@
+{% comment %}
+Modal para enviar por correo varios pagos seleccionados con checkboxes (ver
+form_id) en un solo correo: el total y los documentos se calculan del lado
+del servidor a partir de los pagos realmente marcados al enviar, no aquí.
+Requiere en el contexto: form_id (el <form> externo al que apuntan los
+checkboxes vía el atributo form=), destinatario_inicial, boton_id.
+{% endcomment %}
+<div x-data="{ open: false }" class="inline-block">
+  <button type="button" id="{{ boton_id }}" @click="open = true" disabled class="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed">
+    Enviar por correo (seleccionados)
+  </button>
+  <template x-teleport="body">
+    <div x-show="open" x-cloak>
+      <div
+        class="modal-backdrop"
+        @click="open = false"
+        x-transition:enter="motion-ui-fade-enter-active"
+        x-transition:enter-start="motion-ui-fade-enter-from"
+        x-transition:enter-end="motion-ui-fade-enter-to"
+        x-transition:leave="motion-ui-fade-leave-active"
+        x-transition:leave-start="motion-ui-fade-leave-from"
+        x-transition:leave-end="motion-ui-fade-leave-to"
+      ></div>
+      <div class="modal-shell" @keydown.escape.window="open = false">
+        <div
+          class="modal-panel"
+          @click.stop
+          x-transition:enter="motion-ui-panel-enter-active"
+          x-transition:enter-start="motion-ui-panel-enter-from"
+          x-transition:enter-end="motion-ui-panel-enter-to"
+          x-transition:leave="motion-ui-panel-leave-active"
+          x-transition:leave-start="motion-ui-panel-leave-from"
+          x-transition:leave-end="motion-ui-panel-leave-to"
+        >
+          <header class="modal-header">
+            <h3 class="text-sm font-semibold text-gray-800">Enviar comprobantes por correo</h3>
+            <button type="button" class="btn-icon" @click="open = false" aria-label="Cerrar">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+            </button>
+          </header>
+          <div class="modal-body grid gap-4">
+            <p class="text-xs text-gray-500">El importe total y los documentos del correo se calculan a partir de los pagos que hayas marcado.</p>
+            <div>
+              <label class="label">Para</label>
+              <input type="email" name="destinatario" form="{{ form_id }}" class="input" value="{{ destinatario_inicial }}" required>
+            </div>
+            <div>
+              <label class="label">CC <span class="text-gray-400 font-normal">(opcional)</span></label>
+              <input type="text" name="cc" form="{{ form_id }}" class="input" placeholder="correo1@ejemplo.com, correo2@ejemplo.com">
+            </div>
+            <div>
+              <label class="label">Adjuntar documentos</label>
+              <input type="file" name="adjuntos" form="{{ form_id }}" class="input" multiple required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" @click="open = false">Cancelar</button>
+            <button type="submit" form="{{ form_id }}" class="btn-primary">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>

@@ -1,11 +1,20 @@
 from datetime import timedelta
 from decimal import Decimal
+from email.mime.image import MIMEImage
+
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.contrib.staticfiles.finders import find as encontrar_estatico
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .models import CuentaPorPagar, Pago
+
+FIRMA_CORREO_PAGOS = (
+    "Erick José Hernández Rocas · Depto. de Pagos · Celular: 933 148 0558 · "
+    "Pagos@eltordillo.com.mx · Proveedores@eltordillo.com.mx"
+)
 
 
 def validar_limite_credito(proveedor, monto_nuevo, excluir_cuenta_id=None):
@@ -79,31 +88,77 @@ def registrar_pago(cuenta, fecha_pago, monto_pagado, forma_pago, aplica_descuent
     return pago
 
 
-def enviar_comprobante_email(pago):
-    """Envía el comprobante de un pago por correo al contacto del proveedor.
-    Requiere que el pago tenga un archivo adjunto y que el proveedor tenga
-    correo de contacto registrado; propaga cualquier error de envío (SMTP
-    sin configurar, credenciales inválidas, etc.) para que la vista lo
-    muestre al usuario."""
-    if not pago.comprobante:
-        raise ValueError("Este pago no tiene comprobante adjunto.")
+def calcular_datos_comprobante(pagos):
+    """Reúne los datos comunes para el correo de notificación de pago a
+    partir de uno o varios `Pago` (un pago combinado genera un Pago por
+    cuenta, pero es un solo correo con todos los documentos). Asume que
+    todos los pagos son del mismo proveedor, misma forma de pago/banco y
+    misma fecha (es como se registran hoy los pagos combinados)."""
+    documentos = [
+        pago.cuenta_por_pagar.orden_compra.documento
+        for pago in pagos
+        if pago.cuenta_por_pagar.orden_compra.documento
+    ]
+    primero = pagos[0]
+    return {
+        "proveedor_nombre": primero.cuenta_por_pagar.proveedor.display_name,
+        "documentos": ", ".join(documentos) if documentos else "sin folio capturado",
+        "importe_total": f"${sum((p.monto_pagado for p in pagos), Decimal('0.00')):,.2f}",
+        "banco": primero.banco.nombre if primero.banco_id else primero.forma_pago.descripcion,
+        "fecha_pago": f"{primero.fecha_pago:%d/%m/%Y}",
+    }
 
-    proveedor = pago.cuenta_por_pagar.proveedor
-    if not proveedor.contacto_email:
-        raise ValueError("Este proveedor no tiene correo de contacto registrado.")
 
-    cuenta = pago.cuenta_por_pagar
-    asunto = f"Comprobante de pago {pago.folio} · {proveedor.display_name}"
-    cuerpo = (
-        f"Se registró un pago de ${pago.monto_pagado} el {pago.fecha_pago:%d/%m/%Y}, "
-        f"correspondiente a la cuenta {cuenta.folio} (orden de compra {cuenta.orden_compra.folio}).\n\n"
-        "Se adjunta el comprobante correspondiente."
+def enviar_comprobante_pago(pagos, destinatario, cc, adjuntos):
+    """Envía la notificación de pago (uno o varios documentos a la vez) al
+    correo indicado, con copia opcional, adjuntando los archivos subidos en
+    el momento del envío (no se reutiliza ningún comprobante ya guardado).
+    Propaga cualquier error de envío (SMTP sin configurar, credenciales
+    inválidas, etc.) para que la vista lo muestre al usuario."""
+    if not pagos:
+        raise ValueError("No hay pagos para notificar.")
+    if not adjuntos:
+        raise ValueError("Adjunta al menos un documento.")
+
+    datos = calcular_datos_comprobante(pagos)
+    proveedor = pagos[0].cuenta_por_pagar.proveedor
+    asunto = f"Comprobante de pago · {proveedor.display_name}"
+
+    cuerpo_texto = (
+        f"Documentos: {datos['documentos']}\n"
+        f"Importe total pagado: {datos['importe_total']}\n"
+        f"Banco de origen: {datos['banco']}\n"
+        f"Fecha de pago: {datos['fecha_pago']}\n\n"
+        "Adjunto a este correo encontrará el comprobante de pago correspondiente para su referencia y control.\n\n"
+        "Le agradeceremos validar la recepción y correcta aplicación del pago a los documentos señalados.\n\n"
+        "Este correo ha sido generado automáticamente como notificación de pago.\n\n"
+        "Saludos cordiales,\n\n"
+        f"{FIRMA_CORREO_PAGOS}"
     )
-    email = EmailMessage(
+
+    logo_cid = "logo_tordillo"
+    cuerpo_html = render_to_string("pagos/email/comprobante_pago.html", {**datos, "logo_cid": logo_cid})
+
+    email = EmailMultiAlternatives(
         subject=asunto,
-        body=cuerpo,
+        body=cuerpo_texto,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[proveedor.contacto_email],
+        to=[destinatario],
+        cc=cc or None,
     )
-    email.attach_file(pago.comprobante.path)
+    email.attach_alternative(cuerpo_html, "text/html")
+    email.mixed_subtype = "related"
+
+    logo_path = encontrar_estatico("src/logo.png")
+    if logo_path:
+        with open(logo_path, "rb") as f:
+            logo = MIMEImage(f.read())
+        logo.add_header("Content-ID", f"<{logo_cid}>")
+        logo.add_header("Content-Disposition", "inline", filename="logo.png")
+        email.attach(logo)
+
+    for archivo in adjuntos:
+        archivo.seek(0)
+        email.attach(archivo.name, archivo.read(), archivo.content_type)
+
     email.send()

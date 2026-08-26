@@ -84,6 +84,66 @@ class PagoMultipleForm(forms.Form):
         return cleaned
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """Receta documentada de Django para un campo de archivo múltiple: no
+    existe un FileField nativo para varios archivos, así que se limpia cada
+    uno con la lógica normal de FileField."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            resultado = [single_file_clean(d, initial) for d in data]
+        else:
+            resultado = [single_file_clean(data, initial)] if data else []
+        if self.required and not resultado:
+            raise forms.ValidationError(self.error_messages["required"], code="required")
+        return resultado
+
+
+class EnviarComprobanteForm(forms.Form):
+    """Correo de notificación de pago: el destinatario/CC son editables y
+    los adjuntos siempre se suben en el momento (no se reutiliza el
+    comprobante ya guardado del pago, para permitir mandar varios
+    documentos juntos aunque el pago original solo tenga uno o ninguno)."""
+
+    destinatario = forms.EmailField(label="Para")
+    cc = forms.CharField(label="CC", required=False, help_text="Correos separados por coma (opcional)")
+    adjuntos = MultipleFileField(label="Adjuntar documentos")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name == "adjuntos":
+                continue
+            existing = field.widget.attrs.get("class", "").strip()
+            field.widget.attrs["class"] = f"{existing} input".strip()
+
+    def clean_cc(self):
+        crudo = self.cleaned_data.get("cc", "").strip()
+        if not crudo:
+            return []
+        validador = forms.EmailField()
+        correos = []
+        for correo in crudo.split(","):
+            correo = correo.strip()
+            if not correo:
+                continue
+            try:
+                validador.clean(correo)
+            except forms.ValidationError:
+                raise forms.ValidationError(f'"{correo}" no es un correo válido.')
+            correos.append(correo)
+        return correos
+
+
 class PagoForm(BaseModelForm):
     class Meta:
         model = Pago

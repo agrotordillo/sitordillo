@@ -26,10 +26,15 @@
 </div>
 
 {% if cuenta.pagos.all %}
+<form id="form-enviar-multiple" method="post" action="{% url 'pagos:pago-enviar-correo' %}" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+</form>
 <div class="mb-6 border border-gray-100 rounded-xl overflow-hidden">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
+        <th scope="col" class="px-3 py-2 font-semibold w-8"></th>
         <th scope="col" class="px-3 py-2 font-semibold">Fecha</th>
         <th scope="col" class="px-3 py-2 font-semibold">Monto pagado</th>
         <th scope="col" class="px-3 py-2 font-semibold">Descuento</th>
@@ -39,34 +44,35 @@
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
-      {% for pago in cuenta.pagos.all %}
+      {% for pago, preview in pagos_con_preview %}
       <tr>
+        <td class="px-3 py-2">
+          <input type="checkbox" name="pago_ids" value="{{ pago.pk }}" form="form-enviar-multiple" class="chk-pago-correo">
+        </td>
         <td class="px-3 py-2">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
         <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
         <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|floatformat:2 }}{% else %}-{% endif %}</td>
         <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
         <td class="px-3 py-2">{{ pago.numero_referencia|default:"-" }}</td>
         <td class="px-3 py-2 text-right">
-          {% if pago.comprobante %}
           <div class="flex items-center justify-end gap-3">
+            {% if pago.comprobante %}
             <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
-            <form method="post" action="{% url 'pagos:pago-enviar-correo' pago.pk %}" class="inline">
-              {% csrf_token %}
-              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Enviar por correo</button>
-            </form>
             <a
               href="https://wa.me/{{ whatsapp_numero }}?text={{ pago.folio|urlencode }}%20-%20Comprobante%20de%20pago%20a%20{{ cuenta.proveedor.display_name|urlencode }}%20por%20%24{{ pago.monto_pagado|urlencode }}"
               target="_blank" rel="noopener" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >Enviar por WhatsApp</a>
+            {% endif %}
+            {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago.pago_ids_modal destinatario_inicial=cuenta.proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path %}
           </div>
-          {% else %}
-          <span class="text-xs text-gray-400">Sin comprobante</span>
-          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  <div class="flex justify-end px-3 py-2.5 border-t border-gray-100 bg-gray-50/50">
+    {% include "pagos/includes/_modal_enviar_comprobante_multiple.html" with form_id="form-enviar-multiple" destinatario_inicial=cuenta.proveedor.contacto_email boton_id="btn-enviar-multiple" %}
+  </div>
 </div>
 {% endif %}
 
@@ -134,4 +140,6 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/pago-form.js' %}"></script>
+<script src="{% static 'js/modules/forms/pago-enviar-multiple.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

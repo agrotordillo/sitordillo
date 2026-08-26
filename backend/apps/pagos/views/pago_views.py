@@ -5,11 +5,12 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
-from apps.pagos.forms import PagoForm, PagoMultipleForm
+from apps.pagos.forms import EnviarComprobanteForm, PagoForm, PagoMultipleForm
 from apps.pagos.models import CuentaPorPagar, Pago
-from apps.pagos.services import enviar_comprobante_email
+from apps.pagos.services import calcular_datos_comprobante, enviar_comprobante_pago
 
 CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PARCIAL)
 
@@ -42,6 +43,11 @@ def registrar_pago_view(request, pk):
     else:
         form = PagoForm(initial={"fecha_pago": timezone.localdate()})
 
+    pagos_con_preview = []
+    for pago in cuenta.pagos.all():
+        pago.pago_ids_modal = [pago.pk]
+        pagos_con_preview.append((pago, calcular_datos_comprobante([pago])))
+
     return render(
         request,
         "pagos/pago_form.html",
@@ -49,6 +55,7 @@ def registrar_pago_view(request, pk):
             "cuenta": cuenta,
             "form": form,
             "sin_saldo": sin_saldo,
+            "pagos_con_preview": pagos_con_preview,
             "active_module": "purchases",
             "whatsapp_numero": settings.WHATSAPP_NUMERO_PAGOS,
         },
@@ -136,7 +143,7 @@ def registrar_pago_multiple_view(request):
         comprobante = form.cleaned_data.get("comprobante")
         try:
             with transaction.atomic():
-                pagados = 0
+                pago_ids = []
                 for cuenta in cuentas:
                     monto = montos[cuenta.pk]
                     if monto <= 0:
@@ -156,14 +163,15 @@ def registrar_pago_multiple_view(request):
                     pago.full_clean()
                     pago.save()
                     cuenta.actualizar_estatus()
-                    pagados += 1
+                    pago_ids.append(pago.pk)
         except ValidationError as e:
             for errores in e.message_dict.values():
                 for mensaje in errores:
                     form.add_error(None, mensaje)
         else:
-            messages.success(request, f"Se registraron {pagados} pagos correctamente.")
-            return redirect("pagos:cuenta-list")
+            messages.success(request, f"Se registraron {len(pago_ids)} pagos correctamente.")
+            ids_qs = ",".join(str(pk) for pk in pago_ids)
+            return redirect(f"{reverse('pagos:pago-multiple-confirmacion')}?ids={ids_qs}")
 
     return render(
         request,
@@ -178,17 +186,65 @@ def registrar_pago_multiple_view(request):
     )
 
 
-def enviar_comprobante_email_view(request, pk):
-    pago = get_object_or_404(Pago, pk=pk)
+def pago_multiple_confirmacion_view(request):
+    ids_qs = request.GET.get("ids", "")
+    pago_ids = [pk for pk in ids_qs.split(",") if pk]
+    pagos = list(
+        Pago.objects.filter(pk__in=pago_ids)
+        .select_related("cuenta_por_pagar__orden_compra__proveedor", "banco", "forma_pago")
+        .order_by("cuenta_por_pagar__fecha_vencimiento")
+    )
+    if not pagos:
+        messages.error(request, "No se encontraron los pagos registrados.")
+        return redirect("pagos:cuenta-list")
+
+    return render(
+        request,
+        "pagos/pago_multiple_confirmacion.html",
+        {
+            "pagos": pagos,
+            "pago_ids": [p.pk for p in pagos],
+            "proveedor": pagos[0].cuenta_por_pagar.proveedor,
+            "total": sum((p.monto_pagado for p in pagos), Decimal("0.00")),
+            "preview": calcular_datos_comprobante(pagos),
+            "active_module": "purchases",
+        },
+    )
+
+
+def enviar_comprobante_view(request):
     if request.method != "POST":
-        return redirect("pagos:pago-registrar", pk=pago.cuenta_por_pagar_id)
+        return redirect("pagos:cuenta-list")
+
+    next_url = request.POST.get("next") or reverse("pagos:cuenta-list")
+    pago_ids = request.POST.getlist("pago_ids")
+    pagos = list(
+        Pago.objects.filter(pk__in=pago_ids).select_related(
+            "cuenta_por_pagar__orden_compra__proveedor", "banco", "forma_pago"
+        )
+    )
+    if not pagos or len(pagos) != len(set(pago_ids)):
+        messages.error(request, "No se encontraron los pagos a notificar.")
+        return redirect(next_url)
+
+    form = EnviarComprobanteForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for errores in form.errors.values():
+            for mensaje in errores:
+                messages.error(request, mensaje)
+        return redirect(next_url)
 
     try:
-        enviar_comprobante_email(pago)
+        enviar_comprobante_pago(
+            pagos,
+            destinatario=form.cleaned_data["destinatario"],
+            cc=form.cleaned_data["cc"],
+            adjuntos=form.cleaned_data["adjuntos"],
+        )
     except ValueError as exc:
         messages.error(request, str(exc))
     except Exception as exc:  # noqa: BLE001 - errores de SMTP/red, se muestran tal cual
         messages.error(request, f"No se pudo enviar el correo: {exc}")
     else:
-        messages.success(request, f"Comprobante enviado a {pago.cuenta_por_pagar.proveedor.contacto_email}.")
-    return redirect("pagos:pago-registrar", pk=pago.cuenta_por_pagar_id)
+        messages.success(request, f"Correo enviado a {form.cleaned_data['destinatario']}.")
+    return redirect(next_url)
