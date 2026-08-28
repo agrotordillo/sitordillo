@@ -282,6 +282,24 @@
         </div>
         {% endif %}
 
+        {# ─── Carga por lista ───────────────────────────────────────────── #}
+        <div class="mb-4 rounded-xl border border-gray-100" x-data="{ open: false }">
+          <button type="button" class="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700" @click="open = !open">
+            Carga por lista (pegar SKU y cantidad)
+            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ '-rotate-180': open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          <div x-show="open" x-cloak class="px-3 pb-3 border-t border-gray-100 pt-3">
+            <p class="text-xs text-gray-400 mb-2">Pega una lista con SKU y cantidad por línea (como se copia de Excel), una línea por producto. El precio se autocompleta con el costo registrado; ajústalo si hace falta.</p>
+            <textarea id="lista-masiva-texto" class="input" rows="5" placeholder="COMGG	30&#10;COMGR	89&#10;CPC	11"></textarea>
+            <div class="flex items-center justify-between mt-2">
+              <p id="lista-masiva-resumen" class="text-xs text-gray-500"></p>
+              <button type="button" id="lista-masiva-btn" class="btn-secondary" data-url="{% url 'api:producto-resolver-skus' %}">Agregar a la orden</button>
+            </div>
+          </div>
+        </div>
+
         <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
           <table class="w-full text-sm text-left text-gray-600">
             <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
@@ -333,5 +351,6 @@
 <script src="{% static 'js/modules/forms/precio-alerta.js' %}"></script>
 <script src="{% static 'js/modules/forms/proveedor-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/lista-masiva.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

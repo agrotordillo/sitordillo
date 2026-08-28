@@ -4,6 +4,7 @@ from .views.products import (
     BrandQuickCreateView,
     ProductoActualizarCostoView,
     ProductoBuscarView,
+    ProductoResolverSkusView,
     SubcategoriesByCategoryView,
     UnitMeasureQuickCreateView,
 )
@@ -38,6 +39,11 @@ urlpatterns = [
         "products/actualizar-costo/",
         ProductoActualizarCostoView.as_view(),
         name="producto-actualizar-costo",
+    ),
+    path(
+        "products/resolver-skus/",
+        ProductoResolverSkusView.as_view(),
+        name="producto-resolver-skus",
     ),
     path(
         "compras/promocion-vigente/",

@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 
 from django.db.models import Q, Sum
+from django.db.models.functions import Upper
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -89,6 +90,44 @@ class ProductoBuscarView(APIView):
             for p in productos
         ]
         return Response(data)
+
+
+class ProductoResolverSkusView(APIView):
+    """Resuelve una lista de SKUs a productos (coincidencia exacta,
+    insensible a mayúsculas/minúsculas). Pensado para la carga por lista de
+    Compras: pegas SKU + cantidad por línea y esto encuentra el producto de
+    cada SKU en un solo viaje al servidor."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        skus = request.data.get("skus", [])
+        if not isinstance(skus, list):
+            return Response({"detail": "Se espera una lista de SKUs."}, status=400)
+
+        skus_norm = [str(s).strip().upper() for s in skus if str(s).strip()]
+        if not skus_norm:
+            return Response({"productos": [], "no_encontrados": []})
+
+        productos = list(
+            Producto.objects.filter(is_active=True)
+            .exclude(tipo=Producto.TipoProducto.PAQUETE)
+            .annotate(sku_upper=Upper("sku"))
+            .filter(sku_upper__in=set(skus_norm))
+        )
+        por_sku = {p.sku.upper(): p for p in productos}
+        no_encontrados = [s for s in dict.fromkeys(skus_norm) if s not in por_sku]
+
+        data = [
+            {
+                "id": p.id,
+                "folio": p.folio,
+                "sku": p.sku,
+                "nombre": p.nombre,
+                "precio_costo": str(p.precio_costo),
+            }
+            for p in productos
+        ]
+        return Response({"productos": data, "no_encontrados": no_encontrados})
 
 
 class ProductoActualizarCostoView(APIView):
