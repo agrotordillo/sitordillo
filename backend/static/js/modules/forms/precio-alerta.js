@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("click", (event) => {
     if (!event.target.matches(".actualizar-costo-btn")) return;
-    actualizarCosto(event.target);
+    pedirConfirmacion(event.target);
   });
 
   document.querySelectorAll(".fs-precio").forEach(evaluar);
@@ -35,6 +35,25 @@ document.addEventListener("DOMContentLoaded", () => {
       boton.textContent = "Actualizar precio de costo";
       boton.disabled = false;
     }
+  }
+
+  function pedirConfirmacion(boton) {
+    const row = boton.closest(".formset-row");
+    const productoInput = row?.querySelector('input[name$="-producto"]');
+    const precioInput = row?.querySelector(".fs-precio");
+    const nombreInput = row?.querySelector(".producto-search-input");
+    if (!productoInput?.value || !precioInput?.value) return;
+
+    const costoAnterior = parseFloat(productoInput.dataset.precioCosto || 0);
+    const costoNuevo = parseFloat(precioInput.value);
+    window.dispatchEvent(new CustomEvent("confirmar-costo:abrir", {
+      detail: {
+        nombre: nombreInput?.value || "este producto",
+        anterior: costoAnterior.toFixed(2),
+        nuevo: costoNuevo.toFixed(2),
+        onConfirmar: () => actualizarCosto(boton),
+      },
+    }));
   }
 
   async function actualizarCosto(boton) {

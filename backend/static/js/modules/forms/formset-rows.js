@@ -8,7 +8,7 @@ document.addEventListener("alpine:init", () => {
       this._totalFormsInput = document.querySelector(config.totalFormsSelector);
 
       this._rows.querySelectorAll(".formset-row").forEach((row) => this._bindRow(row));
-      document.querySelectorAll(".fs-impuesto-suma, .fs-impuesto-resta").forEach((el) => {
+      document.querySelectorAll(".fs-impuesto-suma, .fs-impuesto-resta, .fs-descuento-general").forEach((el) => {
         el.addEventListener("input", () => this._recalculate());
       });
       this._recalculate();
@@ -63,6 +63,17 @@ document.addEventListener("alpine:init", () => {
         subtotal += rowTotal;
       });
 
+      // Descuento general del proveedor: un solo % sobre el subtotal (no por
+      // línea), igual que Proveedor.descuento y OrdenCompra.descuento_pct.
+      let descuentoGeneralPct = 0;
+      document.querySelectorAll(".fs-descuento-general").forEach((el) => {
+        descuentoGeneralPct += parseFloat(el.value) || 0;
+      });
+      const montoDescuentoGeneral = subtotal * (descuentoGeneralPct / 100);
+      document.querySelectorAll(".fs-descuento-general-monto").forEach((el) => {
+        el.textContent = montoDescuentoGeneral.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+      });
+
       let ajusteImpuestos = 0;
       document.querySelectorAll(".fs-impuesto-suma").forEach((el) => {
         ajusteImpuestos += parseFloat(el.value) || 0;
@@ -71,7 +82,7 @@ document.addEventListener("alpine:init", () => {
         ajusteImpuestos -= parseFloat(el.value) || 0;
       });
 
-      this.total = (subtotal + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2 });
+      this.total = (subtotal - montoDescuentoGeneral + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2 });
     },
   }));
 });

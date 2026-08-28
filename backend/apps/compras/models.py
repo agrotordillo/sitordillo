@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import BaseAbstractModel
@@ -175,6 +175,13 @@ class OrdenCompra(BaseAbstractModel):
         blank=True,
         verbose_name="Método de pago",
     )
+    descuento_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        verbose_name="Descuento proveedor (%)",
+        help_text="Descuento general que el proveedor aplica sobre el subtotal de la orden.",
+    )
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IVA")
     ieps = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IEPS")
     retencion_iva = models.DecimalField(
@@ -188,8 +195,12 @@ class OrdenCompra(BaseAbstractModel):
     class Meta:
         verbose_name = "Orden de compra"
         verbose_name_plural = "Órdenes de compra"
-        ordering = ["-fecha_orden", "-created_at"]
+        ordering = ["-created_at"]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(descuento_pct__gte=0) & models.Q(descuento_pct__lte=100),
+                name="oc_descuento_pct_rango_valido",
+            ),
             models.CheckConstraint(condition=models.Q(iva__gte=0), name="oc_iva_no_negativo"),
             models.CheckConstraint(condition=models.Q(ieps__gte=0), name="oc_ieps_no_negativo"),
             models.CheckConstraint(condition=models.Q(retencion_iva__gte=0), name="oc_retencion_iva_no_negativa"),
@@ -220,8 +231,19 @@ class OrdenCompra(BaseAbstractModel):
         return sum((detalle.subtotal for detalle in self.detalles.all()), Decimal("0.00"))
 
     @property
+    def descuento_monto(self):
+        """Monto del descuento general del proveedor, calculado sobre el
+        subtotal real (no sobre un total ya redondeado en otro paso) y
+        redondeado una sola vez al final, para que el porcentaje capturado
+        se refleje exacto sin arrastrar error de redondeo."""
+        if not self.descuento_pct:
+            return Decimal("0.00")
+        monto = self.subtotal * self.descuento_pct / Decimal("100")
+        return monto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
     def total(self):
-        return self.subtotal + self.iva + self.ieps - self.retencion_iva - self.retencion_isr
+        return self.subtotal - self.descuento_monto + self.iva + self.ieps - self.retencion_iva - self.retencion_isr
 
     def clean(self):
         super().clean()
@@ -229,6 +251,8 @@ class OrdenCompra(BaseAbstractModel):
             raise ValidationError({
                 "fecha_entrega_estimada": "La fecha de entrega estimada no puede ser anterior a la fecha de la orden.",
             })
+        if self.descuento_pct is not None and (self.descuento_pct < 0 or self.descuento_pct > 100):
+            raise ValidationError({"descuento_pct": "El descuento debe estar entre 0 y 100."})
 
 
 class OrdenCompraDetalle(BaseAbstractModel):

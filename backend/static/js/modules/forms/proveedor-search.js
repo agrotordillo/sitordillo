@@ -69,6 +69,18 @@ document.addEventListener("DOMContentLoaded", () => {
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
         input.value = `${item.rfc} · ${item.nombre}`;
         resultsEl.classList.add("hidden");
+
+        // Sugiere el % de descuento general del proveedor en la orden de
+        // compra (solo si el campo sigue en su valor por default, para no
+        // pisar un descuento ya capturado/editado a mano).
+        const descuentoField = document.getElementById("id_descuento_pct");
+        if (descuentoField && item.descuento !== undefined) {
+          const actual = descuentoField.value.trim();
+          if (!actual || actual === "0" || actual === "0.00") {
+            descuentoField.value = item.descuento;
+            descuentoField.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        }
       });
       resultsEl.appendChild(btn);
     });

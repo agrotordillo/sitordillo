@@ -130,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
-        input.value = `${item.folio} · ${item.nombre}`;
+        input.value = `${item.sku || item.folio} · ${item.nombre}`;
         resultsEl.classList.add("hidden");
       });
       resultsEl.appendChild(btn);

@@ -226,6 +226,12 @@
               <div class="form-card-body">
             <div class="form-card-grid">
               <div>
+                <label for="{{ form.descuento_pct.id_for_label }}" class="label">Descuento proveedor (%)</label>
+                {{ form.descuento_pct }}
+                <p class="mt-1.5 text-xs text-gray-400">Se resta del subtotal: <span class="fs-descuento-general-monto font-medium text-gray-600">0.00</span></p>
+                {% if form.descuento_pct.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento_pct.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
                 <label for="{{ form.iva.id_for_label }}" class="label">IVA</label>
                 {{ form.iva }}
                 {% if form.iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.iva.errors.0 }}</p>{% endif %}
@@ -309,7 +315,7 @@
             Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
           </div>
         </div>
-        <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos más IVA e IEPS, menos las retenciones capturadas arriba.</p>
+        <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos, menos el descuento del proveedor, más IVA e IEPS, menos las retenciones capturadas arriba.</p>
       </div>
     </section>
 
@@ -319,6 +325,7 @@
     </div>
   </div>
 </form>
+{% include "compras/includes/_modal_confirmar_costo.html" %}
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>

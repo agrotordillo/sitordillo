@@ -22,6 +22,7 @@ class OrdenCompraForm(BaseModelForm):
             "estado_pago",
             "medio_pago",
             "forma_pago",
+            "descuento_pct",
             "iva",
             "ieps",
             "retencion_iva",
@@ -48,6 +49,12 @@ class OrdenCompraForm(BaseModelForm):
             ).first()
         self.fields["forma_pago"].queryset = FormaPago.objects.filter(is_active=True)
         self.fields["forma_pago"].required = False
+        self.fields["descuento_pct"].widget.attrs.update({
+            "class": (self.fields["descuento_pct"].widget.attrs.get("class", "") + " fs-descuento-general").strip(),
+            "step": "0.01",
+            "min": "0",
+            "max": "100",
+        })
         for campo in ("iva", "ieps"):
             self.fields[campo].widget.attrs.update({
                 "class": (self.fields[campo].widget.attrs.get("class", "") + " fs-impuesto-suma").strip(),

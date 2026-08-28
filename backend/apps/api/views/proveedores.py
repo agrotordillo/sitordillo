@@ -33,6 +33,7 @@ class ProveedorBuscarView(APIView):
                 "folio": p.folio,
                 "rfc": p.rfc,
                 "nombre": p.display_name,
+                "descuento": str(p.descuento),
             }
             for p in proveedores
         ]
