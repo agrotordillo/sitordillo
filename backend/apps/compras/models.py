@@ -277,7 +277,16 @@ class OrdenCompraDetalle(BaseAbstractModel):
         verbose_name="Producto",
     )
     cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad")
-    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Precio unitario")
+    precio_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=4,
+        verbose_name="Precio unitario",
+        help_text=(
+            "Admite hasta 4 decimales: el valor unitario real de un CFDI a veces trae más "
+            "precisión de la que se ve impresa (ej. $66.785 se imprime como $66.79), y con solo "
+            "2 decimales el importe de la línea no cuadra exacto contra la factura."
+        ),
+    )
     cantidad_recibida = models.DecimalField(
         max_digits=12,
         decimal_places=2,

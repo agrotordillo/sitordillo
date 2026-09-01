@@ -112,7 +112,7 @@ class OrdenCompraDetalleForm(BaseModelForm):
         })
         self.fields["precio_unitario"].widget.attrs.update({
             "class": (self.fields["precio_unitario"].widget.attrs.get("class", "") + " fs-precio").strip(),
-            "step": "0.01",
+            "step": "0.0001",
             "min": "0",
         })
 
