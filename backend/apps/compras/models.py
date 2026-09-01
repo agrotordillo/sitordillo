@@ -155,6 +155,14 @@ class OrdenCompra(BaseAbstractModel):
         verbose_name="Documento",
         help_text="Número de factura o folio de nota de venta del proveedor.",
     )
+    cfdi_uuid = models.CharField(
+        max_length=36,
+        blank=True,
+        unique=True,
+        null=True,
+        verbose_name="UUID del CFDI",
+        help_text="Folio fiscal del CFDI si esta orden se generó cargando el XML de la factura.",
+    )
     estado_pago = models.CharField(
         max_length=10,
         choices=EstadoPago.choices,
@@ -329,6 +337,22 @@ class OrdenCompraDetalle(BaseAbstractModel):
     def subtotal(self):
         bruto = self.cantidad_facturable * (self.precio_unitario or Decimal("0"))
         return bruto.quantize(Decimal("0.01"))
+
+    @property
+    def precio_neto(self):
+        """Precio unitario real que se paga por esta línea, después del
+        descuento general del proveedor capturado en la orden
+        (OrdenCompra.descuento_pct). precio_unitario se captura tal cual
+        viene en la factura (bruto, para verificarlo fácil contra el papel);
+        este es el valor que se debe usar para comparar contra el costo
+        registrado del producto y como costo por default al recibir la
+        mercancía — nunca el bruto."""
+        precio = self.precio_unitario or Decimal("0.00")
+        pct = self.orden_compra.descuento_pct if self.orden_compra_id else None
+        if not pct:
+            return precio
+        neto = precio * (Decimal("1") - pct / Decimal("100"))
+        return neto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def clean(self):
         super().clean()

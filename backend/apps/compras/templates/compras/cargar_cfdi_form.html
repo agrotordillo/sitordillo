@@ -1,0 +1,43 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Cargar CFDI{% endblock title %}
+{% block title_layout %}Cargar orden de compra desde CFDI{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Cargar CFDI</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Sube el archivo <strong>XML</strong> del CFDI que te envió el proveedor (no el PDF). Se crea una orden de
+  compra en borrador con sus productos, cantidades y precios ya con el descuento aplicado tal como lo
+  declara la factura — línea por línea, sin redondeos. El proveedor se busca por su RFC, así que debe estar
+  dado de alta antes de cargar el archivo. Podrás revisar y ajustar todo (almacén destino, estatus, etc.)
+  antes de guardar.
+</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4">
+    <div>
+      <label for="{{ form.archivo.id_for_label }}" class="label">Archivo XML del CFDI</label>
+      {{ form.archivo }}
+      {% if form.archivo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.archivo.errors.0 }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'compras:orden-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Cargar</button>
+  </div>
+</form>
+{% endblock main_content %}

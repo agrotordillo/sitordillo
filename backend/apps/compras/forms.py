@@ -8,6 +8,20 @@ from apps.proveedores.models import Proveedor
 from .models import OrdenCompra, OrdenCompraDetalle, PromocionProveedor
 
 
+class CargarCFDIForm(forms.Form):
+    archivo = forms.FileField(label="Archivo XML del CFDI")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["archivo"].widget.attrs["class"] = "input"
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data["archivo"]
+        if not archivo.name.lower().endswith(".xml"):
+            raise forms.ValidationError("El archivo debe ser un .xml (el CFDI, no el PDF de la representación impresa).")
+        return archivo
+
+
 class OrdenCompraForm(BaseModelForm):
     class Meta:
         model = OrdenCompra

@@ -58,7 +58,7 @@ document.addEventListener("alpine:init", () => {
         const rowTotal = qty * price * (1 - descuento / 100);
 
         const totalEl = row.querySelector(".fs-row-total");
-        if (totalEl) totalEl.textContent = rowTotal.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+        if (totalEl) totalEl.textContent = rowTotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         subtotal += rowTotal;
       });
@@ -71,7 +71,7 @@ document.addEventListener("alpine:init", () => {
       });
       const montoDescuentoGeneral = subtotal * (descuentoGeneralPct / 100);
       document.querySelectorAll(".fs-descuento-general-monto").forEach((el) => {
-        el.textContent = montoDescuentoGeneral.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+        el.textContent = montoDescuentoGeneral.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       });
 
       let ajusteImpuestos = 0;
@@ -82,7 +82,7 @@ document.addEventListener("alpine:init", () => {
         ajusteImpuestos -= parseFloat(el.value) || 0;
       });
 
-      this.total = (subtotal - montoDescuentoGeneral + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2 });
+      this.total = (subtotal - montoDescuentoGeneral + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
   }));
 });

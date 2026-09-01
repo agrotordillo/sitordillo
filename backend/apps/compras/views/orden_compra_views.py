@@ -1,13 +1,16 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.db import transaction
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
 from apps.compras.models import OrdenCompra
-from apps.compras.forms import OrdenCompraForm, OrdenCompraDetalleFormSet
+from apps.compras.forms import CargarCFDIForm, OrdenCompraForm, OrdenCompraDetalleFormSet
+from apps.compras.services import CFDIImportError, importar_cfdi_compra
 
 
 class OrdenCompraListView(ListView):
@@ -66,6 +69,45 @@ class OrdenCompraCreateView(CreateView):
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar la orden de compra. Revisa los campos.")
         return super().form_invalid(form)
+
+
+def cargar_cfdi_view(request):
+    if request.method == "POST":
+        form = CargarCFDIForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                orden, no_encontrados = importar_cfdi_compra(form.cleaned_data["archivo"])
+            except CFDIImportError as exc:
+                form.add_error(None, str(exc))
+            except ValidationError as exc:
+                mensajes = exc.messages if hasattr(exc, "messages") else [str(exc)]
+                for mensaje in mensajes:
+                    form.add_error(None, mensaje)
+            else:
+                if no_encontrados:
+                    detalle = ", ".join(
+                        (c["codigo"] or c["descripcion"] or "?") for c in no_encontrados
+                    )
+                    messages.warning(
+                        request,
+                        f"Se creó la orden {orden.folio} desde el CFDI, pero "
+                        f"{len(no_encontrados)} producto(s) no se encontraron y no se agregaron: "
+                        f"{detalle}. Agrégalos manualmente y revisa el resto antes de guardar.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Orden {orden.folio} creada desde el CFDI. Revisa los datos antes de guardarla.",
+                    )
+                return redirect("compras:orden-update", pk=orden.pk)
+    else:
+        form = CargarCFDIForm()
+
+    return render(
+        request,
+        "compras/cargar_cfdi_form.html",
+        {"form": form, "active_module": "purchases"},
+    )
 
 
 class OrdenCompraUpdateView(UpdateView):

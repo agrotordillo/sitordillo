@@ -22,6 +22,7 @@
   <td class="px-3 py-2 w-32">
     {{ form.precio_unitario }}
     {% if form.precio_unitario.errors %}<p class="mt-1 text-xs text-red-600">{{ form.precio_unitario.errors.0 }}</p>{% endif %}
+    <p class="fs-precio-neto mt-1 text-xs text-gray-400"></p>
     <p class="promo-hint hidden mt-1 text-xs text-emerald-600"></p>
     <button type="button" class="actualizar-costo-btn hidden mt-1 text-xs font-medium text-primary-600 hover:text-primary-700" data-url="{% url 'api:producto-actualizar-costo' %}">Actualizar precio de costo</button>
   </td>
