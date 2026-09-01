@@ -349,15 +349,32 @@ class OrdenCompraDetalle(BaseAbstractModel):
 
     @property
     def precio_neto(self):
-        """Precio unitario real que se paga por esta línea, después del
-        descuento general del proveedor capturado en la orden
-        (OrdenCompra.descuento_pct). precio_unitario se captura tal cual
-        viene en la factura (bruto, para verificarlo fácil contra el papel);
-        este es el valor que se debe usar para comparar contra el costo
-        registrado del producto y como costo por default al recibir la
-        mercancía — nunca el bruto."""
+        """Precio de referencia para costeo: precio_unitario (capturado tal
+        cual viene en la factura, bruto) menos SOLO el % de descuento base
+        del proveedor (Proveedor.descuento) — nunca el % combinado de la
+        orden (OrdenCompra.descuento_pct, que puede traer un adicional
+        variable según consumo/negociación de esa compra).
+
+        El adicional variable sí reduce lo que se paga en la orden (ver
+        OrdenCompra.descuento_monto/total), pero no debe mover el costo de
+        referencia del producto ni el listado de precios: si un mes no se
+        alcanza ese adicional, el costo registrado no debe quedar inflado
+        ni desinflado por una negociación puntual. Este es el valor que se
+        compara contra el costo registrado del producto (alerta de "el
+        precio subió") y el que se usa como costo por default al recibir
+        la mercancía — nunca el precio bruto ni el % combinado."""
         precio = self.precio_unitario or Decimal("0.00")
-        pct = self.orden_compra.descuento_pct if self.orden_compra_id else None
+        if not self.orden_compra_id:
+            return precio
+        orden = self.orden_compra
+        if orden.cfdi_uuid:
+            # Órdenes cargadas desde el XML del CFDI (ver
+            # apps.compras.services.importar_cfdi_compra) ya guardan aquí el
+            # precio real neto, calculado línea por línea con el
+            # Importe/Descuento que declara la factura — no hay nada más
+            # que restarle, y hacerlo lo descontaría dos veces.
+            return precio
+        pct = orden.proveedor.descuento
         if not pct:
             return precio
         neto = precio * (Decimal("1") - pct / Decimal("100"))

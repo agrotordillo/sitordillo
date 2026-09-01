@@ -66,6 +66,10 @@ document.addEventListener("DOMContentLoaded", () => {
         </span>`;
       btn.addEventListener("click", () => {
         hiddenInput.value = item.id;
+        // % base del proveedor: lo usa precio-alerta.js para comparar contra
+        // el costo registrado, independiente de lo que se capture como
+        // adicional en "Descuento proveedor (%)" de la orden.
+        if (item.descuento !== undefined) hiddenInput.dataset.descuento = item.descuento;
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
         input.value = `${item.rfc} · ${item.nombre}`;
         resultsEl.classList.add("hidden");

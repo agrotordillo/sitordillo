@@ -1,22 +1,26 @@
 document.addEventListener("DOMContentLoaded", () => {
   // Marca en rojo el precio unitario de una línea de compra cuando el
-  // precio NETO (ya con el % de descuento general del proveedor aplicado,
-  // ver OrdenCompra.descuento_pct) supera el costo anterior registrado del
-  // producto, y ofrece un botón para actualizar Producto.precio_costo a ese
-  // neto — nunca al precio bruto que se captura tal cual viene en la factura.
+  // precio de referencia (precio_unitario menos SOLO el % base del
+  // proveedor, ver Proveedor.descuento) supera el costo anterior
+  // registrado del producto, y ofrece un botón para actualizar
+  // Producto.precio_costo a ese valor — nunca al precio bruto de la
+  // factura, y nunca al % combinado de la orden (que puede traer un
+  // adicional variable por consumo/negociación que no debe mover el
+  // costo de referencia ni el listado de precios).
   document.addEventListener("input", (event) => {
-    if (event.target.matches(".fs-precio")) {
-      evaluar(event.target);
-    } else if (event.target.id === "id_descuento_pct") {
-      document.querySelectorAll(".fs-precio").forEach(evaluar);
-    }
+    if (!event.target.matches(".fs-precio")) return;
+    evaluar(event.target);
   });
 
   document.addEventListener("change", (event) => {
-    if (!event.target.matches('input[name$="-producto"]')) return;
-    const row = event.target.closest(".formset-row");
-    const precioInput = row?.querySelector(".fs-precio");
-    if (precioInput) evaluar(precioInput);
+    if (event.target.matches('input[name$="-producto"]')) {
+      const row = event.target.closest(".formset-row");
+      const precioInput = row?.querySelector(".fs-precio");
+      if (precioInput) evaluar(precioInput);
+    } else if (event.target.name === "proveedor") {
+      // Cambió el proveedor (y con él, su % base) -> reevaluar todas las líneas.
+      document.querySelectorAll(".fs-precio").forEach(evaluar);
+    }
   });
 
   document.addEventListener("click", (event) => {
@@ -26,14 +30,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.querySelectorAll(".fs-precio").forEach(evaluar);
 
-  function descuentoPct() {
-    const campo = document.getElementById("id_descuento_pct");
-    const valor = campo ? parseFloat(campo.value) : 0;
+  function descuentoBaseProveedor() {
+    const campo = document.querySelector('input[name="proveedor"]');
+    const valor = campo ? parseFloat(campo.dataset.descuento) : 0;
     return isNaN(valor) ? 0 : valor;
   }
 
-  function precioNeto(precioBruto) {
-    return precioBruto * (1 - descuentoPct() / 100);
+  function precioReferencia(precioBruto) {
+    return precioBruto * (1 - descuentoBaseProveedor() / 100);
   }
 
   function evaluar(precioInput) {
@@ -43,21 +47,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const netoEl = row?.querySelector(".fs-precio-neto");
     const costoAnterior = parseFloat(productoInput?.dataset.precioCosto);
     const bruto = parseFloat(precioInput.value);
-    const pct = descuentoPct();
-    const neto = precioNeto(bruto);
+    const pct = descuentoBaseProveedor();
+    const referencia = precioReferencia(bruto);
 
     if (netoEl) {
-      netoEl.textContent = pct > 0 && !isNaN(neto) ? `Neto (−${pct}%): $${neto.toFixed(2)}` : "";
+      netoEl.textContent = pct > 0 && !isNaN(referencia) ? `Costo ref. (−${pct}% proveedor): $${referencia.toFixed(2)}` : "";
     }
 
-    const excede = !isNaN(costoAnterior) && !isNaN(neto) && neto > costoAnterior;
+    const excede = !isNaN(costoAnterior) && !isNaN(referencia) && referencia > costoAnterior;
     precioInput.classList.toggle("border-red-500", excede);
     precioInput.classList.toggle("text-red-600", excede);
     if (boton) {
       boton.classList.toggle("hidden", !excede);
       boton.textContent = "Actualizar precio de costo";
       boton.disabled = false;
-      boton.dataset.precioNeto = isNaN(neto) ? "" : neto.toFixed(2);
+      boton.dataset.precioNeto = isNaN(referencia) ? "" : referencia.toFixed(2);
     }
   }
 

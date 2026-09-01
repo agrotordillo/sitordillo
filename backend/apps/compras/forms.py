@@ -81,6 +81,10 @@ class OrdenCompraForm(BaseModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
+        if self.instance.proveedor_id:
+            # Para que precio-alerta.js pueda comparar contra el % base del
+            # proveedor sin esperar a que se reseleccione (ver proveedor-search.js).
+            self.fields["proveedor"].widget.attrs["data-descuento"] = str(self.instance.proveedor.descuento)
         self.fields["almacen_destino"].queryset = Almacen.objects.filter(is_active=True)
         self.fields["almacen_destino"].required = True
         if not self.instance.pk:

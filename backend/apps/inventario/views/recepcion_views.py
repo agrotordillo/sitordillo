@@ -96,9 +96,9 @@ def recepcion_compra_view(request, pk):
             {
                 "detalle_id": d.id,
                 "cantidad_recibir": d.cantidad - d.cantidad_recibida,
-                # precio_neto (no precio_unitario bruto): ya trae descontado
-                # el % general del proveedor capturado en la orden, para que
-                # el costo del lote refleje lo que realmente se paga.
+                # precio_neto (no precio_unitario bruto): descuenta solo el %
+                # base del proveedor (Proveedor.descuento), nunca el %
+                # combinado/adicional de la orden — ver OrdenCompraDetalle.precio_neto.
                 "costo_unitario": d.precio_neto,
                 "almacen": orden.almacen_destino_id,
             }
