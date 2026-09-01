@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django import forms
 from django.forms import inlineformset_factory
 
@@ -6,6 +8,30 @@ from apps.fiscal.models import FormaPago
 from apps.products.models import Almacen, Producto
 from apps.proveedores.models import Proveedor
 from .models import OrdenCompra, OrdenCompraDetalle, PromocionProveedor
+
+
+class PrecioUnitarioWidget(forms.NumberInput):
+    """Muestra el precio recortando ceros de relleno (238.5000 -> 238.50),
+    pero sin redondear ni esconder precisión real (66.7850 -> 66.785,
+    66.7847 se queda igual) — el campo admite hasta 4 decimales, esto solo
+    limpia cómo se ve cuando no hacen falta."""
+
+    def format_value(self, value):
+        if value in (None, ""):
+            return super().format_value(value)
+        try:
+            valor = Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return super().format_value(value)
+
+        texto = format(valor, "f")
+        if "." not in texto:
+            return texto
+        entero, _, decimales = texto.partition(".")
+        decimales = decimales.rstrip("0")
+        if len(decimales) < 2:
+            decimales = decimales.ljust(2, "0")
+        return f"{entero}.{decimales}"
 
 
 class CargarCFDIForm(forms.Form):
@@ -92,6 +118,7 @@ class OrdenCompraDetalleForm(BaseModelForm):
             # busca por texto (ver producto-search.js) y este campo solo
             # guarda el id elegido.
             "producto": forms.HiddenInput,
+            "precio_unitario": PrecioUnitarioWidget,
         }
 
     def __init__(self, *args, **kwargs):
