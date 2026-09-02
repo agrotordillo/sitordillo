@@ -1,0 +1,60 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Nueva conversión{% endblock title %}
+{% block title_layout %}Nueva conversión{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:conversion-list' %}" class="text-gray-400 hover:text-primary-600">Conversiones</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.almacen.id_for_label }}" class="label">Almacén</label>
+      {{ form.almacen }}
+      {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.receta.id_for_label }}" class="label">Receta</label>
+      {{ form.receta }}
+      {% if not form.receta.field.queryset.exists %}
+      <p class="mt-1.5 text-xs text-amber-600">
+        No hay recetas registradas todavía. <a href="{% url 'inventario:receta-conversion-create' %}" class="underline">Crea una primero</a>.
+      </p>
+      {% endif %}
+      {% if form.receta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.receta.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.cantidad_origen.id_for_label }}" class="label">Cantidad de origen a convertir</label>
+      {{ form.cantidad_origen }}
+      <p class="mt-1 text-xs text-gray-400">La cantidad de destino se calcula sola según la receta.</p>
+      {% if form.cantidad_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad_origen.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.fecha.id_for_label }}" class="label">Fecha</label>
+      {{ form.fecha }}
+      {% if form.fecha.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'inventario:conversion-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar conversión</button>
+  </div>
+</form>
+{% endblock main_content %}

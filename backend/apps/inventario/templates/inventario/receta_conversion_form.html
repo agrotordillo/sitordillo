@@ -1,0 +1,54 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}{% if object %}Editar receta{% else %}Nueva receta{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar receta{% else %}Nueva receta{% endif %}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:receta-conversion-list' %}" class="text-gray-400 hover:text-primary-600">Recetas de conversión</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.producto_origen.id_for_label }}" class="label">Producto origen</label>
+      {{ form.producto_origen }}
+      <p class="mt-1 text-xs text-gray-400">La presentación grande (ej. saco de 40kg).</p>
+      {% if form.producto_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto_origen.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.producto_destino.id_for_label }}" class="label">Producto destino</label>
+      {{ form.producto_destino }}
+      <p class="mt-1 text-xs text-gray-400">La presentación chica (ej. bolsa de 2kg).</p>
+      {% if form.producto_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto_destino.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.cantidad_origen.id_for_label }}" class="label">Cantidad origen</label>
+      {{ form.cantidad_origen }}
+      <p class="mt-1 text-xs text-gray-400">Ej. 1 (un saco).</p>
+      {% if form.cantidad_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad_origen.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.cantidad_destino.id_for_label }}" class="label">Cantidad destino</label>
+      {{ form.cantidad_destino }}
+      <p class="mt-1 text-xs text-gray-400">Ej. 20 (veinte bolsas).</p>
+      {% if form.cantidad_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad_destino.errors.0 }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'inventario:receta-conversion-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

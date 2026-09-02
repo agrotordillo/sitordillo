@@ -3,7 +3,9 @@ from decimal import Decimal
 from django.db import models, transaction
 from django.utils import timezone
 
-from .models import Lote, MovimientoInventario
+from .models import Conversion, Lote, MovimientoInventario
+
+TWO_PLACES = Decimal("0.01")
 
 
 @transaction.atomic
@@ -224,5 +226,80 @@ def registrar_merma_recepcion(lote, cantidad, motivo=""):
         cuenta.monto_total = orden.total
         cuenta.full_clean()
         cuenta.save(update_fields=["monto_total", "updated_at", "updated_by"])
+
+
+@transaction.atomic
+def registrar_conversion(receta, almacen, cantidad_origen, fecha=None, observaciones=""):
+    """Transforma `cantidad_origen` del producto origen de una receta en el
+    producto destino correspondiente, en un mismo almacén.
+
+    El producto origen sale por FIFO (registrar_salida, el mismo mecanismo
+    que una venta), así que el valor consumido es el costo real -no uno
+    estimado-. El producto destino entra en un lote nuevo a su costo de
+    catálogo (Producto.precio_costo). Se rechaza si el valor generado no
+    supera al valor consumido: envasar siempre debe costar más que vender a
+    granel (empaque, mano de obra), así que si no es así hay un costo de
+    catálogo mal capturado en el producto destino -y como esto se valida
+    después de descontar el producto origen, @transaction.atomic revierte
+    esa salida si la conversión se rechaza."""
+    if cantidad_origen is None or cantidad_origen <= 0:
+        raise ValueError("La cantidad a convertir debe ser mayor a cero.")
+
+    producto_origen = receta.producto_origen
+    producto_destino = receta.producto_destino
+    cantidad_destino = (cantidad_origen * receta.factor).quantize(TWO_PLACES)
+
+    movimientos_salida = registrar_salida(
+        producto_origen,
+        almacen,
+        cantidad_origen,
+        estrategia="fifo",
+        motivo=f"Conversión a {producto_destino.nombre}",
+    )
+    valor_consumido = sum(
+        ((-movimiento.cantidad) * movimiento.lote.costo_unitario for movimiento in movimientos_salida),
+        Decimal("0.00"),
+    ).quantize(TWO_PLACES)
+
+    valor_generado = (cantidad_destino * producto_destino.precio_costo).quantize(TWO_PLACES)
+
+    if valor_generado <= valor_consumido:
+        raise ValueError(
+            f"El valor generado (${valor_generado}) no supera al valor consumido (${valor_consumido}): revisa el "
+            f"costo de catálogo de {producto_destino.nombre}, envasar siempre debe costar más que vender a granel."
+        )
+
+    conversion = Conversion(
+        almacen=almacen,
+        receta=receta,
+        cantidad_origen_convertida=cantidad_origen,
+        cantidad_destino_generada=cantidad_destino,
+        fecha=fecha or timezone.localdate(),
+        valor_consumido=valor_consumido,
+        valor_generado=valor_generado,
+        observaciones=observaciones,
+    )
+    conversion.full_clean()
+    conversion.save()
+
+    lote_destino = Lote(
+        producto=producto_destino,
+        almacen=almacen,
+        numero_lote=f"Conversión {conversion.folio}",
+        fecha_ingreso=conversion.fecha,
+        costo_unitario=producto_destino.precio_costo,
+        cantidad_inicial=cantidad_destino,
+        cantidad_disponible=Decimal("0.00"),
+    )
+    lote_destino.full_clean()
+    lote_destino.save()
+    registrar_movimiento(
+        lote_destino,
+        MovimientoInventario.Tipo.ENTRADA,
+        cantidad_destino,
+        motivo=f"Conversión {conversion.folio} desde {producto_origen.nombre}",
+    )
+
+    return conversion
 
     return detalle
