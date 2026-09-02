@@ -1,0 +1,44 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}{% if object %}Editar centro de costo{% else %}Crear centro de costo{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar centro de costo{% else %}Crear centro de costo{% endif %}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:centro-costo-list' %}" class="text-gray-400 hover:text-primary-600">Centros de costo</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.nombre.id_for_label }}" class="label">Nombre</label>
+      {{ form.nombre }}
+      {% if form.nombre.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.nombre.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.tipo.id_for_label }}" class="label">Tipo</label>
+      {{ form.tipo }}
+      {% if form.tipo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tipo.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.almacen.id_for_label }}" class="label">Almacén (solo para tipo Sucursal)</label>
+      {{ form.almacen }}
+      {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.descripcion }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'gastos:centro-costo-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

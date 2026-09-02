@@ -55,6 +55,7 @@ LOCAL_APPS = [
     'apps.cotizaciones',
     'apps.pagos',
     'apps.facturacion',
+    'apps.gastos',
     'apps.api',
 ]
 

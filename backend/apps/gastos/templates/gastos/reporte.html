@@ -1,0 +1,60 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Punto de equilibrio por sucursal{% endblock title %}
+{% block title_layout %}Punto de equilibrio por sucursal{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Punto de equilibrio</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="flex items-center gap-2">
+  <input type="month" name="mes" value="{{ mes_seleccionado }}" class="input" onchange="this.form.submit()">
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="px-4 sm:px-6 pt-4 text-xs text-gray-400">
+  Comparativo de {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_fin|date:"d/m/Y" }}. No es el punto de equilibrio contable
+  completo (falta separar el costo variable de la mercancía vendida); compara venta contra el gasto real de cada
+  sucursal, incluyendo lo que le corresponde de gastos compartidos ya distribuidos.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Ventas</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden sm:table-cell">Gasto directo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden sm:table-cell">Gasto distribuido</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Gasto total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Resultado</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in resumen %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ fila.centro_costo.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">${{ fila.ventas|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_directo|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_distribuido|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ fila.gasto_total|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold {% if fila.resultado >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+          ${{ fila.resultado|floatformat:2 }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay centros de costo de tipo Sucursal registrados.</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

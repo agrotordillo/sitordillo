@@ -1,0 +1,155 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}Registrar gasto{% endblock title %}
+{% block title_layout %}Registrar gasto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Crear</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post" enctype="multipart/form-data" x-data="gastoForm({
+    totalFormsSelector: '#id_distribuciones-TOTAL_FORMS',
+    importeSelector: '#id_importe',
+    compartidoSelector: '#id_es_compartido',
+  })">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-8">
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos del gasto</h3>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.centro_costo.id_for_label }}" class="label">Centro de costo de origen</label>
+          {{ form.centro_costo }}
+          <p class="mt-1 text-xs text-gray-400">Si es compartido, aquí va quién lo pagó (p. ej. Administración); el reparto real por sucursal se captura abajo.</p>
+          {% if form.centro_costo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.centro_costo.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.categoria.id_for_label }}" class="label">Categoría</label>
+          {{ form.categoria }}
+          {% if form.categoria.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.categoria.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.proveedor }}
+        </div>
+        <div>
+          <label for="{{ form.fecha.id_for_label }}" class="label">Fecha</label>
+          {{ form.fecha }}
+          {% if form.fecha.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.concepto.id_for_label }}" class="label">Concepto</label>
+          {{ form.concepto }}
+          {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.importe.id_for_label }}" class="label">Importe total</label>
+          {{ form.importe }}
+          {% if form.importe.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.importe.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="flex items-end pb-1.5">
+          <label class="inline-flex items-center gap-2">
+            {{ form.es_compartido }}
+            <span class="text-sm text-gray-600">Se distribuye entre varias sucursales</span>
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          {{ form.facturado }}
+          <label for="{{ form.facturado.id_for_label }}" class="text-sm text-gray-600">Facturado (con CFDI)</label>
+        </div>
+        <div>
+          <label for="{{ form.referencia_factura.id_for_label }}" class="label">Referencia de factura</label>
+          {{ form.referencia_factura }}
+          {% if form.referencia_factura.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.referencia_factura.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.comprobante.id_for_label }}" class="label">Comprobante <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.comprobante }}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.observaciones }}
+        </div>
+      </div>
+    </div>
+
+    <div x-show="compartido" x-cloak>
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Distribución por sucursal</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Captura la cantidad exacta que le corresponde a cada sucursal (no se calcula un promedio): por ejemplo, la
+        sucursal con más personal puede consumir más agua que las demás. La suma debe cuadrar exactamente con el
+        importe total del gasto.
+      </p>
+
+      {{ formset.management_form }}
+      {% if formset.non_form_errors %}
+      <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Sucursal</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Monto asignado</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+            </tr>
+          </thead>
+          <tbody x-ref="rows" class="divide-y divide-gray-100">
+            {% for distribucion_form in formset %}
+            {% include "gastos/includes/_distribucion_row.html" with form=distribucion_form %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <template x-ref="emptyRow">{% include "gastos/includes/_distribucion_row.html" with form=formset.empty_form %}</template>
+
+      <button type="button" class="btn-secondary mt-3" @click="addRow()">
+        <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+        </svg>
+        Agregar sucursal
+      </button>
+
+      <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
+        <div class="text-sm text-right">
+          <p class="text-gray-600">Asignado: <span class="font-semibold text-gray-800" x-text="formatMoney(totalAsignado)"></span></p>
+          <p class="mt-0.5" :class="restante === 0 ? 'text-green-600' : 'text-amber-600'">
+            <span x-show="restante > 0">Falta por asignar: <span x-text="formatMoney(restante)"></span></span>
+            <span x-show="restante < 0">Asignado de más: <span x-text="formatMoney(restante * -1)"></span></span>
+            <span x-show="restante === 0">Cuadra exacto con el importe total</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'gastos:gasto-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar gasto</button>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/gasto-form.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

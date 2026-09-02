@@ -1,0 +1,62 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Centros de costo{% endblock title %}
+{% block title_layout %}Centros de costo{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Centros de costo</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'gastos:centro-costo-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nuevo centro de costo
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Tipo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Almacén ligado</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"><span class="sr-only">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for centro in centros_costo %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ centro.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ centro.get_tipo_display }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ centro.almacen.nombre|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          <a href="{% url 'gastos:centro-costo-update' centro.pk %}" class="btn-icon-outline" aria-label="Editar centro de costo" title="Editar centro de costo">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+              <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+            </svg>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay centros de costo registrados</p>
+            <a href="{% url 'gastos:centro-costo-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}
