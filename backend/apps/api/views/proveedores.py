@@ -1,5 +1,4 @@
 from django.db.models import Q
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,8 +8,8 @@ from apps.proveedores.models import Proveedor
 class ProveedorBuscarView(APIView):
     """Busca proveedores por folio, RFC o nombre (fiscal o comercial). Pensado
     para reemplazar un <select> con el catálogo completo de proveedores, que
-    ya ronda los 300 registros y sigue creciendo."""
-    permission_classes = [AllowAny]
+    ya ronda los 300 registros y sigue creciendo. Sin permission_classes
+    propio: usa el default del proyecto (IsAuthenticated)."""
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()

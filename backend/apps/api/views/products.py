@@ -3,7 +3,6 @@ from decimal import Decimal, InvalidOperation
 from django.db.models import Q, Sum
 from django.db.models.functions import Upper
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -16,7 +15,6 @@ class SubcategoriesByCategoryView(ListAPIView):
     """Subcategorías activas filtradas por categoría."""
     serializer_class = OptionSerializer
     pagination_class = None
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         category_id = self.request.query_params.get("category")
@@ -31,7 +29,6 @@ class SubcategoriesByCategoryView(ListAPIView):
 
 class BrandQuickCreateView(APIView):
     """Alta rápida de Marca desde el formulario de producto."""
-    permission_classes = [AllowAny]
 
     def post(self, request):
         form = BrandForm(request.data)
@@ -50,7 +47,6 @@ class ProductoBuscarView(APIView):
     productos con existencia disponible (>0) en ese almacén — no tiene
     sentido ofrecer para traspaso algo que no está en stock ahí — e incluye
     `disponible` con esa cantidad."""
-    permission_classes = [AllowAny]
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
@@ -97,7 +93,6 @@ class ProductoResolverSkusView(APIView):
     insensible a mayúsculas/minúsculas). Pensado para la carga por lista de
     Compras: pegas SKU + cantidad por línea y esto encuentra el producto de
     cada SKU en un solo viaje al servidor."""
-    permission_classes = [AllowAny]
 
     def post(self, request):
         skus = request.data.get("skus", [])
@@ -133,7 +128,6 @@ class ProductoResolverSkusView(APIView):
 class ProductoActualizarCostoView(APIView):
     """Actualiza el precio de costo de un producto desde la orden de compra,
     cuando el precio pagado al proveedor supera el costo anterior registrado."""
-    permission_classes = [AllowAny]
 
     def post(self, request):
         producto_id = request.data.get("producto")
@@ -160,7 +154,6 @@ class ProductoActualizarCostoView(APIView):
 
 class UnitMeasureQuickCreateView(APIView):
     """Alta rápida de Unidad de medida desde el formulario de producto."""
-    permission_classes = [AllowAny]
 
     def post(self, request):
         form = UnitMeasureForm(request.data)

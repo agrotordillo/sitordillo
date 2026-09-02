@@ -1,6 +1,5 @@
 from datetime import date
 
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,7 +10,6 @@ from apps.products.models import Producto
 class PromocionVigenteView(APIView):
     """Consulta si hay una promoción vigente de un proveedor sobre un producto
     en una fecha dada, usada para sugerir el precio en la Orden de Compra."""
-    permission_classes = [AllowAny]
 
     def get(self, request):
         producto_id = request.query_params.get("producto")

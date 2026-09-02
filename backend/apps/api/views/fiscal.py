@@ -1,5 +1,4 @@
 from django.db.models import Q
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,7 +10,6 @@ class ClaveProdServBuscarView(APIView):
     sembrado con el catálogo oficial CFDI 4.0, ~52 mil registros). Pensado
     para reemplazar un <select> gigante, que era la causa de que el
     formulario de producto tardara mucho en cargar al editar."""
-    permission_classes = [AllowAny]
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
@@ -29,7 +27,6 @@ class ClaveProdServBuscarView(APIView):
 
 class ClaveUnidadBuscarView(APIView):
     """Busca en el catálogo local de claves de unidad SAT (~2,400 registros)."""
-    permission_classes = [AllowAny]
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
