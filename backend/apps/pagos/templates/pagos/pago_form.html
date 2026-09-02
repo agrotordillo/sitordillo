@@ -40,12 +40,13 @@
         <th scope="col" class="px-3 py-2 font-semibold">Descuento</th>
         <th scope="col" class="px-3 py-2 font-semibold">Forma de pago</th>
         <th scope="col" class="px-3 py-2 font-semibold">Referencia</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Estado</th>
         <th scope="col" class="px-3 py-2 font-semibold"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for pago, preview in pagos_con_preview %}
-      <tr>
+      <tr class="{% if not pago.is_active %}opacity-50{% endif %}">
         <td class="px-3 py-2">
           <input type="checkbox" name="pago_ids" value="{{ pago.pk }}" form="form-enviar-multiple" class="chk-pago-correo">
         </td>
@@ -54,8 +55,16 @@
         <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|floatformat:2 }}{% else %}-{% endif %}</td>
         <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
         <td class="px-3 py-2">{{ pago.numero_referencia|default:"-" }}</td>
+        <td class="px-3 py-2">
+          {% if pago.is_active %}
+          <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Activo</span>
+          {% else %}
+          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Inactivo</span>
+          {% endif %}
+        </td>
         <td class="px-3 py-2 text-right">
           <div class="flex items-center justify-end gap-3">
+            {% if pago.is_active %}
             {% if pago.comprobante %}
             <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
             {% endif %}
@@ -64,6 +73,16 @@
               target="_blank" rel="noopener" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >Enviar por WhatsApp</a>
             {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago.pago_ids_modal destinatario_inicial=cuenta.proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path %}
+            {% endif %}
+            <form method="post" action="{% url 'pagos:pago-toggle-activo' pago.pk %}" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              {% if pago.is_active %}
+              <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Anular</button>
+              {% else %}
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Reactivar</button>
+              {% endif %}
+            </form>
           </div>
         </td>
       </tr>

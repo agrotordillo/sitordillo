@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.pagos.forms import EnviarComprobanteForm, PagoForm, PagoMultipleForm
 from apps.pagos.models import CuentaPorPagar, Pago
-from apps.pagos.services import calcular_datos_comprobante, enviar_comprobante_pago
+from apps.pagos.services import alternar_estado_pago, calcular_datos_comprobante, enviar_comprobante_pago
 
 CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PARCIAL)
 
@@ -215,6 +215,24 @@ def pago_multiple_confirmacion_view(request):
             "active_module": "purchases",
         },
     )
+
+
+@permission_required("pagos.change_pago", raise_exception=True)
+def pago_toggle_activo_view(request, pk):
+    if request.method != "POST":
+        return redirect("pagos:cuenta-list")
+
+    pago = get_object_or_404(Pago, pk=pk)
+    next_url = request.POST.get("next") or reverse("pagos:pago-registrar", args=[pago.cuenta_por_pagar_id])
+
+    error = alternar_estado_pago(pago)
+    if error:
+        messages.error(request, error)
+    elif pago.is_active:
+        messages.success(request, f"Pago {pago.folio} reactivado.")
+    else:
+        messages.success(request, f"Pago {pago.folio} anulado.")
+    return redirect(next_url)
 
 
 @permission_required("pagos.view_pago", raise_exception=True)

@@ -82,18 +82,20 @@
     <tbody class="divide-y divide-gray-100">
       <tr class="bg-gray-50/80">
         <td colspan="7" class="px-4 sm:px-6 py-2">
-          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
             <span class="font-semibold text-gray-700">{{ grupo.proveedor.display_name }}</span>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-              <span>IVA: ${{ grupo.totales.iva|moneda }}</span>
-              {% if grupo.totales.ieps %}<span>IEPS: ${{ grupo.totales.ieps|moneda }}</span>{% endif %}
-              {% if grupo.totales.retenciones %}<span>Ret.: -${{ grupo.totales.retenciones|moneda }}</span>{% endif %}
-              <span class="font-medium text-gray-600">Total: ${{ grupo.totales.monto_total|moneda }}</span>
-              <span>Saldo: ${{ grupo.totales.saldo_pendiente|moneda }}</span>
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-500">
+              <span>IVA: <span class="text-gray-600">${{ grupo.totales.iva|moneda }}</span></span>
+              {% if grupo.totales.ieps %}<span class="text-gray-300">·</span><span>IEPS: <span class="text-gray-600">${{ grupo.totales.ieps|moneda }}</span></span>{% endif %}
+              {% if grupo.totales.retenciones %}<span class="text-gray-300">·</span><span>Ret.: <span class="text-gray-600">-${{ grupo.totales.retenciones|moneda }}</span></span>{% endif %}
+              <span class="text-gray-300">·</span>
+              <span class="font-medium text-gray-700">Total: ${{ grupo.totales.monto_total|moneda }}</span>
+              <span class="text-gray-300">·</span>
+              <span>Saldo: <span class="text-gray-600">${{ grupo.totales.saldo_pendiente|moneda }}</span></span>
               <button
                 type="submit" form="pago-multi-{{ grupo.proveedor.pk }}" disabled
                 id="btn-pagar-{{ grupo.proveedor.pk }}"
-                class="btn-secondary text-xs py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                class="btn-secondary text-xs py-1.5 ml-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >Pagar seleccionadas</button>
             </div>
           </div>

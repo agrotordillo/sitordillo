@@ -89,11 +89,14 @@ class CuentaPorPagar(BaseAbstractModel):
 
     @property
     def total_pagado(self):
-        return sum((p.monto_pagado for p in self.pagos.all()), Decimal("0.00"))
+        # Un pago anulado (is_active=False, ver Pago.get_folio_prefix/baja
+        # lógica) deja de contar aquí -como si nunca se hubiera aplicado-,
+        # aunque se conserva en el historial para trazabilidad.
+        return sum((p.monto_pagado for p in self.pagos.all() if p.is_active), Decimal("0.00"))
 
     @property
     def total_descuento(self):
-        return sum((p.monto_descuento for p in self.pagos.all()), Decimal("0.00"))
+        return sum((p.monto_descuento for p in self.pagos.all() if p.is_active), Decimal("0.00"))
 
     @property
     def saldo_pendiente(self):

@@ -73,6 +73,43 @@ def generar_cuenta_por_pagar(orden_compra, fecha_emision=None, observaciones="")
 
 
 @transaction.atomic
+def alternar_estado_pago(pago):
+    """Anula o reactiva un pago sin eliminarlo -borrado lógico, igual que en
+    el resto del sistema (usuarios, proveedores, etc.)-, replicando el
+    concepto de ACTIVO/INACTIVO del sistema anterior (scvweb): un pago
+    nunca se borra, solo cambia de estado. Un pago anulado deja de contar
+    en el saldo pagado de su cuenta (ver CuentaPorPagar.total_pagado), pero
+    se conserva en el historial para trazabilidad.
+
+    Al anular no hay validación: siempre se puede anular un pago existente.
+    Al reactivar sí se valida que su monto quepa en el saldo pendiente
+    actual de la cuenta -que pudo haberse reducido por otros pagos
+    registrados mientras este estaba anulado-, para no dejar la cuenta
+    sobre-pagada. Devuelve un mensaje de error si no se pudo reactivar, o
+    None si la operación se realizó."""
+    cuenta = pago.cuenta_por_pagar
+
+    if pago.is_active:
+        pago.is_active = False
+        pago.save(update_fields=["is_active"])
+        cuenta.actualizar_estatus()
+        return None
+
+    disponible = cuenta.saldo_pendiente
+    if pago.monto_pagado + pago.monto_descuento > disponible:
+        return (
+            f"No se puede reactivar: el monto de este pago (${pago.monto_pagado}) "
+            f"excede el saldo pendiente actual de la cuenta (${disponible}). "
+            "Es probable que se hayan registrado otros pagos mientras este estaba anulado."
+        )
+
+    pago.is_active = True
+    pago.save(update_fields=["is_active"])
+    cuenta.actualizar_estatus()
+    return None
+
+
+@transaction.atomic
 def registrar_pago(cuenta, fecha_pago, monto_pagado, forma_pago, aplica_descuento_pronto_pago=False, observaciones=""):
     pago = Pago(
         cuenta_por_pagar=cuenta,
