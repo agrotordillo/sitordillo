@@ -54,7 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
       netoEl.textContent = pct > 0 && !isNaN(referencia) ? `Costo ref. (−${pct}% proveedor): $${referencia.toFixed(2)}` : "";
     }
 
-    const excede = !isNaN(costoAnterior) && !isNaN(referencia) && referencia > costoAnterior;
+    // Se compara redondeado a centavos: con floats crudos, un residuo de
+    // punto flotante (p. ej. 207.42000000000002) puede marcar "excede"
+    // aunque ambos valores se muestren idénticos en pantalla.
+    const excede = !isNaN(costoAnterior) && !isNaN(referencia)
+      && Math.round(referencia * 100) > Math.round(costoAnterior * 100);
     precioInput.classList.toggle("border-red-500", excede);
     precioInput.classList.toggle("text-red-600", excede);
     if (boton) {
