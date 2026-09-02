@@ -64,7 +64,6 @@
         </td>
         <td class="px-3 py-2 text-right">
           <div class="flex items-center justify-end gap-3">
-            {% if pago.is_active %}
             {% if pago.comprobante %}
             <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
             {% endif %}
@@ -73,14 +72,13 @@
               target="_blank" rel="noopener" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >Enviar por WhatsApp</a>
             {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago.pago_ids_modal destinatario_inicial=cuenta.proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path %}
-            {% endif %}
             <form method="post" action="{% url 'pagos:pago-toggle-activo' pago.pk %}" class="inline">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
               {% if pago.is_active %}
-              <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Anular</button>
+              <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Desactivar</button>
               {% else %}
-              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Reactivar</button>
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Activar</button>
               {% endif %}
             </form>
           </div>

@@ -225,13 +225,11 @@ def pago_toggle_activo_view(request, pk):
     pago = get_object_or_404(Pago, pk=pk)
     next_url = request.POST.get("next") or reverse("pagos:pago-registrar", args=[pago.cuenta_por_pagar_id])
 
-    error = alternar_estado_pago(pago)
-    if error:
-        messages.error(request, error)
-    elif pago.is_active:
-        messages.success(request, f"Pago {pago.folio} reactivado.")
+    alternar_estado_pago(pago)
+    if pago.is_active:
+        messages.success(request, f"Pago {pago.folio} marcado como Activo.")
     else:
-        messages.success(request, f"Pago {pago.folio} anulado.")
+        messages.success(request, f"Pago {pago.folio} marcado como Inactivo.")
     return redirect(next_url)
 
 

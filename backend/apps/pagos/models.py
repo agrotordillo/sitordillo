@@ -89,9 +89,10 @@ class CuentaPorPagar(BaseAbstractModel):
 
     @property
     def total_pagado(self):
-        # Un pago anulado (is_active=False, ver Pago.get_folio_prefix/baja
-        # lógica) deja de contar aquí -como si nunca se hubiera aplicado-,
-        # aunque se conserva en el historial para trazabilidad.
+        # Un pago Inactivo (is_active=False) todavía no liquida realmente
+        # el adeudo -típicamente porque es por compensación/nota de crédito
+        # y ese documento aún no existe, ver Pago.clean()- así que no
+        # cuenta aquí hasta que se marque Activo.
         return sum((p.monto_pagado for p in self.pagos.all() if p.is_active), Decimal("0.00"))
 
     @property
@@ -229,6 +230,16 @@ class Pago(BaseAbstractModel):
 
         if self.forma_pago_id:
             clave = self.forma_pago.clave
+            if not self.pk and clave == self.CLAVE_COMPENSACION:
+                # Un pago por compensación (nota de crédito) se registra
+                # Inactivo por default: el adeudo no queda realmente
+                # liquidado hasta que exista el documento de la nota de
+                # crédito. El usuario lo marca Activo cuando ya se elaboró
+                # (ver Pago.is_active / CuentaPorPagar.total_pagado, que
+                # solo cuenta los pagos activos). Los demás medios de pago
+                # mueven el dinero de inmediato, así que nacen Activos
+                # (default de BaseAbstractModel).
+                self.is_active = False
             if clave == self.CLAVE_TRANSFERENCIA and not self.banco_id:
                 raise ValidationError({"banco": "Indica el banco de la transferencia."})
             if clave not in self.CLAVES_CON_BANCO and self.banco_id:
