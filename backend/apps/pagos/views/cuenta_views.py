@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
@@ -83,7 +84,50 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
         context["hay_filtros"] = bool(
             context["q"] or context["periodo"]
         )
+        cuentas = context["cuentas"]
+        context["grupos"] = self._agrupar_por_proveedor(cuentas)
+        context["totales_generales"] = self._sumar_totales(cuentas)
         return context
+
+    @staticmethod
+    def _sumar_totales(cuentas):
+        """Acumula, para un conjunto de cuentas, el total facturado, los
+        impuestos trasladados (IVA/IEPS) y retenidos, y el saldo aún
+        pendiente de cobro — cada monto viene directo de la orden de compra
+        asociada (ya calculado y guardado ahí), nunca recalculado aquí."""
+        totales = {
+            "monto_total": Decimal("0.00"),
+            "iva": Decimal("0.00"),
+            "ieps": Decimal("0.00"),
+            "retenciones": Decimal("0.00"),
+            "saldo_pendiente": Decimal("0.00"),
+        }
+        for cuenta in cuentas:
+            orden = cuenta.orden_compra
+            totales["monto_total"] += cuenta.monto_total
+            totales["iva"] += orden.iva
+            totales["ieps"] += orden.ieps
+            totales["retenciones"] += orden.retencion_iva + orden.retencion_isr
+            totales["saldo_pendiente"] += cuenta.saldo_pendiente
+        return totales
+
+    def _agrupar_por_proveedor(self, cuentas):
+        """Agrupa las cuentas (ya vienen ordenadas por proveedor desde
+        get_queryset) calculando el total acumulado de cada grupo. Se arma
+        aquí en Python -en vez de con {% regroup %}- para poder adjuntarle
+        los totales a cada grupo sin depender de un filtro de plantilla que
+        busque en un diccionario por clave variable."""
+        grupos = []
+        actual = None
+        for cuenta in cuentas:
+            proveedor = cuenta.proveedor
+            if actual is None or actual["proveedor"].pk != proveedor.pk:
+                actual = {"proveedor": proveedor, "cuentas": []}
+                grupos.append(actual)
+            actual["cuentas"].append(cuenta)
+        for grupo in grupos:
+            grupo["totales"] = self._sumar_totales(grupo["cuentas"])
+        return grupos
 
 
 @permission_required("pagos.add_cuentaporpagar", raise_exception=True)

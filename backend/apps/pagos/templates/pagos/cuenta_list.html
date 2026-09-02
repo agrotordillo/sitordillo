@@ -1,5 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
-{% load static %}
+{% load static core_extras %}
 {% block title %}Cuentas por pagar{% endblock title %}
 {% block title_layout %}Cuentas por pagar{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -42,13 +42,28 @@
 </form>
 {% endblock table_actions %}
 {% block main_content %}
-{% regroup cuentas by proveedor as cuentas_por_proveedor %}
-
-{% for group in cuentas_por_proveedor %}
-<form id="pago-multi-{{ group.grouper.pk }}" method="post" action="{% url 'pagos:pago-multiple-preparar' %}">
+{% for grupo in grupos %}
+<form id="pago-multi-{{ grupo.proveedor.pk }}" method="post" action="{% url 'pagos:pago-multiple-preparar' %}">
   {% csrf_token %}
 </form>
 {% endfor %}
+
+{% if grupos %}
+<div class="mb-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+  <span class="text-gray-500">Total acumulado{% if hay_filtros %} (con filtros aplicados){% endif %}:</span>
+  <span class="font-semibold text-gray-800">${{ totales_generales.monto_total|moneda }}</span>
+  <span class="text-gray-300">·</span>
+  <span class="text-gray-500">IVA: <span class="font-medium text-gray-700">${{ totales_generales.iva|moneda }}</span></span>
+  {% if totales_generales.ieps %}
+  <span class="text-gray-500">IEPS: <span class="font-medium text-gray-700">${{ totales_generales.ieps|moneda }}</span></span>
+  {% endif %}
+  {% if totales_generales.retenciones %}
+  <span class="text-gray-500">Retenciones: <span class="font-medium text-gray-700">-${{ totales_generales.retenciones|moneda }}</span></span>
+  {% endif %}
+  <span class="text-gray-300">·</span>
+  <span class="text-gray-500">Saldo pendiente: <span class="font-medium text-gray-700">${{ totales_generales.saldo_pendiente|moneda }}</span></span>
+</div>
+{% endif %}
 
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
@@ -63,28 +78,35 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
       </tr>
     </thead>
-    {% for group in cuentas_por_proveedor %}
+    {% for grupo in grupos %}
     <tbody class="divide-y divide-gray-100">
       <tr class="bg-gray-50/80">
         <td colspan="7" class="px-4 sm:px-6 py-2">
-          <div class="flex items-center justify-between gap-3">
-            <span class="font-semibold text-gray-700">{{ group.grouper.display_name }}</span>
-            <button
-              type="submit" form="pago-multi-{{ group.grouper.pk }}" disabled
-              id="btn-pagar-{{ group.grouper.pk }}"
-              class="btn-secondary text-xs py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            >Pagar seleccionadas</button>
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span class="font-semibold text-gray-700">{{ grupo.proveedor.display_name }}</span>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+              <span>IVA: ${{ grupo.totales.iva|moneda }}</span>
+              {% if grupo.totales.ieps %}<span>IEPS: ${{ grupo.totales.ieps|moneda }}</span>{% endif %}
+              {% if grupo.totales.retenciones %}<span>Ret.: -${{ grupo.totales.retenciones|moneda }}</span>{% endif %}
+              <span class="font-medium text-gray-600">Total: ${{ grupo.totales.monto_total|moneda }}</span>
+              <span>Saldo: ${{ grupo.totales.saldo_pendiente|moneda }}</span>
+              <button
+                type="submit" form="pago-multi-{{ grupo.proveedor.pk }}" disabled
+                id="btn-pagar-{{ grupo.proveedor.pk }}"
+                class="btn-secondary text-xs py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >Pagar seleccionadas</button>
+            </div>
           </div>
         </td>
       </tr>
-      {% for cuenta in group.list %}
+      {% for cuenta in grupo.cuentas %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4">
           {% if cuenta.estatus == 'pendiente' or cuenta.estatus == 'parcial' %}
           <input
             type="checkbox" name="cuenta_ids" value="{{ cuenta.pk }}"
-            form="pago-multi-{{ group.grouper.pk }}" class="chk-cuenta"
-            data-group="{{ group.grouper.pk }}"
+            form="pago-multi-{{ grupo.proveedor.pk }}" class="chk-cuenta"
+            data-group="{{ grupo.proveedor.pk }}"
           >
           {% endif %}
         </td>
