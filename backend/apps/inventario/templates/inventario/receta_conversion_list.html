@@ -28,6 +28,7 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto origen</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto destino</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Equivalencia</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden sm:table-cell">Límite diario</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"><span class="sr-only">Acciones</span></th>
       </tr>
     </thead>
@@ -39,6 +40,7 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">
           {{ receta.cantidad_origen|floatformat:2 }} → {{ receta.cantidad_destino|floatformat:2 }}
         </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">{{ receta.limite_diario_origen|floatformat:2|default:"Sin límite" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           <a href="{% url 'inventario:receta-conversion-update' receta.pk %}" class="btn-icon-outline" aria-label="Editar receta" title="Editar receta">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -50,7 +52,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
             <p class="text-sm text-gray-400">No hay recetas de conversión registradas</p>
             <a href="{% url 'inventario:receta-conversion-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>

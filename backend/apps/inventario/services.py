@@ -241,9 +241,28 @@ def registrar_conversion(receta, almacen, cantidad_origen, fecha=None, observaci
     granel (empaque, mano de obra), así que si no es así hay un costo de
     catálogo mal capturado en el producto destino -y como esto se valida
     después de descontar el producto origen, @transaction.atomic revierte
-    esa salida si la conversión se rechaza."""
+    esa salida si la conversión se rechaza.
+
+    Si la receta tiene `limite_diario_origen`, se valida antes de tocar
+    inventario: la suma de esta conversión más las que ya se hicieron ese
+    mismo día con la misma receta en el mismo almacén no puede superarlo
+    (ej. máximo 5 sacos/día, aunque lo normal sea convertir 2)."""
     if cantidad_origen is None or cantidad_origen <= 0:
         raise ValueError("La cantidad a convertir debe ser mayor a cero.")
+
+    fecha = fecha or timezone.localdate()
+
+    if receta.limite_diario_origen is not None:
+        ya_convertido_hoy = Conversion.objects.filter(
+            receta=receta, almacen=almacen, fecha=fecha
+        ).aggregate(total=models.Sum("cantidad_origen_convertida"))["total"] or Decimal("0.00")
+        disponible_hoy = receta.limite_diario_origen - ya_convertido_hoy
+        if cantidad_origen > disponible_hoy:
+            raise ValueError(
+                f"Límite diario de esta receta superado: ya se convirtieron {ya_convertido_hoy} de "
+                f"{receta.limite_diario_origen} permitidos hoy en este almacén; puedes convertir hasta "
+                f"{max(disponible_hoy, Decimal('0.00'))} más."
+            )
 
     producto_origen = receta.producto_origen
     producto_destino = receta.producto_destino
@@ -274,7 +293,7 @@ def registrar_conversion(receta, almacen, cantidad_origen, fecha=None, observaci
         receta=receta,
         cantidad_origen_convertida=cantidad_origen,
         cantidad_destino_generada=cantidad_destino,
-        fecha=fecha or timezone.localdate(),
+        fecha=fecha,
         valor_consumido=valor_consumido,
         valor_generado=valor_generado,
         observaciones=observaciones,

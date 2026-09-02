@@ -162,6 +162,18 @@ class RecetaConversion(BaseAbstractModel):
     )
     cantidad_origen = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad origen")
     cantidad_destino = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad destino")
+    limite_diario_origen = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Límite diario de origen",
+        help_text=(
+            "Máximo del producto origen que se puede convertir en un mismo día con esta receta, sumando todas "
+            "las conversiones de ese día en el mismo almacén (ej. 5 sacos/día, aunque lo normal sea convertir 2). "
+            "Déjalo vacío si no aplica un límite."
+        ),
+    )
 
     class Meta:
         verbose_name = "Receta de conversión"
@@ -170,6 +182,10 @@ class RecetaConversion(BaseAbstractModel):
         constraints = [
             models.CheckConstraint(condition=models.Q(cantidad_origen__gt=0), name="receta_cantidad_origen_positiva"),
             models.CheckConstraint(condition=models.Q(cantidad_destino__gt=0), name="receta_cantidad_destino_positiva"),
+            models.CheckConstraint(
+                condition=models.Q(limite_diario_origen__isnull=True) | models.Q(limite_diario_origen__gt=0),
+                name="receta_limite_diario_positivo_o_nulo",
+            ),
             models.UniqueConstraint(
                 fields=["producto_origen", "producto_destino"], name="receta_unica_por_par_de_productos"
             ),
@@ -206,6 +222,8 @@ class RecetaConversion(BaseAbstractModel):
             raise ValidationError({"cantidad_origen": "La cantidad origen debe ser mayor a cero."})
         if self.cantidad_destino is not None and self.cantidad_destino <= 0:
             raise ValidationError({"cantidad_destino": "La cantidad destino debe ser mayor a cero."})
+        if self.limite_diario_origen is not None and self.limite_diario_origen <= 0:
+            raise ValidationError({"limite_diario_origen": "El límite diario debe ser mayor a cero, o déjalo vacío."})
 
 
 class Conversion(BaseAbstractModel):

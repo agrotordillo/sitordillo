@@ -45,6 +45,15 @@
       <p class="mt-1 text-xs text-gray-400">Ej. 20 (veinte bolsas).</p>
       {% if form.cantidad_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad_destino.errors.0 }}</p>{% endif %}
     </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.limite_diario_origen.id_for_label }}" class="label">Límite diario de origen <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.limite_diario_origen }}
+      <p class="mt-1 text-xs text-gray-400">
+        Máximo del producto origen a convertir por día con esta receta, sumando todas las conversiones de ese día en
+        el mismo almacén (ej. 5 sacos/día, aunque lo normal sea convertir 2). Déjalo vacío si no aplica un límite.
+      </p>
+      {% if form.limite_diario_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.limite_diario_origen.errors.0 }}</p>{% endif %}
+    </div>
   </div>
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
     <a href="{% url 'inventario:receta-conversion-list' %}" class="btn-secondary">Cancelar</a>

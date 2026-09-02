@@ -90,7 +90,7 @@ class ReportarMermaForm(forms.Form):
 class RecetaConversionForm(BaseModelForm):
     class Meta:
         model = RecetaConversion
-        fields = ["producto_origen", "producto_destino", "cantidad_origen", "cantidad_destino"]
+        fields = ["producto_origen", "producto_destino", "cantidad_origen", "cantidad_destino", "limite_diario_origen"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -98,6 +98,7 @@ class RecetaConversionForm(BaseModelForm):
         productos = Producto.objects.filter(is_active=True).exclude(tipo=Producto.TipoProducto.PAQUETE)
         self.fields["producto_origen"].queryset = productos
         self.fields["producto_destino"].queryset = productos
+        self.fields["limite_diario_origen"].required = False
 
 
 class ConversionForm(forms.Form):
