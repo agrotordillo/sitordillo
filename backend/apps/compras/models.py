@@ -239,14 +239,27 @@ class OrdenCompra(BaseAbstractModel):
         return sum((detalle.subtotal for detalle in self.detalles.all()), Decimal("0.00"))
 
     @property
+    def descuento_pct_total(self):
+        """% combinado que realmente se descuenta del subtotal: el % base
+        del proveedor (Proveedor.descuento, siempre el mismo) más el %
+        adicional capturado en esta orden (descuento_pct, variable según
+        consumo/negociación de esa compra en particular — 0 si no aplica).
+        No hay que sumarlos a mano al capturar: descuento_pct es solo el
+        adicional, el base se suma aquí automáticamente."""
+        base = self.proveedor.descuento if self.proveedor_id else Decimal("0.00")
+        return base + (self.descuento_pct or Decimal("0.00"))
+
+    @property
     def descuento_monto(self):
-        """Monto del descuento general del proveedor, calculado sobre el
-        subtotal real (no sobre un total ya redondeado en otro paso) y
-        redondeado una sola vez al final, para que el porcentaje capturado
-        se refleje exacto sin arrastrar error de redondeo."""
-        if not self.descuento_pct:
+        """Monto del descuento combinado (base del proveedor + adicional de
+        la orden), calculado sobre el subtotal real (no sobre un total ya
+        redondeado en otro paso) y redondeado una sola vez al final, para
+        que el porcentaje se refleje exacto sin arrastrar error de
+        redondeo."""
+        pct = self.descuento_pct_total
+        if not pct:
             return Decimal("0.00")
-        monto = self.subtotal * self.descuento_pct / Decimal("100")
+        monto = self.subtotal * pct / Decimal("100")
         return monto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property

@@ -226,9 +226,12 @@
               <div class="form-card-body">
             <div class="form-card-grid">
               <div>
-                <label for="{{ form.descuento_pct.id_for_label }}" class="label">Descuento proveedor (%)</label>
+                <label for="{{ form.descuento_pct.id_for_label }}" class="label">Descuento adicional de la orden (%)</label>
                 {{ form.descuento_pct }}
-                <p class="mt-1.5 text-xs text-gray-400">Se resta del subtotal: <span class="fs-descuento-general-monto font-medium text-gray-600">0.00</span></p>
+                <p class="mt-1.5 text-xs text-gray-400">
+                  Solo el % extra de esta compra (por volumen o negociación); el % base del proveedor se suma solo.
+                  Se resta del subtotal: <span class="fs-descuento-general-monto font-medium text-gray-600">0.00</span>
+                </p>
                 {% if form.descuento_pct.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descuento_pct.errors.0 }}</p>{% endif %}
               </div>
               <div>
@@ -329,8 +332,19 @@
         </button>
 
         <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
-          <div class="text-sm text-gray-600">
-            Total estimado: <span class="font-semibold text-gray-800" x-text="total"></span>
+          <div class="w-full sm:w-72 text-sm">
+            <div class="flex justify-between text-gray-600">
+              <span>Monto total</span>
+              <span x-text="subtotal"></span>
+            </div>
+            <div class="flex justify-between text-gray-500 mt-1">
+              <span>Descuento</span>
+              <span>-<span x-text="descuento"></span></span>
+            </div>
+            <div class="flex justify-between font-semibold text-gray-800 mt-2 pt-2 border-t border-gray-200">
+              <span>Total estimado</span>
+              <span x-text="total"></span>
+            </div>
           </div>
         </div>
         <p class="mt-1 text-xs text-gray-400 text-right">Suma los productos, menos el descuento del proveedor, más IVA e IEPS, menos las retenciones capturadas arriba.</p>

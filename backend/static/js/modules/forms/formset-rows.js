@@ -1,5 +1,7 @@
 document.addEventListener("alpine:init", () => {
   Alpine.data("formsetRows", (config) => ({
+    subtotal: 0,
+    descuento: 0,
     total: 0,
 
     init() {
@@ -63,12 +65,21 @@ document.addEventListener("alpine:init", () => {
         subtotal += rowTotal;
       });
 
-      // Descuento general del proveedor: un solo % sobre el subtotal (no por
-      // línea), igual que Proveedor.descuento y OrdenCompra.descuento_pct.
+      // Descuento general: % base del proveedor (siempre el mismo, ver
+      // Proveedor.descuento) + el % adicional capturado en el campo
+      // .fs-descuento-general (solo el extra de esta orden, ver
+      // OrdenCompra.descuento_pct_total en el backend). El campo nunca
+      // guarda el combinado -solo el adicional-, así que aquí hay que
+      // sumar el base aparte para que el total en pantalla cuadre con el
+      // que realmente se guarda.
       let descuentoGeneralPct = 0;
       document.querySelectorAll(".fs-descuento-general").forEach((el) => {
         descuentoGeneralPct += parseFloat(el.value) || 0;
       });
+      const proveedorInput = document.querySelector('input[name="proveedor"]');
+      if (proveedorInput) {
+        descuentoGeneralPct += parseFloat(proveedorInput.dataset.descuento) || 0;
+      }
       const montoDescuentoGeneral = subtotal * (descuentoGeneralPct / 100);
       document.querySelectorAll(".fs-descuento-general-monto").forEach((el) => {
         el.textContent = montoDescuentoGeneral.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -82,7 +93,10 @@ document.addEventListener("alpine:init", () => {
         ajusteImpuestos -= parseFloat(el.value) || 0;
       });
 
-      this.total = (subtotal - montoDescuentoGeneral + ajusteImpuestos).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatMoney = (value) => value.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      this.subtotal = formatMoney(subtotal);
+      this.descuento = formatMoney(montoDescuentoGeneral);
+      this.total = formatMoney(subtotal - montoDescuentoGeneral + ajusteImpuestos);
     },
   }));
 });
