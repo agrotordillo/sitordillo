@@ -1,0 +1,85 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Usuarios{% endblock title %}
+{% block title_layout %}Usuarios{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Usuarios</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'accounts:asignacion-sucursal-list' %}" class="btn-secondary w-full sm:w-auto">Usuarios y sucursales</a>
+<a href="{% url 'accounts:usuario-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nuevo usuario
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Usuario</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Nombre</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Capacidades</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Estado</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"><span class="sr-only">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for usuario in usuarios %}
+      <tr class="hover:bg-gray-50/50 transition-colors {% if not usuario.is_active %}opacity-50{% endif %}">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ usuario.username }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ usuario.get_full_name|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">
+          {% if usuario.is_superuser %}
+            <span class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">Administrador</span>
+          {% else %}
+            {% for grupo in usuario.groups.all %}
+              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 mr-1 mb-1">{{ grupo.name }}</span>
+            {% empty %}
+              <span class="text-xs text-gray-400">Sin capacidades asignadas</span>
+            {% endfor %}
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell">
+          {% if usuario.is_active %}
+            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Activo</span>
+          {% else %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Inactivo</span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          {% if usuario.pk == request.user.pk %}
+            <span class="text-xs text-gray-300" title="No puedes desactivar tu propia cuenta">—</span>
+          {% else %}
+            <form method="post" action="{% url 'accounts:usuario-toggle-activo' usuario.pk %}" class="inline">
+              {% csrf_token %}
+              {% if usuario.is_active %}
+                <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Desactivar</button>
+              {% else %}
+                <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Activar</button>
+              {% endif %}
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay usuarios registrados</p>
+            <a href="{% url 'accounts:usuario-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

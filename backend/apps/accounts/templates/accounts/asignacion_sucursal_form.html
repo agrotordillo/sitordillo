@@ -1,0 +1,53 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}{% if object %}Editar asignación{% else %}Nueva asignación{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar asignación{% else %}Nueva asignación{% endif %}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'accounts:asignacion-sucursal-list' %}" class="text-gray-400 hover:text-primary-600">Usuarios y sucursales</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.usuario.id_for_label }}" class="label">Usuario</label>
+      {{ form.usuario }}
+      {% if form.usuario.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.usuario.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.almacen.id_for_label }}" class="label">Almacén</label>
+      {{ form.almacen }}
+      {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.es_principal }}
+      <label for="{{ form.es_principal.id_for_label }}" class="text-sm text-gray-600">Sucursal principal</label>
+      {% if form.es_principal.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.es_principal.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.es_encargado }}
+      <label for="{{ form.es_encargado.id_for_label }}" class="text-sm text-gray-600">Encargado de esta sucursal</label>
+    </div>
+  </div>
+  <p class="mt-3 text-xs text-gray-400">
+    Para quien cubre turnos de descanso en varias sucursales, crea una asignación por cada una; solo una puede
+    quedar marcada como principal.
+  </p>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'accounts:asignacion-sucursal-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}
