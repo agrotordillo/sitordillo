@@ -76,16 +76,18 @@ def ventas_por_almacen(almacen, fecha_inicio, fecha_fin):
     return total or Decimal("0.00")
 
 
-def resumen_comparativo(fecha_inicio, fecha_fin):
+def resumen_comparativo(fecha_inicio, fecha_fin, centros_costo_qs=None):
     """Comparativo de ventas vs. gasto total (directo + distribuido) por
     cada centro de costo de tipo Sucursal en el periodo dado. No promedia
-    entre sucursales: cada una se calcula con su propio gasto real."""
+    entre sucursales: cada una se calcula con su propio gasto real.
+
+    `centros_costo_qs` permite acotar a un subconjunto (p. ej. las
+    sucursales visibles para un usuario restringido); por default
+    considera todas."""
     resumen = []
-    centros = (
-        CentroCosto.objects.filter(is_active=True, tipo=CentroCosto.Tipo.SUCURSAL)
-        .select_related("almacen")
-        .order_by("nombre")
-    )
+    centros = (centros_costo_qs if centros_costo_qs is not None else CentroCosto.objects.all()).filter(
+        is_active=True, tipo=CentroCosto.Tipo.SUCURSAL
+    ).select_related("almacen").order_by("nombre")
     for centro in centros:
         ventas = ventas_por_almacen(centro.almacen, fecha_inicio, fecha_fin) if centro.almacen_id else Decimal("0.00")
         gasto_directo = gasto_directo_por_centro(centro, fecha_inicio, fecha_fin)

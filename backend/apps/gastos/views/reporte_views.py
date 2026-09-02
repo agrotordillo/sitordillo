@@ -1,19 +1,23 @@
 import calendar
 from datetime import date
 
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.utils import timezone
 from django.views.generic import TemplateView
 
+from apps.core.scoping import almacenes_visibles
+from apps.gastos.models import CentroCosto
 from apps.gastos.services import resumen_comparativo
 
 
-class ReportePuntoEquilibrioView(TemplateView):
+class ReportePuntoEquilibrioView(PermissionRequiredMixin, TemplateView):
     """Comparativo mensual de ventas vs. gasto real (directo + distribuido)
     por sucursal. No es el punto de equilibrio contable completo -para eso
     falta separar el costo variable de la mercancía vendida-, pero da el
     control operativo inmediato de si cada sucursal vendió más de lo que
     gastó ese mes."""
 
+    permission_required = "gastos.view_gasto"
     template_name = "gastos/reporte.html"
     extra_context = {"active_module": "expenses"}
 
@@ -37,5 +41,10 @@ class ReportePuntoEquilibrioView(TemplateView):
         context["mes_seleccionado"] = fecha_inicio.strftime("%Y-%m")
         context["fecha_inicio"] = fecha_inicio
         context["fecha_fin"] = fecha_fin
-        context["resumen"] = resumen_comparativo(fecha_inicio, fecha_fin)
+
+        centros_costo_qs = None
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            centros_costo_qs = CentroCosto.objects.filter(almacen__in=visibles)
+        context["resumen"] = resumen_comparativo(fecha_inicio, fecha_fin, centros_costo_qs=centros_costo_qs)
         return context

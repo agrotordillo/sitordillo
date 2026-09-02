@@ -1,13 +1,24 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.core.scoping import almacenes_visibles
 from apps.inventario.forms import CorregirLoteForm, ReportarMermaForm
 from apps.inventario.models import Lote
 from apps.inventario.services import corregir_recepcion, registrar_merma_recepcion
 
 
+def _lotes_visibles(user):
+    queryset = Lote.objects.all()
+    visibles = almacenes_visibles(user)
+    if visibles is not None:
+        queryset = queryset.filter(almacen__in=visibles)
+    return queryset
+
+
+@permission_required("inventario.change_lote", raise_exception=True)
 def corregir_lote_view(request, pk):
-    lote = get_object_or_404(Lote, pk=pk)
+    lote = get_object_or_404(_lotes_visibles(request.user), pk=pk)
 
     if lote.cantidad_disponible <= 0:
         messages.error(request, "Este lote ya no tiene existencia disponible para corregir.")
@@ -38,8 +49,9 @@ def corregir_lote_view(request, pk):
     )
 
 
+@permission_required("inventario.change_lote", raise_exception=True)
 def reportar_merma_view(request, pk):
-    lote = get_object_or_404(Lote, pk=pk)
+    lote = get_object_or_404(_lotes_visibles(request.user), pk=pk)
 
     if lote.cantidad_disponible <= 0:
         messages.error(request, "Este lote ya no tiene existencia disponible para dar de baja.")

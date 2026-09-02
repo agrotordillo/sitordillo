@@ -4,11 +4,13 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from apps.products.forms import PuntoVentaForm
 from apps.products.models import Almacen, PuntoVenta
 
 
-class PuntoVentaListView(ListView):
+class PuntoVentaListView(PermissionRequiredMixin, ListView):
+    permission_required = "products.view_puntoventa"
     model = PuntoVenta
     template_name = "warehouses/punto_venta_list.html"
     context_object_name = "puntos_venta"
@@ -24,7 +26,8 @@ class PuntoVentaListView(ListView):
         return context
 
 
-class PuntoVentaCreateView(SuccessMessageMixin, CreateView):
+class PuntoVentaCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "products.add_puntoventa"
     model = PuntoVenta
     form_class = PuntoVentaForm
     template_name = "warehouses/punto_venta_form.html"
@@ -57,7 +60,8 @@ class PuntoVentaCreateView(SuccessMessageMixin, CreateView):
         return reverse_lazy("products:punto-venta-list", kwargs={"almacen_id": self.almacen.pk})
 
 
-class PuntoVentaUpdateView(SuccessMessageMixin, UpdateView):
+class PuntoVentaUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "products.change_puntoventa"
     model = PuntoVenta
     form_class = PuntoVentaForm
     template_name = "warehouses/punto_venta_form.html"

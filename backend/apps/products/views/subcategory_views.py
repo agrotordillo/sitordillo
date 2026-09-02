@@ -3,11 +3,13 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from apps.products.models import Subcategoria
 from apps.products.forms import SubcategoryForm
 
 
-class SubcategoryCreateView(SuccessMessageMixin, CreateView):
+class SubcategoryCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "products.add_subcategoria"
     model = Subcategoria
     form_class = SubcategoryForm
     template_name = "subcategories/subcategory_form.html"
@@ -20,7 +22,8 @@ class SubcategoryCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class SubcategoryUpdateView(SuccessMessageMixin, UpdateView):
+class SubcategoryUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "products.change_subcategoria"
     model = Subcategoria
     form_class = SubcategoryForm
     template_name = "subcategories/subcategory_form.html"
@@ -33,7 +36,8 @@ class SubcategoryUpdateView(SuccessMessageMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class SubcategoryListView(ListView):
+class SubcategoryListView(PermissionRequiredMixin, ListView):
+    permission_required = "products.view_subcategoria"
     model = Subcategoria
     template_name = "subcategories/subcategory_list.html"
     context_object_name = "subcategories"

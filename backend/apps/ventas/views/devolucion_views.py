@@ -1,26 +1,39 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.generic import ListView
 
+from apps.core.scoping import almacenes_visibles
 from apps.ventas.models import DevolucionCliente, DevolucionClienteDetalle, Venta
 from apps.ventas.forms import DevolucionFormSet
 from apps.ventas.services import registrar_devolucion
 
 
-class DevolucionClienteListView(ListView):
+class DevolucionClienteListView(PermissionRequiredMixin, ListView):
+    permission_required = "ventas.view_devolucioncliente"
     model = DevolucionCliente
     template_name = "ventas/devolucion_list.html"
     context_object_name = "devoluciones"
     extra_context = {"active_module": "sales"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("venta", "venta__cliente")
+        queryset = super().get_queryset().select_related("venta", "venta__cliente")
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(venta__almacen__in=visibles)
+        return queryset
 
 
+@permission_required("ventas.add_devolucioncliente", raise_exception=True)
 def devolucion_cliente_view(request, pk):
-    venta = get_object_or_404(Venta, pk=pk)
+    ventas_qs = Venta.objects.all()
+    visibles = almacenes_visibles(request.user)
+    if visibles is not None:
+        ventas_qs = ventas_qs.filter(almacen__in=visibles)
+    venta = get_object_or_404(ventas_qs, pk=pk)
     pendientes = [d for d in venta.detalles.select_related("producto") if d.cantidad_devuelta < d.cantidad]
 
     if not pendientes:

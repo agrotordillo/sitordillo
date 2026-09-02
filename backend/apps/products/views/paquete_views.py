@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -7,6 +8,7 @@ from apps.products.models import Producto
 from apps.products.forms import PaqueteComponenteFormSet
 
 
+@permission_required("products.change_paquetecomponente", raise_exception=True)
 def paquete_componentes_view(request, pk):
     paquete = get_object_or_404(Producto, pk=pk)
     if not paquete.es_paquete:

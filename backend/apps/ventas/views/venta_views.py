@@ -1,32 +1,45 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView
 
+from apps.core.scoping import almacenes_visibles
 from apps.ventas.models import Venta
 from apps.ventas.forms import VentaForm, VentaDetalleFormSet
 from apps.ventas.services import procesar_lineas_venta, validar_stock_disponible
 
 
-class VentaListView(ListView):
+class VentaListView(PermissionRequiredMixin, ListView):
+    permission_required = "ventas.view_venta"
     model = Venta
     template_name = "ventas/venta_list.html"
     context_object_name = "ventas"
     extra_context = {"active_module": "sales"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("cliente", "almacen").prefetch_related("detalles")
+        queryset = super().get_queryset().select_related("cliente", "almacen").prefetch_related("detalles")
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(almacen__in=visibles)
+        return queryset
 
 
-class VentaCreateView(CreateView):
+class VentaCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = "ventas.add_venta"
     model = Venta
     form_class = VentaForm
     template_name = "ventas/venta_form.html"
     success_url = reverse_lazy("ventas:venta-list")
     success_message = "Venta registrada correctamente."
     extra_context = {"active_module": "sales"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)

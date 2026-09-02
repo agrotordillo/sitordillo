@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
@@ -8,7 +9,8 @@ from apps.clientes.models import Cliente
 from apps.clientes.forms import ClienteForm
 
 
-class ClienteCreateView(SuccessMessageMixin, CreateView):
+class ClienteCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "clientes.add_cliente"
     model = Cliente
     form_class = ClienteForm
     template_name = "clientes/cliente_form.html"
@@ -21,7 +23,8 @@ class ClienteCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class ClienteUpdateView(SuccessMessageMixin, UpdateView):
+class ClienteUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "clientes.change_cliente"
     model = Cliente
     form_class = ClienteForm
     template_name = "clientes/cliente_form.html"
@@ -34,7 +37,8 @@ class ClienteUpdateView(SuccessMessageMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class ClienteListView(ListView):
+class ClienteListView(PermissionRequiredMixin, ListView):
+    permission_required = "clientes.view_cliente"
     model = Cliente
     template_name = "clientes/cliente_list.html"
     context_object_name = "clientes"

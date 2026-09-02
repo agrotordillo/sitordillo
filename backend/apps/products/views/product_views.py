@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import DecimalField, OuterRef, Q, Subquery
 from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
@@ -18,7 +19,8 @@ LISTAS_PRECIO_TABLA = [
 ]
 
 
-class ProductCreateView(SuccessMessageMixin, CreateView):
+class ProductCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "products.add_producto"
     model = Producto
     form_class = ProductForm
     template_name = "products/product_form.html"
@@ -31,7 +33,8 @@ class ProductCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class ProductUpdateView(SuccessMessageMixin, UpdateView):
+class ProductUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "products.change_producto"
     model = Producto
     form_class = ProductForm
     template_name = "products/product_form.html"
@@ -44,7 +47,8 @@ class ProductUpdateView(SuccessMessageMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class ProductListView(ListView):
+class ProductListView(PermissionRequiredMixin, ListView):
+    permission_required = "products.view_producto"
     model = Producto
     template_name = "products/product_list.html"
     context_object_name = "products"

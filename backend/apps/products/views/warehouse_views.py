@@ -3,11 +3,13 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from apps.products.models import Almacen
 from apps.products.forms import WarehouseForm
 
 
-class WarehouseCreateView(SuccessMessageMixin, CreateView):
+class WarehouseCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "products.add_almacen"
     model = Almacen
     form_class = WarehouseForm
     template_name = "warehouses/warehouse_form.html"
@@ -20,7 +22,8 @@ class WarehouseCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class WarehouseUpdateView(SuccessMessageMixin, UpdateView):
+class WarehouseUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "products.change_almacen"
     model = Almacen
     form_class = WarehouseForm
     template_name = "warehouses/warehouse_form.html"
@@ -33,7 +36,8 @@ class WarehouseUpdateView(SuccessMessageMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class WarehouseListView(ListView):
+class WarehouseListView(PermissionRequiredMixin, ListView):
+    permission_required = "products.view_almacen"
     model = Almacen
     template_name = "warehouses/warehouse_list.html"
     context_object_name = "warehouses"

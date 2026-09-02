@@ -1,31 +1,44 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
+from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.models import Cotizacion
 from apps.cotizaciones.forms import CotizacionForm, CotizacionDetalleFormSet
 
 
-class CotizacionListView(ListView):
+class CotizacionListView(PermissionRequiredMixin, ListView):
+    permission_required = "cotizaciones.view_cotizacion"
     model = Cotizacion
     template_name = "cotizaciones/cotizacion_list.html"
     context_object_name = "cotizaciones"
     extra_context = {"active_module": "quotes"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("cliente", "almacen", "venta").prefetch_related("detalles")
+        queryset = super().get_queryset().select_related("cliente", "almacen", "venta").prefetch_related("detalles")
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(almacen__in=visibles)
+        return queryset
 
 
-class CotizacionCreateView(CreateView):
+class CotizacionCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = "cotizaciones.add_cotizacion"
     model = Cotizacion
     form_class = CotizacionForm
     template_name = "cotizaciones/cotizacion_form.html"
     success_url = reverse_lazy("cotizaciones:cotizacion-list")
     success_message = "Cotización registrada correctamente."
     extra_context = {"active_module": "quotes"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -62,13 +75,26 @@ class CotizacionCreateView(CreateView):
         return super().form_invalid(form)
 
 
-class CotizacionUpdateView(UpdateView):
+class CotizacionUpdateView(PermissionRequiredMixin, UpdateView):
+    permission_required = "cotizaciones.change_cotizacion"
     model = Cotizacion
     form_class = CotizacionForm
     template_name = "cotizaciones/cotizacion_form.html"
     success_url = reverse_lazy("cotizaciones:cotizacion-list")
     success_message = "Cotización actualizada correctamente."
     extra_context = {"active_module": "quotes"}
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(almacen__in=visibles)
+        return queryset
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()

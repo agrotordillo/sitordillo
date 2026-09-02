@@ -1,8 +1,11 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView
 
+from apps.core.scoping import almacenes_visibles
 from apps.fiscal.models import MetodoPago
 from apps.ventas.models import Venta
 from apps.facturacion.facturama_client import FacturamaError
@@ -11,18 +14,32 @@ from apps.facturacion.models import Factura
 from apps.facturacion.factura_service import cancelar_factura, generar_factura, timbrar_factura
 
 
-class FacturaListView(ListView):
+def _facturas_visibles(user):
+    queryset = Factura.objects.all()
+    visibles = almacenes_visibles(user)
+    if visibles is not None:
+        queryset = queryset.filter(venta__almacen__in=visibles)
+    return queryset
+
+
+class FacturaListView(PermissionRequiredMixin, ListView):
+    permission_required = "facturacion.view_factura"
     model = Factura
     template_name = "facturacion/factura_list.html"
     context_object_name = "facturas"
     extra_context = {"active_module": "sales"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("venta", "venta__cliente")
+        return _facturas_visibles(self.request.user).select_related("venta", "venta__cliente")
 
 
+@permission_required("facturacion.add_factura", raise_exception=True)
 def generar_factura_view(request, venta_pk):
-    venta = get_object_or_404(Venta, pk=venta_pk)
+    ventas_qs = Venta.objects.all()
+    visibles = almacenes_visibles(request.user)
+    if visibles is not None:
+        ventas_qs = ventas_qs.filter(almacen__in=visibles)
+    venta = get_object_or_404(ventas_qs, pk=venta_pk)
 
     if hasattr(venta, "factura"):
         messages.info(request, "Esta venta ya tiene una factura generada.")
@@ -65,8 +82,13 @@ def generar_factura_view(request, venta_pk):
     )
 
 
+# "Facturación" tiene change_factura (agregado en
+# accounts/migrations/0004_facturacion_change_factura.py) para poder
+# completar el timbrado, a diferencia de delete_factura (cancelar), que
+# sigue siendo exclusivo del Administrador.
+@permission_required("facturacion.change_factura", raise_exception=True)
 def timbrar_factura_view(request, pk):
-    factura = get_object_or_404(Factura, pk=pk)
+    factura = get_object_or_404(_facturas_visibles(request.user), pk=pk)
     if request.method != "POST":
         return redirect("facturacion:factura-list")
     try:
@@ -77,8 +99,12 @@ def timbrar_factura_view(request, pk):
     return redirect("facturacion:factura-list")
 
 
+# "Cancelar" reutiliza el permiso delete_factura como semántica de
+# "anular" (regla de negocio: cancelar es exclusivo del Administrador,
+# ningún grupo tiene delete_factura a propósito).
+@permission_required("facturacion.delete_factura", raise_exception=True)
 def cancelar_factura_view(request, pk):
-    factura = get_object_or_404(Factura, pk=pk)
+    factura = get_object_or_404(_facturas_visibles(request.user), pk=pk)
     if request.method != "POST":
         return redirect("facturacion:factura-list")
     if factura.estatus != Factura.Estatus.TIMBRADA:

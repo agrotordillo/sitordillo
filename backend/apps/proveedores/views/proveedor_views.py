@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.views.generic import CreateView, ListView, UpdateView
 from django.urls import reverse_lazy
@@ -8,7 +9,8 @@ from apps.proveedores.models import Proveedor
 from apps.proveedores.forms import ProveedorForm
 
 
-class SupplierCreateView(SuccessMessageMixin, CreateView):
+class SupplierCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "proveedores.add_proveedor"
     model = Proveedor
     form_class = ProveedorForm
     template_name = "proveedores/proveedor_form.html"
@@ -21,7 +23,8 @@ class SupplierCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class SupplierUpdateView(SuccessMessageMixin, UpdateView):
+class SupplierUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "proveedores.change_proveedor"
     model = Proveedor
     form_class = ProveedorForm
     template_name = "proveedores/proveedor_form.html"
@@ -34,7 +37,8 @@ class SupplierUpdateView(SuccessMessageMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class SupplierListView(ListView):
+class SupplierListView(PermissionRequiredMixin, ListView):
+    permission_required = "proveedores.view_proveedor"
     model = Proveedor
     template_name = "proveedores/proveedor_list.html"
     context_object_name = "suppliers"

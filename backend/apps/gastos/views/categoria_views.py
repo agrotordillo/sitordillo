@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
@@ -7,14 +8,16 @@ from apps.gastos.forms import CategoriaGastoForm
 from apps.gastos.models import CategoriaGasto
 
 
-class CategoriaGastoListView(ListView):
+class CategoriaGastoListView(PermissionRequiredMixin, ListView):
+    permission_required = "gastos.view_categoriagasto"
     model = CategoriaGasto
     template_name = "gastos/categoria_list.html"
     context_object_name = "categorias"
     extra_context = {"active_module": "expenses"}
 
 
-class CategoriaGastoCreateView(SuccessMessageMixin, CreateView):
+class CategoriaGastoCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+    permission_required = "gastos.add_categoriagasto"
     model = CategoriaGasto
     form_class = CategoriaGastoForm
     template_name = "gastos/categoria_form.html"
@@ -27,7 +30,8 @@ class CategoriaGastoCreateView(SuccessMessageMixin, CreateView):
         return super().form_invalid(form)
 
 
-class CategoriaGastoUpdateView(SuccessMessageMixin, UpdateView):
+class CategoriaGastoUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+    permission_required = "gastos.change_categoriagasto"
     model = CategoriaGasto
     form_class = CategoriaGastoForm
     template_name = "gastos/categoria_form.html"

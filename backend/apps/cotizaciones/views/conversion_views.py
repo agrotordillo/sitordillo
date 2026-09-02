@@ -1,8 +1,10 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.forms import BuscarFolioForm
 from apps.cotizaciones.models import Cotizacion
 from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
@@ -10,6 +12,7 @@ from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.services import procesar_lineas_venta, validar_stock_disponible
 
 
+@permission_required("cotizaciones.view_cotizacion", raise_exception=True)
 def buscar_cotizacion_view(request):
     """Punto de entrada para caja: captura el folio que trae el cliente y
     lo lleva a la pantalla de conversión (o de aviso, si ya fue usado)."""
@@ -17,7 +20,11 @@ def buscar_cotizacion_view(request):
 
     if request.GET and form.is_valid():
         folio = form.cleaned_data["folio"].strip()
-        cotizacion = Cotizacion.objects.filter(folio__iexact=folio).first()
+        cotizaciones_qs = Cotizacion.objects.all()
+        visibles = almacenes_visibles(request.user)
+        if visibles is not None:
+            cotizaciones_qs = cotizaciones_qs.filter(almacen__in=visibles)
+        cotizacion = cotizaciones_qs.filter(folio__iexact=folio).first()
         if cotizacion is None:
             form.add_error("folio", f"No se encontró ninguna cotización con el folio '{folio}'.")
         else:
@@ -26,13 +33,16 @@ def buscar_cotizacion_view(request):
     return render(request, "cotizaciones/buscar_folio.html", {"form": form, "active_module": "quotes"})
 
 
+@permission_required("ventas.add_venta", raise_exception=True)
 def convertir_cotizacion_view(request, pk):
     """Caja revisa/edita los datos traídos de la cotización y confirma la
     venta. El inventario solo se descuenta hasta aquí, nunca al generar la
     cotización en mostrador."""
-    cotizacion = get_object_or_404(
-        Cotizacion.objects.select_related("cliente", "almacen", "venta"), pk=pk
-    )
+    cotizaciones_qs = Cotizacion.objects.select_related("cliente", "almacen", "venta")
+    visibles = almacenes_visibles(request.user)
+    if visibles is not None:
+        cotizaciones_qs = cotizaciones_qs.filter(almacen__in=visibles)
+    cotizacion = get_object_or_404(cotizaciones_qs, pk=pk)
 
     if cotizacion.estatus == Cotizacion.Estatus.CONVERTIDA:
         return render(
@@ -47,7 +57,7 @@ def convertir_cotizacion_view(request, pk):
         return redirect("cotizaciones:cotizacion-list")
 
     if request.method == "POST":
-        form = VentaForm(request.POST)
+        form = VentaForm(request.POST, user=request.user)
         formset = VentaDetalleFormSet(request.POST, instance=Venta(), prefix="detalles")
         if form.is_valid() and formset.is_valid():
             almacen = form.cleaned_data["almacen"]
@@ -79,14 +89,17 @@ def convertir_cotizacion_view(request, pk):
                     )
                     return redirect("ventas:venta-list")
     else:
-        form = VentaForm(initial={
-            "cliente": cotizacion.cliente_id,
-            "almacen": cotizacion.almacen_id,
-            "observaciones": (
-                f"Generada desde cotización {cotizacion.folio}."
-                + (f" {cotizacion.observaciones}" if cotizacion.observaciones else "")
-            ),
-        })
+        form = VentaForm(
+            initial={
+                "cliente": cotizacion.cliente_id,
+                "almacen": cotizacion.almacen_id,
+                "observaciones": (
+                    f"Generada desde cotización {cotizacion.folio}."
+                    + (f" {cotizacion.observaciones}" if cotizacion.observaciones else "")
+                ),
+            },
+            user=request.user,
+        )
         initial_detalles = [
             {
                 "producto": d.producto_id,

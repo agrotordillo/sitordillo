@@ -1,4 +1,6 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpResponseRedirect
@@ -13,7 +15,8 @@ from apps.compras.forms import CargarCFDIForm, OrdenCompraForm, OrdenCompraDetal
 from apps.compras.services import CFDIImportError, importar_cfdi_compra
 
 
-class OrdenCompraListView(ListView):
+class OrdenCompraListView(PermissionRequiredMixin, ListView):
+    permission_required = "compras.view_ordencompra"
     model = OrdenCompra
     template_name = "compras/orden_compra_list.html"
     context_object_name = "ordenes"
@@ -38,7 +41,8 @@ class OrdenCompraListView(ListView):
         return context
 
 
-class OrdenCompraCreateView(CreateView):
+class OrdenCompraCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = "compras.add_ordencompra"
     model = OrdenCompra
     form_class = OrdenCompraForm
     template_name = "compras/orden_compra_form.html"
@@ -71,6 +75,7 @@ class OrdenCompraCreateView(CreateView):
         return super().form_invalid(form)
 
 
+@permission_required("compras.add_ordencompra", raise_exception=True)
 def cargar_cfdi_view(request):
     if request.method == "POST":
         form = CargarCFDIForm(request.POST, request.FILES)
@@ -110,7 +115,12 @@ def cargar_cfdi_view(request):
     )
 
 
-class OrdenCompraUpdateView(UpdateView):
+class OrdenCompraUpdateView(PermissionRequiredMixin, UpdateView):
+    # Ojo: "change_ordencompra" solo lo tiene "Compras - Completo", no
+    # "Compras - Captura" (residente) - ver la nota en
+    # accounts/migrations/0003_grupos_de_capacidades.py sobre por qué esta
+    # misma vista maneja tanto editar un borrador como avanzar el estatus.
+    permission_required = "compras.change_ordencompra"
     model = OrdenCompra
     form_class = OrdenCompraForm
     template_name = "compras/orden_compra_form.html"

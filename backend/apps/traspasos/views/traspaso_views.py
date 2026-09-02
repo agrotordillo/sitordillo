@@ -1,33 +1,57 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView
 
+from apps.core.scoping import almacenes_visibles
 from apps.traspasos.models import Traspaso
 from apps.traspasos.forms import TraspasoForm, TraspasoDetalleFormSet
 from apps.traspasos.services import enviar_traspaso, recibir_traspaso
 
 
-class TraspasoListView(ListView):
+def _traspasos_visibles(user):
+    queryset = Traspaso.objects.all()
+    visibles = almacenes_visibles(user)
+    if visibles is not None:
+        # Un traspaso involucra dos almacenes; basta con que uno de los
+        # dos sea suyo (lo está enviando o lo está recibiendo).
+        queryset = queryset.filter(Q(almacen_origen__in=visibles) | Q(almacen_destino__in=visibles))
+    return queryset
+
+
+class TraspasoListView(PermissionRequiredMixin, ListView):
+    permission_required = "traspasos.view_traspaso"
     model = Traspaso
     template_name = "traspasos/traspaso_list.html"
     context_object_name = "traspasos"
     extra_context = {"active_module": "warehouses"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("almacen_origen", "almacen_destino")
+        return (
+            _traspasos_visibles(self.request.user)
+            .select_related("almacen_origen", "almacen_destino")
+        )
 
 
-class TraspasoCreateView(CreateView):
+class TraspasoCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = "traspasos.add_traspaso"
     model = Traspaso
     form_class = TraspasoForm
     template_name = "traspasos/traspaso_form.html"
     success_url = reverse_lazy("traspasos:traspaso-list")
     success_message = "Traspaso creado correctamente."
     extra_context = {"active_module": "warehouses"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -54,8 +78,9 @@ class TraspasoCreateView(CreateView):
         return super().form_invalid(form)
 
 
+@permission_required("traspasos.change_traspaso", raise_exception=True)
 def traspaso_enviar_view(request, pk):
-    traspaso = get_object_or_404(Traspaso, pk=pk)
+    traspaso = get_object_or_404(_traspasos_visibles(request.user), pk=pk)
     if request.method != "POST":
         return redirect("traspasos:traspaso-list")
     try:
@@ -66,8 +91,9 @@ def traspaso_enviar_view(request, pk):
     return redirect("traspasos:traspaso-list")
 
 
+@permission_required("traspasos.change_traspaso", raise_exception=True)
 def traspaso_recibir_view(request, pk):
-    traspaso = get_object_or_404(Traspaso, pk=pk)
+    traspaso = get_object_or_404(_traspasos_visibles(request.user), pk=pk)
     if request.method != "POST":
         return redirect("traspasos:traspaso-list")
     try:

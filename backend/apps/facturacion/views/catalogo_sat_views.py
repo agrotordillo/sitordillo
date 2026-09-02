@@ -1,3 +1,8 @@
+# Estas vistas son búsquedas de solo lectura sobre catálogos SAT
+# (producto/servicio, unidad) que alimentan formularios de varios módulos
+# distintos (Productos, Facturación) sin un dueño claro entre las
+# capacidades de la Fase 2 - se dejan abiertas a cualquier usuario
+# autenticado en vez de forzarlas a un permiso que no les corresponde.
 from django.contrib import messages
 from django.shortcuts import redirect, render
 

@@ -1,16 +1,19 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView
 
+from apps.core.scoping import almacenes_visibles
 from apps.gastos.forms import GastoDistribucionFormSet, GastoForm
 from apps.gastos.models import Gasto
 from apps.gastos.services import validar_distribucion
 
 
-class GastoListView(ListView):
+class GastoListView(PermissionRequiredMixin, ListView):
+    permission_required = "gastos.view_gasto"
     model = Gasto
     template_name = "gastos/gasto_list.html"
     context_object_name = "gastos"
@@ -18,16 +21,29 @@ class GastoListView(ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        return super().get_queryset().select_related("centro_costo", "categoria", "proveedor")
+        queryset = super().get_queryset().select_related("centro_costo", "categoria", "proveedor")
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            # Excluye de paso los centros de costo sin almacén (proyectos,
+            # administración, personal): un usuario restringido a
+            # sucursal no debe ver ese gasto corporativo/personal.
+            queryset = queryset.filter(centro_costo__almacen__in=visibles)
+        return queryset
 
 
-class GastoCreateView(CreateView):
+class GastoCreateView(PermissionRequiredMixin, CreateView):
+    permission_required = "gastos.add_gasto"
     model = Gasto
     form_class = GastoForm
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gastos:gasto-list")
     success_message = "Gasto registrado correctamente."
     extra_context = {"active_module": "expenses"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)

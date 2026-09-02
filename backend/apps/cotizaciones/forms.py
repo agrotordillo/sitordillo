@@ -2,6 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from apps.core.forms import BaseModelForm
+from apps.core.scoping import almacenes_visibles
 from apps.clientes.models import Cliente
 from apps.products.models import Almacen, Producto
 from .models import Cotizacion, CotizacionDetalle
@@ -15,10 +16,15 @@ class CotizacionForm(BaseModelForm):
             "fecha_cotizacion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["cliente"].queryset = Cliente.objects.filter(is_active=True)
-        self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
+        almacenes = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
+        if user is not None:
+            visibles = almacenes_visibles(user)
+            if visibles is not None:
+                almacenes = almacenes.filter(pk__in=visibles.values("pk"))
+        self.fields["almacen"].queryset = almacenes
         self.fields["fecha_cotizacion"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 

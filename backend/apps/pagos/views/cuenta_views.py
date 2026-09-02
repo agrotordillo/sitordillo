@@ -1,6 +1,8 @@
 from datetime import timedelta
 
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -13,7 +15,8 @@ from apps.pagos.models import CuentaPorPagar
 from apps.pagos.services import generar_cuenta_por_pagar
 
 
-class CuentaPorPagarListView(ListView):
+class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
+    permission_required = "pagos.view_cuentaporpagar"
     model = CuentaPorPagar
     template_name = "pagos/cuenta_list.html"
     context_object_name = "cuentas"
@@ -83,6 +86,7 @@ class CuentaPorPagarListView(ListView):
         return context
 
 
+@permission_required("pagos.add_cuentaporpagar", raise_exception=True)
 def generar_cuenta_view(request, pk):
     orden = get_object_or_404(OrdenCompra, pk=pk)
 

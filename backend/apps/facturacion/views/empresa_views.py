@@ -1,10 +1,12 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.shortcuts import redirect, render
 
 from apps.facturacion.forms import EmpresaForm
 from apps.facturacion.models import Empresa
 
 
+@permission_required("facturacion.change_empresa", raise_exception=True)
 def empresa_config_view(request):
     empresa = Empresa.objects.first()
 

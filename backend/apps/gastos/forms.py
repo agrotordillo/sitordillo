@@ -2,6 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from apps.core.forms import BaseModelForm
+from apps.core.scoping import almacenes_visibles
 from apps.products.models import Almacen
 from apps.proveedores.models import Proveedor
 from .models import CategoriaGasto, CentroCosto, Gasto, GastoDistribucion
@@ -42,9 +43,18 @@ class GastoForm(BaseModelForm):
             "observaciones": forms.Textarea(attrs={"rows": 3}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["centro_costo"].queryset = CentroCosto.objects.filter(is_active=True)
+        centros_costo = CentroCosto.objects.filter(is_active=True)
+        # El origen del gasto (quién lo paga) sí queda acotado a la
+        # sucursal del usuario restringido; a diferencia del destino de
+        # una distribución (GastoDistribucionForm), que necesita poder
+        # abarcar sucursales que no son la suya.
+        if user is not None:
+            visibles = almacenes_visibles(user)
+            if visibles is not None:
+                centros_costo = centros_costo.filter(almacen__in=visibles)
+        self.fields["centro_costo"].queryset = centros_costo
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
         self.fields["proveedor"].required = False
         self.fields["responsable"].required = False

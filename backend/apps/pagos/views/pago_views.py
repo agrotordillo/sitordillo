@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,6 +16,7 @@ from apps.pagos.services import calcular_datos_comprobante, enviar_comprobante_p
 CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PARCIAL)
 
 
+@permission_required("pagos.add_pago", raise_exception=True)
 def registrar_pago_view(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
     sin_saldo = cuenta.estatus in (CuentaPorPagar.Estatus.PAGADA, CuentaPorPagar.Estatus.CANCELADA)
@@ -85,6 +87,7 @@ def _cuentas_seleccionadas_validas(request):
     return cuentas, None
 
 
+@permission_required("pagos.add_pago", raise_exception=True)
 def preparar_pago_multiple_view(request):
     if request.method != "POST":
         return redirect("pagos:cuenta-list")
@@ -108,6 +111,7 @@ def preparar_pago_multiple_view(request):
     )
 
 
+@permission_required("pagos.add_pago", raise_exception=True)
 def registrar_pago_multiple_view(request):
     if request.method != "POST":
         return redirect("pagos:cuenta-list")
@@ -186,6 +190,7 @@ def registrar_pago_multiple_view(request):
     )
 
 
+@permission_required("pagos.view_pago", raise_exception=True)
 def pago_multiple_confirmacion_view(request):
     ids_qs = request.GET.get("ids", "")
     pago_ids = [pk for pk in ids_qs.split(",") if pk]
@@ -212,6 +217,7 @@ def pago_multiple_confirmacion_view(request):
     )
 
 
+@permission_required("pagos.view_pago", raise_exception=True)
 def enviar_comprobante_view(request):
     if request.method != "POST":
         return redirect("pagos:cuenta-list")
