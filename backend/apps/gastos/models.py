@@ -22,6 +22,14 @@ class CentroCosto(BaseAbstractModel):
         ADMINISTRATIVO = "administrativo", "Administración / corporativo"
         PERSONAL = "personal", "Gasto personal de los dueños"
 
+    codigo = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Código corto",
+        help_text="Identificador corto para reconocerlo rápido en reportes (p. ej. \"01\" o \"SUR\"). Opcional.",
+    )
     nombre = models.CharField(max_length=150, unique=True, verbose_name="Nombre")
     tipo = models.CharField(max_length=15, choices=Tipo.choices, verbose_name="Tipo de centro de costo")
     almacen = models.OneToOneField(
@@ -38,13 +46,13 @@ class CentroCosto(BaseAbstractModel):
     class Meta:
         verbose_name = "Centro de costo"
         verbose_name_plural = "Centros de costo"
-        ordering = ["nombre"]
+        ordering = ["codigo", "nombre"]
         indexes = [
             models.Index(fields=["tipo"]),
         ]
 
     def __str__(self):
-        return self.nombre
+        return f"{self.codigo} · {self.nombre}" if self.codigo else self.nombre
 
     def get_folio_prefix(self):
         return "CCO"
@@ -54,10 +62,12 @@ class CentroCosto(BaseAbstractModel):
 
     @property
     def display_name(self):
-        return self.nombre.strip()
+        return self.__str__()
 
     def clean(self):
         super().clean()
+        if self.codigo == "":
+            self.codigo = None
         if self.tipo == self.Tipo.SUCURSAL:
             if not self.almacen_id:
                 raise ValidationError({"almacen": "Un centro de costo de tipo Sucursal debe ligarse a un almacén."})
@@ -141,6 +151,12 @@ class Gasto(BaseAbstractModel):
         verbose_name="Proveedor",
     )
     concepto = models.CharField(max_length=255, verbose_name="Concepto")
+    responsable = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Responsable",
+        help_text="Quién recibió o autorizó el gasto (nombre libre; no necesariamente un usuario del sistema).",
+    )
     fecha = models.DateField(verbose_name="Fecha del gasto")
     importe = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Importe total")
     facturado = models.BooleanField(default=False, verbose_name="Facturado (con CFDI)")

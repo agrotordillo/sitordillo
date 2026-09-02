@@ -25,6 +25,7 @@
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Código</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Tipo</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Almacén ligado</th>
@@ -34,6 +35,7 @@
     <tbody class="divide-y divide-gray-100">
       {% for centro in centros_costo %}
       <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ centro.codigo|default:"—" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ centro.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ centro.get_tipo_display }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ centro.almacen.nombre|default:"—" }}</td>
@@ -48,7 +50,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
             <p class="text-sm text-gray-400">No hay centros de costo registrados</p>
             <a href="{% url 'gastos:centro-costo-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>

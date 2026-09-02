@@ -10,12 +10,13 @@ from .models import CategoriaGasto, CentroCosto, Gasto, GastoDistribucion
 class CentroCostoForm(BaseModelForm):
     class Meta:
         model = CentroCosto
-        fields = ["nombre", "tipo", "almacen", "descripcion"]
+        fields = ["codigo", "nombre", "tipo", "almacen", "descripcion"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
         self.fields["almacen"].required = False
+        self.fields["codigo"].required = False
         self.fields["descripcion"].required = False
 
 
@@ -33,7 +34,7 @@ class GastoForm(BaseModelForm):
     class Meta:
         model = Gasto
         fields = [
-            "centro_costo", "categoria", "proveedor", "concepto", "fecha", "importe",
+            "centro_costo", "categoria", "proveedor", "concepto", "responsable", "fecha", "importe",
             "facturado", "referencia_factura", "comprobante", "es_compartido", "observaciones",
         ]
         widgets = {
@@ -46,6 +47,7 @@ class GastoForm(BaseModelForm):
         self.fields["centro_costo"].queryset = CentroCosto.objects.filter(is_active=True)
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
         self.fields["proveedor"].required = False
+        self.fields["responsable"].required = False
         self.fields["referencia_factura"].required = False
         self.fields["comprobante"].required = False
         self.fields["observaciones"].required = False

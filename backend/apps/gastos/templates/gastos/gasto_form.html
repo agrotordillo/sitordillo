@@ -58,6 +58,11 @@
           {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
         </div>
         <div>
+          <label for="{{ form.responsable.id_for_label }}" class="label">Responsable <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.responsable }}
+          <p class="mt-1 text-xs text-gray-400">Quién lo recibió o autorizó (no tiene que ser un usuario del sistema).</p>
+        </div>
+        <div>
           <label for="{{ form.importe.id_for_label }}" class="label">Importe total</label>
           {{ form.importe }}
           {% if form.importe.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.importe.errors.0 }}</p>{% endif %}
