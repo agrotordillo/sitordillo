@@ -109,6 +109,38 @@ def normalizar_whatsapp(telefono, respaldo=""):
     return digitos
 
 
+def construir_texto_whatsapp(pagos):
+    """Arma el texto del comprobante de WhatsApp listando, por cada pago,
+    el documento de la compra que cubre (OrdenCompra.documento) y su monto
+    -"Compra <documento> => $<monto>"-, igual para un pago individual (una
+    sola línea) que para uno agrupado (varias cuentas de un mismo proveedor
+    pagadas juntas bajo un mismo ReciboPago, una línea por documento). Si la
+    orden no tiene documento capturado, se usa el folio de la cuenta por
+    pagar como referencia."""
+    proveedor = pagos[0].cuenta_por_pagar.proveedor
+    lineas = [f"Comprobante de pago a {proveedor.display_name}"]
+    for pago in pagos:
+        cuenta = pago.cuenta_por_pagar
+        documento = cuenta.orden_compra.documento or cuenta.folio
+        lineas.append(f"Compra {documento} => ${pago.monto_pagado:,.2f}")
+    if len(pagos) > 1:
+        total = sum((p.monto_pagado for p in pagos), Decimal("0.00"))
+        lineas.append(f"Total: ${total:,.2f}")
+    return "\n".join(lineas)
+
+
+def construir_texto_whatsapp_pago(pago):
+    """Variante de construir_texto_whatsapp() para un solo Pago ya
+    guardado: si es parte de un evento de pago agrupado (Pago.recibo),
+    incluye el documento de cada pago cubierto por ese mismo recibo; si es
+    individual (o un pago viejo sin recibo asignado), solo el suyo."""
+    if pago.recibo_id:
+        pagos = list(pago.recibo.pagos.select_related("cuenta_por_pagar__orden_compra__proveedor"))
+    else:
+        pagos = [pago]
+    return construir_texto_whatsapp(pagos)
+
+
 @transaction.atomic
 def registrar_pago(cuenta, fecha_pago, monto_pagado, forma_pago, aplica_descuento_pronto_pago=False, observaciones=""):
     pago = Pago(

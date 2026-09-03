@@ -45,7 +45,13 @@
 
 <div class="flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
   <a href="{% url 'pagos:cuenta-list' %}" class="btn-secondary">Volver a Cuentas por pagar</a>
-  {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago_ids destinatario_inicial=proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path boton_label="Enviar por correo" boton_class="btn-primary" %}
+  <div class="flex flex-col-reverse sm:flex-row gap-2">
+    <a
+      href="https://wa.me/{{ whatsapp_numero }}?text={{ mensaje_whatsapp|urlencode }}"
+      target="_blank" rel="noopener" class="btn-secondary text-emerald-600"
+    >Enviar por WhatsApp</a>
+    {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago_ids destinatario_inicial=proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path boton_label="Enviar por correo" boton_class="btn-primary" %}
+  </div>
 </div>
 {% endblock main_content %}
 {% block extra_js %}

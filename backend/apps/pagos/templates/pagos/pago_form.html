@@ -68,7 +68,7 @@
             <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
             {% endif %}
             <a
-              href="https://wa.me/{{ whatsapp_numero }}?text={{ pago.folio|urlencode }}%20-%20Comprobante%20de%20pago%20a%20{{ cuenta.proveedor.display_name|urlencode }}%20por%20%24{{ pago.monto_pagado|urlencode }}"
+              href="https://wa.me/{{ whatsapp_numero }}?text={{ pago.mensaje_whatsapp|urlencode }}"
               target="_blank" rel="noopener" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >Enviar por WhatsApp</a>
             {% include "pagos/includes/_modal_enviar_comprobante.html" with pago_ids=pago.pago_ids_modal destinatario_inicial=cuenta.proveedor.contacto_email preview_documentos=preview.documentos preview_importe=preview.importe_total preview_banco=preview.banco preview_fecha=preview.fecha_pago next_url=request.get_full_path %}

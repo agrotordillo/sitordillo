@@ -13,6 +13,8 @@ from apps.pagos.forms import EnviarComprobanteForm, PagoEditForm, PagoForm, Pago
 from apps.pagos.models import CuentaPorPagar, Pago
 from apps.pagos.services import (
     calcular_datos_comprobante,
+    construir_texto_whatsapp,
+    construir_texto_whatsapp_pago,
     crear_recibo_pago,
     enviar_comprobante_pago,
     normalizar_whatsapp,
@@ -61,6 +63,7 @@ def registrar_pago_view(request, pk):
     pagos_con_preview = []
     for pago in cuenta.pagos.all():
         pago.pago_ids_modal = [pago.pk]
+        pago.mensaje_whatsapp = construir_texto_whatsapp_pago(pago)
         pagos_con_preview.append((pago, calcular_datos_comprobante([pago])))
 
     return render(
@@ -230,15 +233,20 @@ def pago_multiple_confirmacion_view(request):
         messages.error(request, "No se encontraron los pagos registrados.")
         return redirect("pagos:cuenta-list")
 
+    proveedor = pagos[0].cuenta_por_pagar.proveedor
     return render(
         request,
         "pagos/pago_multiple_confirmacion.html",
         {
             "pagos": pagos,
             "pago_ids": [p.pk for p in pagos],
-            "proveedor": pagos[0].cuenta_por_pagar.proveedor,
+            "proveedor": proveedor,
             "total": sum((p.monto_pagado for p in pagos), Decimal("0.00")),
             "preview": calcular_datos_comprobante(pagos),
+            "mensaje_whatsapp": construir_texto_whatsapp(pagos),
+            "whatsapp_numero": normalizar_whatsapp(
+                proveedor.contacto_telefono, respaldo=settings.WHATSAPP_NUMERO_PAGOS
+            ),
             "active_module": "purchases",
         },
     )
