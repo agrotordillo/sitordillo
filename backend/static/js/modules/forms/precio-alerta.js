@@ -40,6 +40,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return precioBruto * (1 - descuentoBaseProveedor() / 100);
   }
 
+  // Solo para texto visible al usuario (separador de miles); los valores
+  // que se guardan en dataset.precioNeto y se mandan al backend siguen en
+  // .toFixed(2) plano, sin comas, para que se puedan volver a parsear.
+  function formatMoney(valor) {
+    return valor.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function evaluar(precioInput) {
     const row = precioInput.closest(".formset-row");
     const productoInput = row?.querySelector('input[name$="-producto"]');
@@ -51,7 +58,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const referencia = precioReferencia(bruto);
 
     if (netoEl) {
-      netoEl.textContent = pct > 0 && !isNaN(referencia) ? `Costo ref. (−${pct}% proveedor): $${referencia.toFixed(2)}` : "";
+      netoEl.textContent = pct > 0 && !isNaN(referencia)
+        ? `Costo ref. (−${pct}% proveedor): $${formatMoney(referencia)}`
+        : "";
     }
 
     // Se compara redondeado a centavos: con floats crudos, un residuo de
@@ -80,8 +89,8 @@ document.addEventListener("DOMContentLoaded", () => {
     window.dispatchEvent(new CustomEvent("confirmar-costo:abrir", {
       detail: {
         nombre: nombreInput?.value || "este producto",
-        anterior: costoAnterior.toFixed(2),
-        nuevo: costoNuevo.toFixed(2),
+        anterior: formatMoney(costoAnterior),
+        nuevo: formatMoney(costoNuevo),
         onConfirmar: () => actualizarCosto(boton),
       },
     }));

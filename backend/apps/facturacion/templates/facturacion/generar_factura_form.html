@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% block title %}Generar factura{% endblock title %}
 {% block title_layout %}Generar factura{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -16,7 +17,7 @@
 <p class="text-sm text-gray-500 mb-4">
   Venta <span class="font-medium text-gray-700">{{ venta.folio }}</span> ·
   Cliente <span class="font-medium text-gray-700">{{ venta.cliente.display_name }}</span> ·
-  Total <span class="font-medium text-gray-700">${{ venta.total|floatformat:2 }}</span>
+  Total <span class="font-medium text-gray-700">${{ venta.total|moneda }}</span>
 </p>
 
 <form method="post">

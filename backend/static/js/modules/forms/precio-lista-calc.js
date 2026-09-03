@@ -38,7 +38,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setTexto(row, selector, valor) {
     const el = row?.querySelector(selector);
-    if (el) el.textContent = isFinite(valor) ? valor.toFixed(2) : "—";
+    if (el) {
+      el.textContent = isFinite(valor)
+        ? valor.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : "—";
+    }
   }
 
   function recalcularDesdePrecio(precioInput) {

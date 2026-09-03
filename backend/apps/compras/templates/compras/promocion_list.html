@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
 {% block title %}Promociones de proveedor{% endblock title %}
 {% block title_layout %}Promociones de proveedor{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -41,7 +42,7 @@
           {% if promo.tipo_descuento == 'porcentaje' %}
           -{{ promo.descuento_porcentaje }}%
           {% else %}
-          ${{ promo.precio_promocional }}
+          ${{ promo.precio_promocional|moneda }}
           {% endif %}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ promo.fecha_inicio|date:"d/m/Y" }} – {{ promo.fecha_fin|date:"d/m/Y" }}</td>

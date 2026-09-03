@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
 {% block title %}Proveedores{% endblock title %}
 {% block title_layout %}Proveedores{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -62,7 +63,7 @@
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ supplier.regimen_fiscal.clave }} - {{ supplier.regimen_fiscal.descripcion }}</td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">
                     {% if supplier.tiene_credito %}
-                    ${{ supplier.limite_credito }} · {{ supplier.dias_credito }} días
+                    ${{ supplier.limite_credito|moneda }} · {{ supplier.dias_credito }} días
                     {% else %}
                     <span class="text-gray-400">Sin crédito</span>
                     {% endif %}

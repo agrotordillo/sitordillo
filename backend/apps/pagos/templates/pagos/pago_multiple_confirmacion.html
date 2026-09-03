@@ -1,5 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
-{% load static %}
+{% load static core_extras %}
 {% block title %}Pago registrado{% endblock title %}
 {% block title_layout %}Pago registrado · {{ proveedor.display_name }}{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -29,7 +29,7 @@
       <tr>
         <td class="px-3 py-2">{{ pago.cuenta_por_pagar.folio }}</td>
         <td class="px-3 py-2">{{ pago.cuenta_por_pagar.orden_compra.documento|default:"-" }}</td>
-        <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
+        <td class="px-3 py-2">${{ pago.monto_pagado|moneda }}</td>
         <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
       </tr>
       {% endfor %}
@@ -37,7 +37,7 @@
     <tfoot class="bg-gray-50 border-t border-gray-100">
       <tr>
         <td colspan="2" class="px-3 py-2 text-right font-semibold text-gray-700">Total pagado</td>
-        <td colspan="2" class="px-3 py-2 font-semibold text-gray-800">${{ total|floatformat:2 }}</td>
+        <td colspan="2" class="px-3 py-2 font-semibold text-gray-800">${{ total|moneda }}</td>
       </tr>
     </tfoot>
   </table>

@@ -12,6 +12,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const valor = parseFloat(input.value);
       if (!Number.isNaN(valor)) suma += valor;
     });
-    total.textContent = `$${suma.toFixed(2)}`;
+    total.textContent = `$${suma.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 });

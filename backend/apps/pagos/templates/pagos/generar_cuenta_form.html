@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% block title %}Generar cuenta por pagar{% endblock title %}
 {% block title_layout %}Generar cuenta por pagar{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -16,7 +17,7 @@
 <p class="text-sm text-gray-500 mb-4">
   Orden <span class="font-medium text-gray-700">{{ orden.folio }}</span> ·
   Proveedor <span class="font-medium text-gray-700">{{ orden.proveedor.display_name }}</span> ·
-  Total <span class="font-medium text-gray-700">${{ orden.total|floatformat:2 }}</span>
+  Total <span class="font-medium text-gray-700">${{ orden.total|moneda }}</span>
 </p>
 
 <form method="post">

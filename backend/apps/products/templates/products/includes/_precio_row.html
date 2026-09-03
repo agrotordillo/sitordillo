@@ -1,3 +1,4 @@
+{% load core_extras %}
 <tr class="formset-row">
   <td class="px-3 py-2">
     {{ form.id }}
@@ -16,10 +17,10 @@
     {{ form.precio_con_impuesto }}
     {% if form.precio_con_impuesto.errors %}<p class="mt-1 text-xs text-red-600">{{ form.precio_con_impuesto.errors.0 }}</p>{% endif %}
   </td>
-  <td class="px-3 py-2 w-28 text-right text-gray-500 pp-sin-impuesto">{% if form.instance.pk %}{{ form.instance.precio_sin_impuesto|floatformat:2 }}{% else %}—{% endif %}</td>
-  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-iva">{% if form.instance.pk %}{{ form.instance.importe_iva|floatformat:2 }}{% else %}—{% endif %}</td>
-  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-ieps">{% if form.instance.pk %}{{ form.instance.importe_ieps|floatformat:2 }}{% else %}—{% endif %}</td>
-  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-utilidad-importe">{% if form.instance.pk %}{{ form.instance.importe_utilidad|floatformat:2 }}{% else %}—{% endif %}</td>
+  <td class="px-3 py-2 w-28 text-right text-gray-500 pp-sin-impuesto">{% if form.instance.pk %}{{ form.instance.precio_sin_impuesto|moneda }}{% else %}—{% endif %}</td>
+  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-iva">{% if form.instance.pk %}{{ form.instance.importe_iva|moneda }}{% else %}—{% endif %}</td>
+  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-ieps">{% if form.instance.pk %}{{ form.instance.importe_ieps|moneda }}{% else %}—{% endif %}</td>
+  <td class="px-3 py-2 w-24 text-right text-gray-500 pp-utilidad-importe">{% if form.instance.pk %}{{ form.instance.importe_utilidad|moneda }}{% else %}—{% endif %}</td>
   <td class="px-3 py-2 w-12 text-right">
     <div class="hidden">{{ form.DELETE }}</div>
     <button type="button" class="btn-icon-outline" @click="removeRow($event.currentTarget)" aria-label="Quitar línea" title="Quitar línea">

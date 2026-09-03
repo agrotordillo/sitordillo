@@ -1,6 +1,6 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% load pagos_extras %}
+{% load pagos_extras core_extras %}
 {% block title %}Pagar varias cuentas{% endblock title %}
 {% block title_layout %}Pagar varias cuentas · {{ proveedor.display_name }}{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -48,7 +48,7 @@
             <p class="text-xs text-gray-400">Orden {{ cuenta.orden_compra.folio }}</p>
           </td>
           <td class="px-3 py-2">{{ cuenta.fecha_vencimiento|date:"d/m/Y" }}</td>
-          <td class="px-3 py-2 font-medium text-gray-700">${{ cuenta.saldo_pendiente|floatformat:2 }}</td>
+          <td class="px-3 py-2 font-medium text-gray-700">${{ cuenta.saldo_pendiente|moneda }}</td>
           <td class="px-3 py-2">
             <input
               type="number" step="0.01" min="0" max="{{ cuenta.saldo_pendiente }}"

@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
 {% block title %}Gastos{% endblock title %}
 {% block title_layout %}Gastos{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -45,7 +46,7 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.categoria.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ gasto.responsable|default:"—" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.fecha|date:"d/m/Y" }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ gasto.importe|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ gasto.importe|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           {% if gasto.es_compartido %}
           <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700" title="Se distribuye entre varias sucursales">

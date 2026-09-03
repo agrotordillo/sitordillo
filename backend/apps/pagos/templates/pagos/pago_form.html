@@ -1,5 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
-{% load static %}
+{% load static core_extras %}
 {% block title %}Registrar pago{% endblock title %}
 {% block title_layout %}Registrar pago{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -17,7 +17,7 @@
 <div class="mb-4 grid gap-1 text-sm text-gray-600">
   <p>Proveedor: <span class="font-medium text-gray-800">{{ cuenta.proveedor.display_name }}</span></p>
   <p>Orden de compra: <span class="font-medium text-gray-800">{{ cuenta.orden_compra.folio }}</span></p>
-  <p>Saldo pendiente: <span class="font-semibold text-gray-800">${{ cuenta.saldo_pendiente|floatformat:2 }}</span> de ${{ cuenta.monto_total|floatformat:2 }}</p>
+  <p>Saldo pendiente: <span class="font-semibold text-gray-800">${{ cuenta.saldo_pendiente|moneda }}</span> de ${{ cuenta.monto_total|moneda }}</p>
   {% if cuenta.fecha_limite_pronto_pago %}
   <p class="text-emerald-600">
     Pronto pago del {{ cuenta.proveedor.descuento_pronto_pago }}% disponible si se paga a más tardar el {{ cuenta.fecha_limite_pronto_pago|date:"d/m/Y" }}.
@@ -51,8 +51,8 @@
           <input type="checkbox" name="pago_ids" value="{{ pago.pk }}" form="form-enviar-multiple" class="chk-pago-correo">
         </td>
         <td class="px-3 py-2">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
-        <td class="px-3 py-2">${{ pago.monto_pagado|floatformat:2 }}</td>
-        <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|floatformat:2 }}{% else %}-{% endif %}</td>
+        <td class="px-3 py-2">${{ pago.monto_pagado|moneda }}</td>
+        <td class="px-3 py-2">{% if pago.monto_descuento %}${{ pago.monto_descuento|moneda }}{% else %}-{% endif %}</td>
         <td class="px-3 py-2">{{ pago.forma_pago.descripcion }}{% if pago.banco %} · {{ pago.banco.nombre }}{% endif %}</td>
         <td class="px-3 py-2">{{ pago.numero_referencia|default:"-" }}</td>
         <td class="px-3 py-2">

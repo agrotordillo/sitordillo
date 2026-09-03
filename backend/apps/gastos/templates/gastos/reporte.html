@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
 {% block title %}Punto de equilibrio por sucursal{% endblock title %}
 {% block title_layout %}Punto de equilibrio por sucursal{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -39,12 +40,12 @@
       {% for fila in resumen %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ fila.centro_costo.nombre }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">${{ fila.ventas|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_directo|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_distribuido|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ fila.gasto_total|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">${{ fila.ventas|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_directo|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden sm:table-cell">${{ fila.gasto_distribuido|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ fila.gasto_total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold {% if fila.resultado >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-          ${{ fila.resultado|floatformat:2 }}
+          ${{ fila.resultado|moneda }}
         </td>
       </tr>
       {% empty %}

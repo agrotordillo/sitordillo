@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
 {% block title %}Conversiones{% endblock title %}
 {% block title_layout %}Conversiones{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -43,9 +44,9 @@
           → {{ conversion.cantidad_destino_generada|floatformat:2 }} {{ conversion.receta.producto_destino.nombre }}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ conversion.fecha|date:"d/m/Y" }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">${{ conversion.valor_consumido|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ conversion.valor_generado|floatformat:2 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-green-600">+${{ conversion.diferencia|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">${{ conversion.valor_consumido|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ conversion.valor_generado|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-green-600">+${{ conversion.diferencia|moneda }}</td>
       </tr>
       {% empty %}
       <tr>
