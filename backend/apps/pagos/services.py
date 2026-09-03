@@ -9,7 +9,7 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .models import CuentaPorPagar, Pago
+from .models import CuentaPorPagar, Pago, ReciboPago
 
 FIRMA_CORREO_PAGOS = (
     "Erick José Hernández Rocas · Depto. de Pagos · Celular: 933 148 0558 · "
@@ -73,18 +73,40 @@ def generar_cuenta_por_pagar(orden_compra, fecha_emision=None, observaciones="")
 
 
 @transaction.atomic
-def alternar_estado_pago(pago):
-    """Cambia el estatus Activo/Inactivo de un pago, replicando el sentido
-    que tenía en el sistema anterior (scvweb): Activo significa que el
-    adeudo ya quedó liquidado; Inactivo, que el pago está registrado pero
-    el adeudo sigue pendiente porque falta el documento que lo liquide
-    (típicamente una nota de crédito en pago por compensación -ver
-    Pago.clean()-, aunque también se puede desactivar a mano cualquier
-    pago). Mientras está Inactivo no cuenta en el saldo pagado de su cuenta
-    (ver CuentaPorPagar.total_pagado); es solo el toggle, sin más reglas."""
-    pago.is_active = not pago.is_active
-    pago.save(update_fields=["is_active"])
-    pago.cuenta_por_pagar.actualizar_estatus()
+def crear_recibo_pago(proveedor, fecha_pago, forma_pago, banco=None, numero_referencia="", observaciones=""):
+    """Crea el encabezado (ReciboPago) de un evento de pago, con su número
+    consecutivo propio. Se llama una sola vez por evento -sea un pago a una
+    sola cuenta o varias juntas (ver registrar_pago_view /
+    registrar_pago_multiple_view)- y cada Pago que se genere en ese evento
+    debe apuntarle vía Pago.recibo."""
+    recibo = ReciboPago(
+        proveedor=proveedor,
+        fecha_pago=fecha_pago,
+        forma_pago=forma_pago,
+        banco=banco,
+        numero_referencia=numero_referencia,
+        observaciones=observaciones,
+    )
+    # "numero" se asigna hasta save() (ver ReciboPago.save()); se excluye
+    # aquí para no validar contra None.
+    recibo.full_clean(exclude=["numero"])
+    recibo.save()
+    return recibo
+
+
+def normalizar_whatsapp(telefono, respaldo=""):
+    """Limpia un teléfono a solo dígitos y le antepone el código de país
+    (52, México) si es un número local de 10 dígitos, para armar un link de
+    WhatsApp (wa.me/<numero>). El contacto del proveedor
+    (Proveedor.contacto_telefono) es texto libre sin garantía de formato,
+    a diferencia de settings.WHATSAPP_NUMERO_PAGOS (`respaldo`), que ya se
+    captura en formato internacional."""
+    digitos = "".join(caracter for caracter in (telefono or "") if caracter.isdigit())
+    if not digitos:
+        return respaldo or ""
+    if len(digitos) == 10:
+        digitos = "52" + digitos
+    return digitos
 
 
 @transaction.atomic

@@ -162,3 +162,31 @@ class PagoForm(BaseModelForm):
         self.fields["banco"].required = False
         self.fields["numero_referencia"].required = False
         self.fields["comprobante"].required = False
+
+
+class PagoEditForm(PagoForm):
+    """Para corregir un pago ya registrado (monto, forma de pago, etc.),
+    en vez de solo poder desactivarlo: is_active es editable=False en el
+    modelo (como en todo BaseAbstractModel), así que se agrega aquí como
+    campo aparte, no ligado por Meta.fields."""
+
+    is_active = forms.BooleanField(
+        required=False,
+        label="Pago activo (cuenta como pagado)",
+        help_text=(
+            "Desactívalo si es un pago por nota de crédito que todavía no tiene el documento; actívalo cuando ya "
+            "exista."
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["is_active"].initial = self.instance.is_active
+
+    def save(self, commit=True):
+        pago = super().save(commit=False)
+        pago.is_active = self.cleaned_data["is_active"]
+        if commit:
+            pago.save()
+        return pago

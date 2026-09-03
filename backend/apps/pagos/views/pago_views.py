@@ -9,9 +9,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.pagos.forms import EnviarComprobanteForm, PagoForm, PagoMultipleForm
+from apps.pagos.forms import EnviarComprobanteForm, PagoEditForm, PagoForm, PagoMultipleForm
 from apps.pagos.models import CuentaPorPagar, Pago
-from apps.pagos.services import alternar_estado_pago, calcular_datos_comprobante, enviar_comprobante_pago
+from apps.pagos.services import (
+    calcular_datos_comprobante,
+    crear_recibo_pago,
+    enviar_comprobante_pago,
+    normalizar_whatsapp,
+)
 
 CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PARCIAL)
 
@@ -38,9 +43,17 @@ def registrar_pago_view(request, pk):
                         form.add_error(None if field == "__all__" else field, mensaje)
             else:
                 with transaction.atomic():
+                    recibo = crear_recibo_pago(
+                        proveedor=cuenta.proveedor,
+                        fecha_pago=pago.fecha_pago,
+                        forma_pago=pago.forma_pago,
+                        banco=pago.banco,
+                        numero_referencia=pago.numero_referencia,
+                    )
+                    pago.recibo = recibo
                     pago.save()
                     cuenta.actualizar_estatus()
-                messages.success(request, "Pago registrado correctamente.")
+                messages.success(request, f"Pago registrado correctamente (recibo {recibo.numero}).")
                 return redirect("pagos:cuenta-list")
     else:
         form = PagoForm(initial={"fecha_pago": timezone.localdate()})
@@ -59,7 +72,9 @@ def registrar_pago_view(request, pk):
             "sin_saldo": sin_saldo,
             "pagos_con_preview": pagos_con_preview,
             "active_module": "purchases",
-            "whatsapp_numero": settings.WHATSAPP_NUMERO_PAGOS,
+            "whatsapp_numero": normalizar_whatsapp(
+                cuenta.proveedor.contacto_telefono, respaldo=settings.WHATSAPP_NUMERO_PAGOS
+            ),
         },
     )
 
@@ -147,6 +162,17 @@ def registrar_pago_multiple_view(request):
         comprobante = form.cleaned_data.get("comprobante")
         try:
             with transaction.atomic():
+                # Un solo recibo (evento de pago) agrupa los pagos de todas
+                # las cuentas seleccionadas -así se ven juntos después en
+                # el listado de Pagos, en vez de como N registros sueltos-.
+                recibo = crear_recibo_pago(
+                    proveedor=cuentas[0].proveedor,
+                    fecha_pago=form.cleaned_data["fecha_pago"],
+                    forma_pago=form.cleaned_data["forma_pago"],
+                    banco=form.cleaned_data.get("banco"),
+                    numero_referencia=form.cleaned_data.get("numero_referencia", ""),
+                    observaciones=form.cleaned_data.get("observaciones", ""),
+                )
                 pago_ids = []
                 for cuenta in cuentas:
                     monto = montos[cuenta.pk]
@@ -156,6 +182,7 @@ def registrar_pago_multiple_view(request):
                         comprobante.seek(0)
                     pago = Pago(
                         cuenta_por_pagar=cuenta,
+                        recibo=recibo,
                         fecha_pago=form.cleaned_data["fecha_pago"],
                         monto_pagado=monto,
                         forma_pago=form.cleaned_data["forma_pago"],
@@ -173,7 +200,7 @@ def registrar_pago_multiple_view(request):
                 for mensaje in errores:
                     form.add_error(None, mensaje)
         else:
-            messages.success(request, f"Se registraron {len(pago_ids)} pagos correctamente.")
+            messages.success(request, f"Se registraron {len(pago_ids)} pagos correctamente (recibo {recibo.numero}).")
             ids_qs = ",".join(str(pk) for pk in pago_ids)
             return redirect(f"{reverse('pagos:pago-multiple-confirmacion')}?ids={ids_qs}")
 
@@ -218,19 +245,38 @@ def pago_multiple_confirmacion_view(request):
 
 
 @permission_required("pagos.change_pago", raise_exception=True)
-def pago_toggle_activo_view(request, pk):
-    if request.method != "POST":
-        return redirect("pagos:cuenta-list")
-
+def editar_pago_view(request, pk):
+    """Corrige un pago ya registrado -monto, forma de pago, si cuenta como
+    activo, etc.- para el caso de haberse equivocado al capturarlo (ver
+    conversación de diseño: reemplaza al botón simple de Desactivar)."""
     pago = get_object_or_404(Pago, pk=pk)
-    next_url = request.POST.get("next") or reverse("pagos:pago-registrar", args=[pago.cuenta_por_pagar_id])
+    cuenta = pago.cuenta_por_pagar
+    next_url = request.POST.get("next") or request.GET.get("next") or reverse("pagos:pago-registrar", args=[cuenta.pk])
 
-    alternar_estado_pago(pago)
-    if pago.is_active:
-        messages.success(request, f"Pago {pago.folio} marcado como Activo.")
+    if request.method == "POST":
+        form = PagoEditForm(request.POST, request.FILES, instance=pago)
+        if form.is_valid():
+            pago = form.save(commit=False)
+            try:
+                pago.full_clean()
+            except ValidationError as e:
+                for field, errores in e.message_dict.items():
+                    for mensaje in errores:
+                        form.add_error(None if field == "__all__" else field, mensaje)
+            else:
+                with transaction.atomic():
+                    pago.save()
+                    cuenta.actualizar_estatus()
+                messages.success(request, f"Pago {pago.folio} actualizado correctamente.")
+                return redirect(next_url)
     else:
-        messages.success(request, f"Pago {pago.folio} marcado como Inactivo.")
-    return redirect(next_url)
+        form = PagoEditForm(instance=pago)
+
+    return render(
+        request,
+        "pagos/pago_editar_form.html",
+        {"form": form, "pago": pago, "cuenta": cuenta, "next_url": next_url, "active_module": "purchases"},
+    )
 
 
 @permission_required("pagos.view_pago", raise_exception=True)
