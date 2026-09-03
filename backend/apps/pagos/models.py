@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from apps.core.models import BaseAbstractModel
 
 
@@ -142,6 +142,100 @@ class CuentaPorPagar(BaseAbstractModel):
             raise ValidationError({"fecha_vencimiento": "La fecha de vencimiento no puede ser anterior a la de emisión."})
 
 
+class ReciboPago(BaseAbstractModel):
+    """Un evento de pago: agrupa uno o varios `Pago` (a una o varias cuentas
+    del mismo proveedor) liquidados juntos, con su propio número
+    consecutivo (1, 2, 3...) -distinto del folio interno aleatorio que usa
+    el resto del sistema- porque así se lleva el control administrativo de
+    pagos en papel. Se crea siempre desde las vistas de registrar pago,
+    nunca directo: por eso no repite aquí el comprobante (ya vive en cada
+    Pago, que además es el mismo archivo para todos los de un mismo
+    evento)."""
+
+    numero = models.PositiveIntegerField(unique=True, editable=False, verbose_name="Número")
+    proveedor = models.ForeignKey(
+        "proveedores.Proveedor",
+        on_delete=models.PROTECT,
+        related_name="recibos_pago",
+        verbose_name="Proveedor",
+    )
+    fecha_pago = models.DateField(verbose_name="Fecha de pago")
+    forma_pago = models.ForeignKey(
+        "fiscal.FormaPago",
+        on_delete=models.PROTECT,
+        related_name="recibos_pago",
+        verbose_name="Forma de pago",
+    )
+    banco = models.ForeignKey(
+        Banco,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recibos_pago",
+        verbose_name="Banco",
+    )
+    numero_referencia = models.CharField(
+        max_length=50, blank=True, verbose_name="Número de cheque o nota de crédito"
+    )
+    observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Recibo de pago"
+        verbose_name_plural = "Recibos de pago"
+        ordering = ["-numero"]
+        indexes = [
+            models.Index(fields=["proveedor"]),
+            models.Index(fields=["fecha_pago"]),
+        ]
+
+    def __str__(self):
+        return f"Recibo {self.numero} · {self.proveedor.display_name}"
+
+    def get_folio_prefix(self):
+        return "REC"
+
+    def get_slug_source(self):
+        return f"{self.numero}-{self.proveedor_id}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def importe_total(self):
+        return sum((p.monto_pagado for p in self.pagos.all()), Decimal("0.00"))
+
+    @property
+    def esta_activo(self):
+        """True si todos sus pagos siguen activos -nada pendiente de nota
+        de crédito-, para el filtro de "lo realmente ya pagado"."""
+        pagos = list(self.pagos.all())
+        return bool(pagos) and all(p.is_active for p in pagos)
+
+    def _guardar_con_numero_nuevo(self, *args, **kwargs):
+        with transaction.atomic():
+            ultimo = ReciboPago.objects.select_for_update().order_by("-numero").first()
+            self.numero = (ultimo.numero if ultimo else 0) + 1
+            super().save(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        if self.numero is not None:
+            super().save(*args, **kwargs)
+            return
+        # Igual que BaseAbstractModel con folio/slug: se reintenta si dos
+        # recibos se crean en paralelo y calculan el mismo "siguiente"
+        # número antes de que el primero se confirme. El except queda
+        # FUERA del "with" de cada intento para que Django ya haya hecho
+        # el rollback al savepoint antes de reintentar.
+        for _ in range(3):
+            try:
+                self._guardar_con_numero_nuevo(*args, **kwargs)
+                return
+            except IntegrityError:
+                self.numero = None
+        self._guardar_con_numero_nuevo(*args, **kwargs)
+
+
 class Pago(BaseAbstractModel):
     # Claves del catálogo oficial SAT c_FormaPago (fiscal.FormaPago) que
     # requieren o admiten un dato adicional al registrar el pago.
@@ -159,6 +253,15 @@ class Pago(BaseAbstractModel):
         on_delete=models.CASCADE,
         related_name="pagos",
         verbose_name="Cuenta por pagar",
+    )
+    recibo = models.ForeignKey(
+        ReciboPago,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pagos",
+        verbose_name="Recibo de pago",
+        help_text="Agrupa este pago con los demás del mismo evento (ej. varias cuentas pagadas juntas).",
     )
     fecha_pago = models.DateField(verbose_name="Fecha de pago")
     monto_pagado = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto pagado")
