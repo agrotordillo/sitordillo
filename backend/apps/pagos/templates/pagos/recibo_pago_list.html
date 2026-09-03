@@ -1,0 +1,147 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load static core_extras %}
+{% block title %}Pagos{% endblock title %}
+{% block title_layout %}Pagos{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'pagos:cuenta-list' %}" class="text-gray-400 hover:text-primary-600">Cuentas por pagar</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Pagos</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  <input type="text" name="q" value="{{ q }}" placeholder="Buscar proveedor por nombre o RFC..." class="input w-full sm:w-60">
+  <div class="flex items-center gap-2">
+    <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input">
+    <span class="text-sm text-gray-400">a</span>
+    <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input">
+  </div>
+  <label class="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
+    <input type="checkbox" name="solo_activos" value="1" {% if solo_activos %}checked{% endif %}>
+    Solo realmente pagado
+  </label>
+  <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
+    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+    </svg>
+  </button>
+  {% if q or fecha_desde or fecha_hasta or solo_activos %}
+  <a href="{% url 'pagos:recibo-list' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+    </svg>
+  </a>
+  {% endif %}
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold w-10"></th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha de pago</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Forma de pago</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Importe</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
+      </tr>
+    </thead>
+    {% for recibo in recibos %}
+    <tbody x-data="{ abierto: false }" class="divide-y divide-gray-100">
+      <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" @click="abierto = !abierto">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400">
+          <svg class="w-4 h-4 transition-transform" :class="abierto ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" />
+          </svg>
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-500">{{ recibo.numero }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ recibo.proveedor.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ recibo.fecha_pago|date:"d/m/Y" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden sm:table-cell text-gray-500">{{ recibo.forma_pago.descripcion }}{% if recibo.banco %} · {{ recibo.banco.nombre }}{% endif %}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-700">${{ recibo.importe_total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if recibo.esta_activo %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Pagado
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Con pendiente
+          </span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr x-show="abierto" x-cloak>
+        <td colspan="7" class="px-4 sm:px-6 pb-4 pt-1 bg-gray-50/50">
+          <table class="w-full text-xs text-left text-gray-500 border border-gray-100 rounded-lg overflow-hidden">
+            <thead class="uppercase tracking-wider text-gray-400 bg-white border-b border-gray-100">
+              <tr>
+                <th scope="col" class="px-3 py-2 font-semibold">Clave</th>
+                <th scope="col" class="px-3 py-2 font-semibold">Fecha</th>
+                <th scope="col" class="px-3 py-2 font-semibold">Documento</th>
+                <th scope="col" class="px-3 py-2 font-semibold">Importe</th>
+                <th scope="col" class="px-3 py-2 font-semibold">Estado</th>
+                <th scope="col" class="px-3 py-2 font-semibold"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
+              {% for pago in recibo.pagos.all %}
+              <tr>
+                <td class="px-3 py-2 font-mono text-gray-400">{{ pago.cuenta_por_pagar.folio }}</td>
+                <td class="px-3 py-2">{{ pago.cuenta_por_pagar.fecha_emision|date:"d/m/Y" }}</td>
+                <td class="px-3 py-2">{{ pago.cuenta_por_pagar.orden_compra.documento|default:"-" }}</td>
+                <td class="px-3 py-2 font-medium text-gray-700">${{ pago.monto_pagado|moneda }}</td>
+                <td class="px-3 py-2">
+                  {% if pago.is_active %}
+                  <span class="text-emerald-600">Activo</span>
+                  {% else %}
+                  <span class="text-gray-400">Inactivo</span>
+                  {% endif %}
+                </td>
+                <td class="px-3 py-2 text-right" @click.stop>
+                  <a href="{% url 'pagos:pago-editar' pago.pk %}?next={{ request.get_full_path|urlencode }}" class="text-primary-600 hover:text-primary-700 font-medium">Editar</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+    {% empty %}
+    <tbody>
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay pagos registrados</p>
+        </td>
+      </tr>
+    </tbody>
+    {% endfor %}
+  </table>
+</div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+    <p class="text-sm text-gray-400">
+        Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} pago{{ paginator.count|pluralize }}
+    </p>
+    <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Anterior</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Siguiente</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}
