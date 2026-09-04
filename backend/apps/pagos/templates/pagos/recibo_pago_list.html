@@ -21,6 +21,12 @@
     <span class="text-sm text-gray-400">a</span>
     <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input">
   </div>
+  <select name="forma_pago" class="input w-full sm:w-auto">
+    <option value="">Todas las formas de pago</option>
+    {% for forma in formas_pago %}
+    <option value="{{ forma.pk }}" {% if forma_pago_id == forma.pk|stringformat:"s" %}selected{% endif %}>{{ forma.descripcion }}</option>
+    {% endfor %}
+  </select>
   <label class="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
     <input type="checkbox" name="solo_activos" value="1" {% if solo_activos %}checked{% endif %}>
     Solo realmente pagado
@@ -30,7 +36,7 @@
       <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
     </svg>
   </button>
-  {% if q or fecha_desde or fecha_hasta or solo_activos %}
+  {% if q or fecha_desde or fecha_hasta or forma_pago_id or solo_activos %}
   <a href="{% url 'pagos:recibo-list' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
     <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
       <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
@@ -49,6 +55,9 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha de pago</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Forma de pago</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Subtotal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">IVA</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">IEPS</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Importe</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
       </tr>
@@ -65,6 +74,9 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ recibo.proveedor.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ recibo.fecha_pago|date:"d/m/Y" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden sm:table-cell text-gray-500">{{ recibo.forma_pago.descripcion }}{% if recibo.banco %} · {{ recibo.banco.nombre }}{% endif %}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right hidden lg:table-cell text-gray-500">${{ recibo.subtotal_total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right hidden lg:table-cell text-gray-500">${{ recibo.iva_total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right hidden lg:table-cell text-gray-500">${{ recibo.ieps_total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-700">${{ recibo.importe_total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4">
           {% if recibo.esta_activo %}
@@ -79,7 +91,7 @@
         </td>
       </tr>
       <tr x-show="abierto" x-cloak>
-        <td colspan="7" class="px-4 sm:px-6 pb-4 pt-1 bg-gray-50/50">
+        <td colspan="10" class="px-4 sm:px-6 pb-4 pt-1 bg-gray-50/50">
           <table class="w-full text-xs text-left text-gray-500 border border-gray-100 rounded-lg overflow-hidden">
             <thead class="uppercase tracking-wider text-gray-400 bg-white border-b border-gray-100">
               <tr>
@@ -118,7 +130,7 @@
     {% empty %}
     <tbody>
       <tr>
-        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="10" class="px-4 sm:px-6 py-12 text-center">
           <p class="text-sm text-gray-400">No hay pagos registrados</p>
         </td>
       </tr>
@@ -133,10 +145,10 @@
     </p>
     <div class="flex items-center gap-2">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Anterior</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if forma_pago_id %}&forma_pago={{ forma_pago_id }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Anterior</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Siguiente</a>
+        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if forma_pago_id %}&forma_pago={{ forma_pago_id }}{% endif %}{% if solo_activos %}&solo_activos=1{% endif %}" class="btn-secondary">Siguiente</a>
         {% endif %}
     </div>
 </div>

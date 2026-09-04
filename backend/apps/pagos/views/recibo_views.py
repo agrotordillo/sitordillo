@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Count, Q
 from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
+from apps.fiscal.models import FormaPago
 from apps.pagos.models import ReciboPago
 
 
@@ -24,7 +27,7 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
             super()
             .get_queryset()
             .select_related("proveedor", "forma_pago", "banco")
-            .prefetch_related("pagos__cuenta_por_pagar__orden_compra")
+            .prefetch_related("pagos__cuenta_por_pagar__orden_compra__detalles")
         )
 
         buscar = self.request.GET.get("q", "").strip()
@@ -41,6 +44,10 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
         fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
         if fecha_hasta:
             queryset = queryset.filter(fecha_pago__lte=fecha_hasta)
+
+        forma_pago_id = self.request.GET.get("forma_pago", "").strip()
+        if forma_pago_id:
+            queryset = queryset.filter(forma_pago_id=forma_pago_id)
 
         if self.request.GET.get("solo_activos") == "1":
             # "Realmente ya pagado": ningún pago del recibo está Inactivo
@@ -64,4 +71,25 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         context["solo_activos"] = self.request.GET.get("solo_activos") == "1"
+        context["forma_pago_id"] = self.request.GET.get("forma_pago", "")
+        context["formas_pago"] = FormaPago.objects.all()
+
+        for recibo in context["recibos"]:
+            self._anotar_totales_fiscales(recibo)
+
         return context
+
+    @staticmethod
+    def _anotar_totales_fiscales(recibo):
+        """Subtotal/IVA/IEPS son de la compra (OrdenCompra), no del pago -un
+        recibo puede cubrir varias cuentas, y una cuenta puede recibir más
+        de un pago (abonos)-, así que se suman una sola vez por cada orden
+        distinta que el recibo cubre, para no duplicar sus impuestos cuando
+        hay más de un pago sobre la misma cuenta."""
+        ordenes = {}
+        for pago in recibo.pagos.all():
+            orden = pago.cuenta_por_pagar.orden_compra
+            ordenes[orden.pk] = orden
+        recibo.subtotal_total = sum((o.subtotal for o in ordenes.values()), Decimal("0.00"))
+        recibo.iva_total = sum((o.iva for o in ordenes.values()), Decimal("0.00"))
+        recibo.ieps_total = sum((o.ieps for o in ordenes.values()), Decimal("0.00"))
