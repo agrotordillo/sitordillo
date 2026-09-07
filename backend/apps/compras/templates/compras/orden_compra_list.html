@@ -73,7 +73,11 @@
                     </span>
                 </td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+                    {% if orden.cuenta_por_pagar.pagos_activos %}
+                    <span class="text-xs text-gray-300" title="Tiene pagos activos, anúlalos primero para poder editarla">—</span>
+                    {% else %}
                     <a href="{% url 'compras:orden-update' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
+                    {% endif %}
                     {% if orden.estatus != 'recibida' and orden.estatus != 'cancelada' %}
                     <a href="{% url 'compras:orden-recibir' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</a>
                     {% endif %}

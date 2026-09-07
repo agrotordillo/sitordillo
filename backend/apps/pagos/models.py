@@ -361,10 +361,20 @@ class Pago(BaseAbstractModel):
             return
 
         cuenta = self.cuenta_por_pagar
-        saldo_antes = cuenta.saldo_pendiente
+        # "saldo_antes" es el saldo pendiente como si ESTE pago no existiera
+        # todavía: se le sobrepone (suma de vuelta) lo que este mismo pago
+        # ya venía descontando -pero solo si venía activo-, porque
+        # cuenta.saldo_pendiente ya excluye a los pagos Inactivos (ver
+        # CuentaPorPagar.total_pagado). Sin ese cuidado, reactivar un pago
+        # que estaba Inactivo (editar_pago_view) sumaría su propio monto
+        # dos veces al saldo disponible y dejaría pasar un monto que en
+        # realidad ya no cabe.
+        contribucion_previa = Decimal("0.00")
         if self.pk:
             pago_previo = Pago.objects.get(pk=self.pk)
-            saldo_antes += pago_previo.monto_pagado + pago_previo.monto_descuento
+            if pago_previo.is_active:
+                contribucion_previa = pago_previo.monto_pagado + pago_previo.monto_descuento
+        saldo_antes = cuenta.saldo_pendiente + contribucion_previa
 
         self.monto_descuento = Decimal("0.00")
         if self.aplica_descuento_pronto_pago:
@@ -386,7 +396,10 @@ class Pago(BaseAbstractModel):
                 Decimal("0.01")
             )
 
-        if self.monto_pagado + self.monto_descuento > saldo_antes:
+        # Un pago que se guarda/queda Inactivo no cuenta en el saldo (ver
+        # CuentaPorPagar.total_pagado), así que su monto no tiene por qué
+        # caber en él -el límite solo aplica al pago que sí va a contar-.
+        if self.is_active and self.monto_pagado + self.monto_descuento > saldo_antes:
             raise ValidationError({
                 "monto_pagado": f"El monto excede el saldo pendiente (${saldo_antes}).",
             })
