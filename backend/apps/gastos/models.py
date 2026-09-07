@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 
 from apps.core.models import BaseAbstractModel
 
@@ -129,6 +129,12 @@ class Gasto(BaseAbstractModel):
     proporcional -por ejemplo, el reparto de agua depende de cuánto
     personal tiene cada una, no de una división en partes iguales."""
 
+    class Condicion(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        PAGADO = "pagado", "Pagado"
+        CANCELADO = "cancelado", "Cancelado"
+
+    numero = models.PositiveIntegerField(unique=True, editable=False, verbose_name="Número")
     centro_costo = models.ForeignKey(
         CentroCosto,
         on_delete=models.PROTECT,
@@ -150,7 +156,32 @@ class Gasto(BaseAbstractModel):
         related_name="gastos",
         verbose_name="Proveedor",
     )
+    turno = models.ForeignKey(
+        "products.Turno",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="gastos",
+        verbose_name="Turno",
+        help_text="Obligatorio cuando el centro de costo es de tipo Sucursal: el turno abierto de esa sucursal en "
+        "el que se aplicó el gasto.",
+    )
     concepto = models.CharField(max_length=255, verbose_name="Concepto")
+    referencia = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Referencia",
+        help_text="Referencia interna/administrativa (folio de caja, número de memo, clave de control propia). "
+        "No es el folio o UUID fiscal -para eso está \"Referencia de factura\".",
+    )
+    condicion = models.CharField(
+        max_length=10,
+        choices=Condicion.choices,
+        default=Condicion.PENDIENTE,
+        verbose_name="Condición",
+        help_text="Estado de seguimiento del gasto, independiente de si está facturado. Un gasto Cancelado no "
+        "cuenta en el reporte de punto de equilibrio.",
+    )
     responsable = models.CharField(
         max_length=150,
         blank=True,
@@ -190,6 +221,8 @@ class Gasto(BaseAbstractModel):
             models.Index(fields=["centro_costo"]),
             models.Index(fields=["categoria"]),
             models.Index(fields=["fecha"]),
+            models.Index(fields=["turno"]),
+            models.Index(fields=["condicion"]),
         ]
 
     def __str__(self):
@@ -200,6 +233,24 @@ class Gasto(BaseAbstractModel):
 
     def get_slug_source(self):
         return f"{self.folio}-{self.centro_costo_id}"
+
+    def _guardar_con_numero_nuevo(self, *args, **kwargs):
+        with transaction.atomic():
+            ultimo = Gasto.objects.select_for_update().order_by("-numero").first()
+            self.numero = (ultimo.numero if ultimo else 0) + 1
+            super().save(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        if self.numero is not None:
+            super().save(*args, **kwargs)
+            return
+        for _ in range(3):
+            try:
+                self._guardar_con_numero_nuevo(*args, **kwargs)
+                return
+            except IntegrityError:
+                self.numero = None
+        self._guardar_con_numero_nuevo(*args, **kwargs)
 
     @property
     def display_name(self):
@@ -223,6 +274,13 @@ class Gasto(BaseAbstractModel):
             raise ValidationError({"referencia_factura": "Indica el folio o UUID fiscal de la factura."})
         if not self.facturado and self.referencia_factura:
             raise ValidationError({"referencia_factura": "Solo aplica cuando el gasto está facturado."})
+        if self.centro_costo_id and self.centro_costo.tipo == CentroCosto.Tipo.SUCURSAL:
+            if not self.turno_id:
+                raise ValidationError({"turno": "Indica el turno de la sucursal en el que se aplicó el gasto."})
+            if self.turno.almacen_id != self.centro_costo.almacen_id:
+                raise ValidationError({"turno": "El turno elegido no corresponde a la sucursal de este gasto."})
+        elif self.turno_id:
+            raise ValidationError({"turno": "Solo aplica cuando el centro de costo es de tipo Sucursal."})
 
 
 class GastoDistribucion(BaseAbstractModel):

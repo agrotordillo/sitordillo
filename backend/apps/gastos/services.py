@@ -34,25 +34,28 @@ def validar_distribucion(importe_total, montos):
 
 def gasto_directo_por_centro(centro_costo, fecha_inicio, fecha_fin):
     """Suma de gastos no compartidos registrados directamente contra este
-    centro de costo en el periodo."""
+    centro de costo en el periodo. Excluye los gastos Cancelados -su
+    condición de seguimiento, no is_active-, ya que un gasto cancelado no
+    representa una salida real de dinero."""
     total = Gasto.objects.filter(
         centro_costo=centro_costo,
         es_compartido=False,
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
-    ).aggregate(total=Sum("importe"))["total"]
+    ).exclude(condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("importe"))["total"]
     return total or Decimal("0.00")
 
 
 def gasto_distribuido_por_centro(centro_costo, fecha_inicio, fecha_fin):
     """Suma de lo que le corresponde a este centro de costo de gastos
-    compartidos con otras sucursales, según el reparto manual capturado."""
+    compartidos con otras sucursales, según el reparto manual capturado.
+    Excluye los gastos Cancelados, igual que gasto_directo_por_centro()."""
     total = GastoDistribucion.objects.filter(
         centro_costo=centro_costo,
         gasto__es_compartido=True,
         gasto__fecha__gte=fecha_inicio,
         gasto__fecha__lte=fecha_fin,
-    ).aggregate(total=Sum("monto"))["total"]
+    ).exclude(gasto__condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("monto"))["total"]
     return total or Decimal("0.00")
 
 

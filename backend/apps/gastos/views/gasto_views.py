@@ -4,7 +4,7 @@ from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView
-from django.views.generic.edit import CreateView
+from django.views.generic.edit import CreateView, UpdateView
 
 from apps.core.scoping import almacenes_visibles
 from apps.gastos.forms import GastoDistribucionFormSet, GastoForm
@@ -31,19 +31,12 @@ class GastoListView(PermissionRequiredMixin, ListView):
         return queryset
 
 
-class GastoCreateView(PermissionRequiredMixin, CreateView):
-    permission_required = "gastos.add_gasto"
-    model = Gasto
-    form_class = GastoForm
-    template_name = "gastos/gasto_form.html"
-    success_url = reverse_lazy("gastos:gasto-list")
-    success_message = "Gasto registrado correctamente."
-    extra_context = {"active_module": "expenses"}
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
+class _GastoDistribucionFormValidMixin:
+    """Comparte entre alta y edición de Gasto la lógica de validar/guardar
+    el formset de distribución (`es_compartido`), incluida la limpieza de
+    las distribuciones ya guardadas si, al editar, se desmarca
+    "compartido" -de lo contrario quedarían huérfanas, sin cuadrar contra
+    `Gasto.distribucion_cuadra`-."""
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -78,10 +71,42 @@ class GastoCreateView(PermissionRequiredMixin, CreateView):
             if es_compartido:
                 formset.instance = self.object
                 formset.save()
+            elif self.object.pk and self.object.distribuciones.exists():
+                self.object.distribuciones.all().delete()
 
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
 
     def form_invalid(self, form):
-        messages.error(self.request, "No fue posible registrar el gasto. Revisa los campos.")
+        messages.error(self.request, "No fue posible guardar el gasto. Revisa los campos.")
         return super().form_invalid(form)
+
+
+class GastoCreateView(_GastoDistribucionFormValidMixin, PermissionRequiredMixin, CreateView):
+    permission_required = "gastos.add_gasto"
+    model = Gasto
+    form_class = GastoForm
+    template_name = "gastos/gasto_form.html"
+    success_url = reverse_lazy("gastos:gasto-list")
+    success_message = "Gasto registrado correctamente."
+    extra_context = {"active_module": "expenses"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+
+class GastoUpdateView(_GastoDistribucionFormValidMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = "gastos.change_gasto"
+    model = Gasto
+    form_class = GastoForm
+    template_name = "gastos/gasto_form.html"
+    success_url = reverse_lazy("gastos:gasto-list")
+    success_message = "Gasto actualizado correctamente."
+    extra_context = {"active_module": "expenses"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs

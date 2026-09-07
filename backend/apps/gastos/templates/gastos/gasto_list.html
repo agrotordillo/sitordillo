@@ -27,6 +27,7 @@
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Número</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Concepto</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Centro de costo</th>
@@ -34,30 +35,50 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Responsable</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Importe</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Condición</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for gasto in gastos %}
       <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.numero }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ gasto.folio }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ gasto.concepto }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">
+          {{ gasto.concepto }}
+          {% if gasto.es_compartido %}
+          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ms-1.5" title="Se distribuye entre varias sucursales">
+            Compartido
+          </span>
+          {% endif %}
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.centro_costo.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.categoria.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ gasto.responsable|default:"—" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.fecha|date:"d/m/Y" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ gasto.importe|moneda }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
-          {% if gasto.es_compartido %}
-          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700" title="Se distribuye entre varias sucursales">
-            Compartido
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if gasto.condicion == 'pagado' %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Pagado
+          </span>
+          {% elif gasto.condicion == 'cancelado' %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-500">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Cancelado
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pendiente
           </span>
           {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          <a href="{% url 'gastos:gasto-update' gasto.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="10" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
             <p class="text-sm text-gray-400">No hay gastos registrados</p>
             <a href="{% url 'gastos:gasto-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Registrar el primero</a>

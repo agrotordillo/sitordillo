@@ -1,7 +1,7 @@
 {% extends "core/layouts/_main_form_layout.html" %}
 {% load static %}
-{% block title %}Registrar gasto{% endblock title %}
-{% block title_layout %}Registrar gasto{% endblock title_layout %}
+{% block title %}{% if object %}Editar gasto{% else %}Registrar gasto{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar gasto{% else %}Registrar gasto{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
@@ -9,7 +9,7 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Crear</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
@@ -48,14 +48,33 @@
           {{ form.proveedor }}
         </div>
         <div>
+          <label for="{{ form.turno.id_for_label }}" class="label">Turno <span class="text-gray-400 font-normal">(solo si el centro de costo es Sucursal)</span></label>
+          {{ form.turno }}
+          <p class="mt-1 text-xs text-gray-400">
+            Solo aparecen los turnos abiertos ahora mismo.
+            <a href="{% url 'products:turno-list' %}" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-700 font-medium">¿No ves el de tu sucursal? Ábrelo aquí</a>.
+          </p>
+          {% if form.turno.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.turno.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
           <label for="{{ form.fecha.id_for_label }}" class="label">Fecha</label>
           {{ form.fecha }}
           {% if form.fecha.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.condicion.id_for_label }}" class="label">Condición</label>
+          {{ form.condicion }}
+          <p class="mt-1 text-xs text-gray-400">Un gasto Cancelado no cuenta en el reporte de punto de equilibrio.</p>
         </div>
         <div class="sm:col-span-2">
           <label for="{{ form.concepto.id_for_label }}" class="label">Concepto</label>
           {{ form.concepto }}
           {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.referencia.id_for_label }}" class="label">Referencia <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.referencia }}
+          <p class="mt-1 text-xs text-gray-400">Uso interno (folio de caja, memo, clave propia); no es el folio fiscal.</p>
         </div>
         <div>
           <label for="{{ form.responsable.id_for_label }}" class="label">Responsable <span class="text-gray-400 font-normal">(opcional)</span></label>
@@ -150,7 +169,7 @@
 
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
     <a href="{% url 'gastos:gasto-list' %}" class="btn-secondary">Cancelar</a>
-    <button type="submit" class="btn-primary">Registrar gasto</button>
+    <button type="submit" class="btn-primary">{% if object %}Guardar cambios{% else %}Registrar gasto{% endif %}</button>
   </div>
 </form>
 {% endblock main_content %}
