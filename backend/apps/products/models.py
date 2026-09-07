@@ -1,7 +1,9 @@
 from decimal import Decimal, ROUND_HALF_UP
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
 from apps.core.models import BaseAbstractModel
 
 class Categoria(BaseAbstractModel):
@@ -165,11 +167,11 @@ class Almacen(BaseAbstractModel):
 
 
 class PuntoVenta(BaseAbstractModel):
-    """Caja o mostrador de una sucursal. Cada uno abrirá y cerrará su
-    propio turno de forma independiente (turnos: fase futura), y es de
-    tipo "cobro" (cajas donde se recibe el pago) o "pedido" (mostradores
-    donde se toma el pedido del cliente pero se cobra después en una
-    caja)."""
+    """Caja o mostrador de una sucursal, de tipo "cobro" (cajas donde se
+    recibe el pago) o "pedido" (mostradores donde se toma el pedido del
+    cliente pero se cobra después en una caja). El turno de operación (ver
+    `Turno`) se maneja por sucursal completa, no por punto de venta
+    individual."""
 
     class Tipo(models.TextChoices):
         COBRO = "cobro", "Cobro"
@@ -218,6 +220,79 @@ class PuntoVenta(BaseAbstractModel):
         super().clean()
         if self.almacen_id and self.almacen.tipo != Almacen.Tipo.SUCURSAL:
             raise ValidationError({"almacen": "Los puntos de venta solo se configuran para sucursales, no para el CEDIS."})
+
+
+class Turno(BaseAbstractModel):
+    """Apertura y cierre de un turno de operación de una sucursal completa
+    (no por punto de venta individual): quién estuvo a cargo y en qué
+    rango de horas, para poder ligarle los gastos que se registran
+    mientras esa sucursal está operando (ver `gastos.Gasto.turno`). Por
+    ahora es solo el registro de apertura/cierre -sin fondo de caja ni
+    arqueo, que sigue siendo una fase futura del punto de venta-."""
+
+    class Estatus(models.TextChoices):
+        ABIERTO = "abierto", "Abierto"
+        CERRADO = "cerrado", "Cerrado"
+
+    almacen = models.ForeignKey(
+        Almacen,
+        on_delete=models.PROTECT,
+        related_name="turnos",
+        verbose_name="Sucursal",
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="turnos",
+        verbose_name="Responsable del turno",
+    )
+    fecha = models.DateField(default=timezone.localdate, verbose_name="Fecha")
+    hora_apertura = models.DateTimeField(auto_now_add=True, verbose_name="Apertura")
+    hora_cierre = models.DateTimeField(null=True, blank=True, verbose_name="Cierre")
+    estatus = models.CharField(
+        max_length=10, choices=Estatus.choices, default=Estatus.ABIERTO, editable=False, verbose_name="Estatus"
+    )
+    observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Turno"
+        verbose_name_plural = "Turnos"
+        ordering = ["-fecha", "-hora_apertura"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["almacen"],
+                condition=models.Q(estatus="abierto"),
+                name="trn_un_turno_abierto_por_almacen",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["almacen"]),
+            models.Index(fields=["fecha"]),
+        ]
+
+    def __str__(self):
+        return f"Turno {self.folio} · {self.almacen.nombre} · {self.fecha:%d/%m/%Y}"
+
+    def get_folio_prefix(self):
+        return "TRN"
+
+    def get_slug_source(self):
+        return f"{self.almacen_id}-{self.fecha}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def esta_abierto(self):
+        return self.estatus == self.Estatus.ABIERTO
+
+    def cerrar(self):
+        if not self.esta_abierto:
+            raise ValidationError("Este turno ya está cerrado.")
+        self.hora_cierre = timezone.now()
+        self.estatus = self.Estatus.CERRADO
+        self.save()
 
 
 class UnidadMedida(BaseAbstractModel):

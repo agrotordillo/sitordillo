@@ -1,0 +1,96 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Turnos{% endblock title %}
+{% block title_layout %}Turnos{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:warehouse-list' %}" class="text-gray-400 hover:text-primary-600">Almacenes</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Turnos</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+{% if almacenes %}
+<form method="post" action="{% url 'products:turno-abrir' %}" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  {% csrf_token %}
+  <select name="almacen" class="input w-full sm:w-auto" required>
+    <option value="">Selecciona la sucursal...</option>
+    {% for almacen in almacenes %}
+    <option value="{{ almacen.pk }}">{{ almacen.nombre }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn-primary w-full sm:w-auto">Abrir turno</button>
+</form>
+{% endif %}
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Responsable</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Apertura</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Cierre</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"><span class="sr-only">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for turno in turnos %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ turno.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ turno.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden sm:table-cell text-gray-500">{{ turno.usuario.get_full_name|default:turno.usuario.username }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_apertura|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_cierre|date:"d/m/Y H:i"|default:"-" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if turno.esta_abierto %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Abierto
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cerrado
+          </span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          {% if turno.esta_abierto %}
+          <form method="post" action="{% url 'products:turno-cerrar' turno.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cerrar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay turnos registrados</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+  <p class="text-sm text-gray-400">
+    Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} turno{{ paginator.count|pluralize }}
+  </p>
+  <div class="flex items-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="btn-secondary">Anterior</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="btn-secondary">Siguiente</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock main_content %}
