@@ -3,6 +3,7 @@ from django.urls import path
 from .views.traspaso_views import (
     TraspasoCreateView,
     TraspasoListView,
+    traspaso_cancelar_view,
     traspaso_enviar_view,
     traspaso_recibir_view,
 )
@@ -14,4 +15,5 @@ urlpatterns = [
     path("crear/", TraspasoCreateView.as_view(), name="traspaso-create"),
     path("<int:pk>/enviar/", traspaso_enviar_view, name="traspaso-enviar"),
     path("<int:pk>/recibir/", traspaso_recibir_view, name="traspaso-recibir"),
+    path("<int:pk>/cancelar/", traspaso_cancelar_view, name="traspaso-cancelar"),
 ]

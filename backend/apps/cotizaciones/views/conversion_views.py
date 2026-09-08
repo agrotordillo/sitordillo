@@ -4,12 +4,19 @@ from django.db import transaction
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.forms import BuscarFolioForm
 from apps.cotizaciones.models import Cotizacion
+from apps.products.models import Turno
 from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
 from apps.ventas.models import Venta, VentaDetalle
-from apps.ventas.services import procesar_lineas_venta, validar_stock_disponible
+from apps.ventas.services import (
+    procesar_lineas_venta,
+    validar_stock_disponible,
+    validar_turno_abierto,
+    validar_venta_a_credito,
+)
 
 
 @permission_required("cotizaciones.view_cotizacion", raise_exception=True)
@@ -61,12 +68,16 @@ def convertir_cotizacion_view(request, pk):
         formset = VentaDetalleFormSet(request.POST, instance=Venta(), prefix="detalles")
         if form.is_valid() and formset.is_valid():
             almacen = form.cleaned_data["almacen"]
+            error_turno = validar_turno_abierto(almacen, request.user)
             lineas = [
                 (cd["producto"], cd["cantidad"], cd["estrategia_salida"])
                 for f in formset
                 if (cd := f.cleaned_data) and cd.get("producto") and not cd.get("DELETE")
             ]
-            if not lineas:
+
+            if error_turno:
+                form.add_error(None, error_turno)
+            elif not lineas:
                 form.add_error(None, "Agrega al menos un producto a la venta.")
             else:
                 errores_stock = validar_stock_disponible(almacen, lineas)
@@ -74,20 +85,30 @@ def convertir_cotizacion_view(request, pk):
                     form.add_error(None, error)
 
                 if not errores_stock:
-                    with transaction.atomic():
-                        venta = form.save()
-                        formset.instance = venta
-                        formset.save()
-                        procesar_lineas_venta(venta)
-                        cotizacion.venta = venta
-                        cotizacion.estatus = Cotizacion.Estatus.CONVERTIDA
-                        cotizacion.save(update_fields=["venta", "estatus", "updated_at"])
-
-                    messages.success(
-                        request,
-                        f"Cotización {cotizacion.folio} convertida a la venta {venta.folio}.",
-                    )
-                    return redirect("ventas:venta-list")
+                    try:
+                        with transaction.atomic():
+                            venta = form.save()
+                            formset.instance = venta
+                            formset.save()
+                            error_credito = validar_venta_a_credito(
+                                venta.cliente, venta.forma_pago, venta.total
+                            )
+                            if error_credito:
+                                raise ValueError(error_credito)
+                            procesar_lineas_venta(venta)
+                            if venta.forma_pago.clave == Venta.CLAVE_CREDITO:
+                                generar_cuenta_por_cobrar(venta)
+                            cotizacion.venta = venta
+                            cotizacion.estatus = Cotizacion.Estatus.CONVERTIDA
+                            cotizacion.save(update_fields=["venta", "estatus", "updated_at"])
+                    except ValueError as e:
+                        form.add_error(None, str(e))
+                    else:
+                        messages.success(
+                            request,
+                            f"Cotización {cotizacion.folio} convertida a la venta {venta.folio}.",
+                        )
+                        return redirect("ventas:venta-list")
     else:
         form = VentaForm(
             initial={
@@ -119,8 +140,26 @@ def convertir_cotizacion_view(request, pk):
         )
         formset = PrefillFormSet(instance=Venta(), initial=initial_detalles, prefix="detalles")
 
+    # Mismo aviso previo que en Crear venta (ver VentaCreateView): en cuáles
+    # de las sucursales que puede elegir el usuario actual NO tiene su
+    # propio turno abierto -no bloquea ver la pantalla, solo informa antes
+    # de llenar todo; el candado real está arriba, en validar_turno_abierto.
+    almacenes = list(form.fields["almacen"].queryset)
+    con_turno_propio_abierto = set(
+        Turno.objects.filter(
+            punto_venta__almacen__in=almacenes, usuario=request.user, estatus=Turno.Estatus.ABIERTO
+        ).values_list("punto_venta__almacen_id", flat=True)
+    )
+    sucursales_sin_turno = [a for a in almacenes if a.pk not in con_turno_propio_abierto]
+
     return render(
         request,
         "cotizaciones/convertir_form.html",
-        {"cotizacion": cotizacion, "form": form, "formset": formset, "active_module": "quotes"},
+        {
+            "cotizacion": cotizacion,
+            "form": form,
+            "formset": formset,
+            "sucursales_sin_turno": sucursales_sin_turno,
+            "active_module": "quotes",
+        },
     )

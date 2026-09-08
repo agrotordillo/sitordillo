@@ -47,7 +47,7 @@ class GastoForm(BaseModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         centros_costo = CentroCosto.objects.filter(is_active=True)
-        turnos = Turno.objects.filter(estatus=Turno.Estatus.ABIERTO).select_related("almacen")
+        turnos = Turno.objects.filter(estatus=Turno.Estatus.ABIERTO).select_related("punto_venta__almacen")
         # El origen del gasto (quién lo paga) sí queda acotado a la
         # sucursal del usuario restringido; a diferencia del destino de
         # una distribución (GastoDistribucionForm), que necesita poder
@@ -56,7 +56,7 @@ class GastoForm(BaseModelForm):
             visibles = almacenes_visibles(user)
             if visibles is not None:
                 centros_costo = centros_costo.filter(almacen__in=visibles)
-                turnos = turnos.filter(almacen__in=visibles)
+                turnos = turnos.filter(punto_venta__almacen__in=visibles)
         self.fields["centro_costo"].queryset = centros_costo
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
         self.fields["proveedor"].required = False

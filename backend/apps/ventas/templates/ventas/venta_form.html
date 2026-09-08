@@ -23,6 +23,14 @@
   </div>
   {% endif %}
 
+  {% if sucursales_sin_turno %}
+  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+    No tienes un turno propio abierto en: {{ sucursales_sin_turno|join:", " }}. Ábrelo en
+    <a href="{% url 'products:turno-list' %}" target="_blank" rel="noopener" class="underline font-medium">Turnos</a>
+    antes de vender ahí.
+  </div>
+  {% endif %}
+
   <div class="grid gap-8">
 
     <div>

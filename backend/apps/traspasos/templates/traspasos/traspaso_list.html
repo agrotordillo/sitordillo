@@ -54,15 +54,25 @@
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           {% if traspaso.estatus == 'borrador' %}
-          <form method="post" action="{% url 'traspasos:traspaso-enviar' traspaso.pk %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Enviar</button>
-          </form>
+            {% if not almacenes_propios_ids or traspaso.almacen_origen_id in almacenes_propios_ids %}
+            <form method="post" action="{% url 'traspasos:traspaso-enviar' traspaso.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Enviar</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'traspasos:traspaso-cancelar' traspaso.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cancelar</button>
+            </form>
           {% elif traspaso.estatus == 'enviado' %}
-          <form method="post" action="{% url 'traspasos:traspaso-recibir' traspaso.pk %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</button>
-          </form>
+            {% if not almacenes_propios_ids or traspaso.almacen_destino_id in almacenes_propios_ids %}
+            <form method="post" action="{% url 'traspasos:traspaso-recibir' traspaso.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</button>
+            </form>
+            {% else %}
+            <span class="text-xs text-gray-400">Esperando a que {{ traspaso.almacen_destino.nombre }} confirme</span>
+            {% endif %}
           {% endif %}
         </td>
       </tr>

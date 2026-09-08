@@ -6,6 +6,12 @@ from apps.core.models import BaseAbstractModel
 
 
 class Venta(BaseAbstractModel):
+    # Clave SAT c_FormaPago "99 - Por definir": la que se usa para una
+    # venta a crédito (método de pago PPD) cuando todavía no se sabe cómo
+    # se va a cobrar. Ver ventas.services.validar_venta_a_credito y
+    # cobros.services.generar_cuenta_por_cobrar, que se disparan con ella.
+    CLAVE_CREDITO = "99"
+
     cliente = models.ForeignKey(
         "clientes.Cliente",
         on_delete=models.PROTECT,

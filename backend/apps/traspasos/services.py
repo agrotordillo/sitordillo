@@ -8,6 +8,24 @@ from apps.inventario.services import registrar_movimiento, seleccionar_lotes_par
 from .models import Traspaso, TraspasoLote
 
 
+def validar_stock_disponible_traspaso(traspaso):
+    """Pre-valida (sin mutar nada) que haya stock suficiente para TODAS las
+    líneas del traspaso en el almacén de origen, igual que
+    ventas.services.validar_stock_disponible. Devuelve una lista de
+    mensajes de error -uno por cada producto que no alcanza-, en vez de
+    that enviar_traspaso() truene con el primero que encuentre: así quien
+    envía ve de una vez todo lo que falta, no un producto a la vez."""
+    errores = []
+    for detalle in traspaso.detalles.select_related("producto"):
+        try:
+            seleccionar_lotes_para_salida(
+                detalle.producto, traspaso.almacen_origen, detalle.cantidad, estrategia=detalle.estrategia_salida,
+            )
+        except ValueError as e:
+            errores.append(f"{detalle.producto.nombre}: {e}")
+    return errores
+
+
 @transaction.atomic
 def enviar_traspaso(traspaso):
     if traspaso.estatus != Traspaso.Estatus.BORRADOR:
@@ -80,4 +98,16 @@ def recibir_traspaso(traspaso):
     traspaso.estatus = Traspaso.Estatus.RECIBIDO
     traspaso.fecha_recepcion = timezone.localdate()
     traspaso.save(update_fields=["estatus", "fecha_recepcion", "updated_at", "updated_by"])
+    return traspaso
+
+
+def cancelar_traspaso(traspaso):
+    """Cancela un traspaso que todavía no se envió. Una vez enviado ya no
+    se puede cancelar así -el inventario del origen ya se descontó y
+    quedó registrado en TraspasoLote-; revertir eso es un caso de
+    corrección de inventario, no una simple cancelación."""
+    if traspaso.estatus != Traspaso.Estatus.BORRADOR:
+        raise ValueError("Solo se puede cancelar un traspaso en borrador.")
+    traspaso.estatus = Traspaso.Estatus.CANCELADO
+    traspaso.save(update_fields=["estatus", "updated_at", "updated_by"])
     return traspaso

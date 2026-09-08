@@ -277,7 +277,7 @@ class Gasto(BaseAbstractModel):
         if self.centro_costo_id and self.centro_costo.tipo == CentroCosto.Tipo.SUCURSAL:
             if not self.turno_id:
                 raise ValidationError({"turno": "Indica el turno de la sucursal en el que se aplicó el gasto."})
-            if self.turno.almacen_id != self.centro_costo.almacen_id:
+            if self.turno.punto_venta.almacen_id != self.centro_costo.almacen_id:
                 raise ValidationError({"turno": "El turno elegido no corresponde a la sucursal de este gasto."})
         elif self.turno_id:
             raise ValidationError({"turno": "Solo aplica cuando el centro de costo es de tipo Sucursal."})

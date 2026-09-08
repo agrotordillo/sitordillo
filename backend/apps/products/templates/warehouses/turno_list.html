@@ -13,13 +13,13 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-{% if almacenes %}
+{% if puntos_venta %}
 <form method="post" action="{% url 'products:turno-abrir' %}" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
   {% csrf_token %}
-  <select name="almacen" class="input w-full sm:w-auto" required>
-    <option value="">Selecciona la sucursal...</option>
-    {% for almacen in almacenes %}
-    <option value="{{ almacen.pk }}">{{ almacen.nombre }}</option>
+  <select name="punto_venta" class="input w-full sm:w-auto" required>
+    <option value="">Selecciona la caja...</option>
+    {% for punto_venta in puntos_venta %}
+    <option value="{{ punto_venta.pk }}">{{ punto_venta.nombre }} · {{ punto_venta.almacen.nombre }}</option>
     {% endfor %}
   </select>
   <button type="submit" class="btn-primary w-full sm:w-auto">Abrir turno</button>
@@ -32,7 +32,7 @@
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Caja</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Responsable</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Apertura</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Cierre</th>
@@ -44,7 +44,7 @@
       {% for turno in turnos %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ turno.folio }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ turno.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ turno.punto_venta.nombre }} <span class="text-gray-400 font-normal">· {{ turno.almacen.nombre }}</span></td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden sm:table-cell text-gray-500">{{ turno.usuario.get_full_name|default:turno.usuario.username }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_apertura|date:"d/m/Y H:i" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_cierre|date:"d/m/Y H:i"|default:"-" }}</td>

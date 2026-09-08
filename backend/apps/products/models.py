@@ -223,22 +223,28 @@ class PuntoVenta(BaseAbstractModel):
 
 
 class Turno(BaseAbstractModel):
-    """Apertura y cierre de un turno de operación de una sucursal completa
-    (no por punto de venta individual): quién estuvo a cargo y en qué
-    rango de horas, para poder ligarle los gastos que se registran
-    mientras esa sucursal está operando (ver `gastos.Gasto.turno`). Por
-    ahora es solo el registro de apertura/cierre -sin fondo de caja ni
-    arqueo, que sigue siendo una fase futura del punto de venta-."""
+    """Apertura y cierre de un turno de una caja (`PuntoVenta` de tipo
+    Cobro): quién estuvo a cargo y en qué rango de horas, para poder
+    ligarle los gastos que se registran mientras esa caja está operando
+    (ver `gastos.Gasto.turno`) y para exigir turno abierto al cobrar una
+    venta (ver `ventas.services.validar_turno_abierto`).
+
+    Se ata a la caja, no a la sucursal completa: así una misma sucursal
+    puede operar con más de una caja abierta a la vez (cada una con su
+    propio cajero), aunque hoy en la práctica solo se use una por
+    sucursal. Por ahora es solo el registro de apertura/cierre -sin fondo
+    de caja ni arqueo, que sigue siendo una fase futura del punto de
+    venta-."""
 
     class Estatus(models.TextChoices):
         ABIERTO = "abierto", "Abierto"
         CERRADO = "cerrado", "Cerrado"
 
-    almacen = models.ForeignKey(
-        Almacen,
+    punto_venta = models.ForeignKey(
+        "PuntoVenta",
         on_delete=models.PROTECT,
         related_name="turnos",
-        verbose_name="Sucursal",
+        verbose_name="Punto de venta",
     )
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -260,32 +266,48 @@ class Turno(BaseAbstractModel):
         ordering = ["-fecha", "-hora_apertura"]
         constraints = [
             models.UniqueConstraint(
-                fields=["almacen"],
+                fields=["punto_venta"],
                 condition=models.Q(estatus="abierto"),
-                name="trn_un_turno_abierto_por_almacen",
+                name="trn_un_turno_abierto_por_punto_venta",
             ),
         ]
         indexes = [
-            models.Index(fields=["almacen"]),
+            models.Index(fields=["punto_venta"]),
             models.Index(fields=["fecha"]),
         ]
 
     def __str__(self):
-        return f"Turno {self.folio} · {self.almacen.nombre} · {self.fecha:%d/%m/%Y}"
+        return f"Turno {self.folio} · {self.punto_venta.nombre} · {self.fecha:%d/%m/%Y}"
 
     def get_folio_prefix(self):
         return "TRN"
 
     def get_slug_source(self):
-        return f"{self.almacen_id}-{self.fecha}-{self.uuid}"
+        return f"{self.punto_venta_id}-{self.fecha}-{self.uuid}"
 
     @property
     def display_name(self):
         return self.__str__()
 
     @property
+    def almacen(self):
+        """Atajo de solo lectura para el código que ya conocía Turno como
+        "por sucursal" (p. ej. Gasto.turno en plantillas/__str__) -para
+        filtrar en una consulta (`.filter(...)`) hay que usar
+        `punto_venta__almacen`, esto no sirve ahí, solo para acceder al
+        valor ya en memoria de una instancia."""
+        return self.punto_venta.almacen
+
+    @property
     def esta_abierto(self):
         return self.estatus == self.Estatus.ABIERTO
+
+    def clean(self):
+        super().clean()
+        if self.punto_venta_id and self.punto_venta.tipo != PuntoVenta.Tipo.COBRO:
+            raise ValidationError({
+                "punto_venta": "Un turno solo se abre en un punto de venta de tipo Cobro (una caja).",
+            })
 
     def cerrar(self):
         if not self.esta_abierto:

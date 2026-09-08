@@ -7,14 +7,14 @@ from django.urls import reverse
 from django.views.generic import ListView
 
 from apps.core.scoping import almacenes_visibles
-from apps.products.models import Almacen, Turno
+from apps.products.models import PuntoVenta, Turno
 from apps.products.services import abrir_turno
 
 
 class TurnoListView(PermissionRequiredMixin, ListView):
-    """Apertura/cierre de turno por sucursal (ver Turno y su uso en
-    Gasto.turno). Un usuario restringido solo ve y abre turnos de sus
-    sucursales asignadas."""
+    """Apertura/cierre de turno por punto de venta -una caja- (ver Turno y
+    su uso en Gasto.turno). Un usuario restringido solo ve y abre turnos
+    de las cajas de sus sucursales asignadas."""
 
     permission_required = "products.view_turno"
     model = Turno
@@ -24,19 +24,21 @@ class TurnoListView(PermissionRequiredMixin, ListView):
     paginate_by = 30
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("almacen", "usuario")
+        queryset = super().get_queryset().select_related("punto_venta__almacen", "usuario")
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
-            queryset = queryset.filter(almacen__in=visibles)
+            queryset = queryset.filter(punto_venta__almacen__in=visibles)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        almacenes = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
+        puntos_venta = PuntoVenta.objects.filter(
+            is_active=True, tipo=PuntoVenta.Tipo.COBRO, almacen__is_active=True
+        ).select_related("almacen")
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
-            almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
-        context["almacenes"] = almacenes
+            puntos_venta = puntos_venta.filter(almacen__in=visibles)
+        context["puntos_venta"] = puntos_venta
         return context
 
 
@@ -45,19 +47,19 @@ def abrir_turno_view(request):
     if request.method != "POST":
         return redirect("products:turno-list")
 
-    almacen = get_object_or_404(Almacen, pk=request.POST.get("almacen"))
+    punto_venta = get_object_or_404(PuntoVenta, pk=request.POST.get("punto_venta"))
     visibles = almacenes_visibles(request.user)
-    if visibles is not None and not visibles.filter(pk=almacen.pk).exists():
-        messages.error(request, "No puedes abrir un turno para una sucursal que no te corresponde.")
+    if visibles is not None and not visibles.filter(pk=punto_venta.almacen_id).exists():
+        messages.error(request, "No puedes abrir un turno para una caja que no te corresponde.")
         return redirect("products:turno-list")
 
     try:
-        turno = abrir_turno(almacen=almacen, usuario=request.user)
+        turno = abrir_turno(punto_venta=punto_venta, usuario=request.user)
     except ValidationError as e:
         for mensaje in e.messages:
             messages.error(request, mensaje)
     else:
-        messages.success(request, f"Turno {turno.folio} abierto en {almacen.nombre}.")
+        messages.success(request, f"Turno {turno.folio} abierto en {punto_venta.nombre} ({punto_venta.almacen.nombre}).")
     return redirect("products:turno-list")
 
 
@@ -68,8 +70,8 @@ def cerrar_turno_view(request, pk):
 
     turno = get_object_or_404(Turno, pk=pk)
     visibles = almacenes_visibles(request.user)
-    if visibles is not None and not visibles.filter(pk=turno.almacen_id).exists():
-        messages.error(request, "No puedes cerrar un turno de una sucursal que no te corresponde.")
+    if visibles is not None and not visibles.filter(pk=turno.punto_venta.almacen_id).exists():
+        messages.error(request, "No puedes cerrar un turno de una caja que no te corresponde.")
         return redirect("products:turno-list")
 
     try:

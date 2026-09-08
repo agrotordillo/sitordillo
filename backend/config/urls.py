@@ -22,6 +22,7 @@ urlpatterns = [
     path("traspasos/", include("apps.traspasos.urls", namespace="traspasos")),
     path("cotizaciones/", include("apps.cotizaciones.urls", namespace="cotizaciones")),
     path("ventas/", include("apps.ventas.urls", namespace="ventas")),
+    path("cuentas-por-cobrar/", include("apps.cobros.urls", namespace="cobros")),
     path("pagos/", include("apps.pagos.urls", namespace="pagos")),
     path("facturacion/", include("apps.facturacion.urls", namespace="facturacion")),
     path("gastos/", include("apps.gastos.urls", namespace="gastos")),

@@ -1,0 +1,111 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static core_extras %}
+{% block title %}Registrar cobro{% endblock title %}
+{% block title_layout %}Registrar cobro{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'cobros:cuenta-list' %}" class="text-gray-400 hover:text-primary-600">Cuentas por cobrar</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Registrar cobro</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="mb-4 grid gap-1 text-sm text-gray-600">
+  <p>Cliente: <span class="font-medium text-gray-800">{{ cuenta.cliente.display_name }}</span></p>
+  <p>Venta: <span class="font-medium text-gray-800">{{ cuenta.venta.folio }}</span></p>
+  <p>Saldo pendiente: <span class="font-semibold text-gray-800">${{ cuenta.saldo_pendiente|moneda }}</span> de ${{ cuenta.monto_total|moneda }}</p>
+</div>
+
+{% if cobros %}
+<div class="mb-6 border border-gray-100 rounded-xl overflow-hidden">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2 font-semibold">Fecha</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Monto cobrado</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Forma de pago</th>
+        <th scope="col" class="px-3 py-2 font-semibold">Referencia</th>
+        <th scope="col" class="px-3 py-2 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for cobro in cobros %}
+      <tr class="{% if not cobro.is_active %}opacity-50{% endif %}">
+        <td class="px-3 py-2">{{ cobro.fecha_cobro|date:"d/m/Y" }}</td>
+        <td class="px-3 py-2">${{ cobro.monto_cobrado|moneda }}</td>
+        <td class="px-3 py-2">{{ cobro.forma_pago.descripcion }}{% if cobro.banco %} · {{ cobro.banco.nombre }}{% endif %}</td>
+        <td class="px-3 py-2">{{ cobro.numero_referencia|default:"-" }}</td>
+        <td class="px-3 py-2 text-right">
+          {% if cobro.comprobante %}
+          <a href="{{ cobro.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver comprobante</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if sin_saldo %}
+<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+  Esta cuenta por cobrar ya no tiene saldo pendiente. Aquí puedes consultar sus cobros.
+</div>
+{% else %}
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.fecha_cobro.id_for_label }}" class="label">Fecha de cobro</label>
+      {{ form.fecha_cobro }}
+      {% if form.fecha_cobro.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_cobro.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.monto_cobrado.id_for_label }}" class="label">Monto cobrado</label>
+      {{ form.monto_cobrado }}
+      {% if form.monto_cobrado.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.monto_cobrado.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
+      {{ form.forma_pago }}
+      {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
+    </div>
+    <div id="campo-banco" class="hidden">
+      <label for="{{ form.banco.id_for_label }}" class="label">Banco</label>
+      {{ form.banco }}
+      {% if form.banco.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.banco.errors.0 }}</p>{% endif %}
+    </div>
+    <div id="campo-referencia" class="hidden">
+      <label for="{{ form.numero_referencia.id_for_label }}" class="label" id="label-referencia">Número de cheque</label>
+      {{ form.numero_referencia }}
+      {% if form.numero_referencia.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.numero_referencia.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.comprobante.id_for_label }}" class="label">Comprobante de cobro <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.comprobante }}
+      {% if form.comprobante.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.comprobante.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'cobros:cuenta-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar cobro</button>
+  </div>
+</form>
+{% endif %}
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/cobro-form.js' %}"></script>
+{% endblock extra_js %}

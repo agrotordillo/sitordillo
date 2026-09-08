@@ -4,9 +4,44 @@ from django.utils import timezone
 
 from apps.inventario.models import Lote, MovimientoInventario
 from apps.inventario.services import registrar_movimiento, seleccionar_lotes_para_salida
-from apps.products.models import Producto
+from apps.products.models import Producto, Turno
 
 from .models import VentaDetalleLote
+
+
+def validar_venta_a_credito(cliente, forma_pago, monto):
+    """Si la venta es a crédito (forma de pago con clave SAT "99 - Por
+    definir", ver Venta.CLAVE_CREDITO), valida que el cliente tenga
+    crédito autorizado y que esta venta no lo deje por encima de su
+    límite. No aplica a ninguna otra forma de pago -esas se asumen
+    cobradas de inmediato-. Devuelve un mensaje de error, o None si no
+    aplica o todo está en orden."""
+    if forma_pago.clave != "99":
+        return None
+    if not cliente.tiene_credito:
+        return (
+            f'"{cliente.display_name}" no tiene crédito autorizado; no se le puede vender '
+            'con forma de pago "Por definir".'
+        )
+    from apps.cobros.services import validar_limite_credito_cliente
+    return validar_limite_credito_cliente(cliente, monto)
+
+
+def validar_turno_abierto(almacen, usuario):
+    """Una venta solo se puede registrar si el usuario que la captura tiene
+    ÉL MISMO un turno abierto en alguna caja (PuntoVenta tipo Cobro) de
+    esa sucursal (ver products.Turno) -no basta con que la sucursal tenga
+    alguno abierto por otra persona-, para que quede claro quién estuvo a
+    cargo de esa operación. Una sucursal puede tener varias cajas, cada
+    una con su propio turno abierto simultáneo (aunque hoy en la práctica
+    solo se use una), así que esto no bloquea a un segundo cajero con su
+    propia caja abierta. Devuelve un mensaje de error, o None si el
+    usuario tiene un turno propio abierto en alguna caja de esa sucursal."""
+    if not Turno.objects.filter(
+        punto_venta__almacen=almacen, usuario=usuario, estatus=Turno.Estatus.ABIERTO
+    ).exists():
+        return f'No tienes un turno abierto en "{almacen.nombre}". Ábrelo antes de registrar la venta.'
+    return None
 
 
 def expandir_linea(producto, cantidad, estrategia):
