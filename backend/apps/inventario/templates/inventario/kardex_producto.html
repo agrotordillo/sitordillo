@@ -1,0 +1,106 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load static core_extras product_extras %}
+{% block title %}Kardex de producto{% endblock title %}
+{% block title_layout %}Kardex de producto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Kardex de producto</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Historial completo de entradas y salidas de un producto en un almacén, con el saldo que va quedando después
+  de cada movimiento -incluye ajustes y mermas, así que cualquier corrección o cancelación ya queda reflejada
+  aquí sin nada especial que hacer-. El saldo final debe coincidir con la existencia real del almacén.
+</p>
+
+<form method="get" class="grid gap-3 sm:grid-cols-4 items-end mb-6 bg-gray-50/50 border border-gray-100 rounded-xl p-4">
+  <div class="sm:col-span-2">
+    <label class="label">Producto</label>
+    <div
+      class="producto-search relative"
+      data-producto-search-url="{% url 'api:producto-buscar' %}"
+    >
+      <input type="hidden" name="producto" value="{{ producto_id }}">
+      <input type="text" class="input producto-search-input" placeholder="Folio, SKU, código o nombre..." value="{{ producto_id|producto_label }}" autocomplete="off">
+      <div class="producto-search-results hidden z-[55] bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+    </div>
+  </div>
+  <div>
+    <label class="label">Almacén</label>
+    <select name="almacen" class="input w-full" required>
+      <option value="">Selecciona...</option>
+      {% for a in almacenes %}
+      <option value="{{ a.pk }}" {% if almacen_id == a.pk|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-2">
+    <div class="flex-1">
+      <label class="label">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input w-full">
+    </div>
+  </div>
+  <div class="sm:col-span-4">
+    <button type="submit" class="btn-primary">Consultar</button>
+  </div>
+</form>
+
+{% if producto and almacen %}
+<div class="mb-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+  <span class="text-gray-500">{{ producto.nombre }} · {{ almacen.nombre }}</span>
+  <span class="text-gray-300">·</span>
+  <span class="text-gray-500">Saldo inicial: <span class="font-medium text-gray-700">{{ saldo_inicial }}</span></span>
+  <span class="text-gray-300">·</span>
+  <span class="text-gray-500">Saldo final del Kardex: <span class="font-semibold text-gray-800">{{ saldo_final }}</span></span>
+  <span class="text-gray-300">·</span>
+  <span class="text-gray-500">Existencia real ahora: <span class="font-semibold {% if saldo_final == existencia_actual and not fecha_hasta %}text-emerald-600{% else %}text-gray-800{% endif %}">{{ existencia_actual }}</span></span>
+</div>
+
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Concepto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Entrada</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Salida</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Saldo</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ fila.movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ fila.movimiento.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">
+          {{ fila.movimiento.get_tipo_display }}{% if fila.movimiento.motivo %} · {{ fila.movimiento.motivo }}{% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-emerald-600 font-medium">{{ fila.entrada|default:"" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-red-600 font-medium">{{ fila.salida|default:"" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-800 font-semibold">{{ fila.saldo }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">Sin movimientos en el periodo seleccionado</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+{% endblock extra_js %}
