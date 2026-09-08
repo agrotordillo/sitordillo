@@ -10,6 +10,7 @@ from .views.turno_views import TurnoListView, abrir_turno_view, cerrar_turno_vie
 from .views.unit_measure_views import UnitMeasureCreateView, UnitMeasureListView
 from .views.paquete_views import paquete_componentes_view
 from .views.precio_views import producto_precios_view
+from .views.stock_sucursal_views import producto_stock_sucursal_view
 
 app_name = "products"
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path("<int:pk>/editar/", ProductUpdateView.as_view(), name="product-update"),
     path("<int:pk>/paquete/", paquete_componentes_view, name="paquete-componentes"),
     path("<int:pk>/precios/", producto_precios_view, name="producto-precios"),
+    path("<int:pk>/stock-sucursal/", producto_stock_sucursal_view, name="producto-stock-sucursal"),
     path("categorias/", CategoryListView.as_view(), name="category-list"),
     path("categorias/crear/", CategoryCreateView.as_view(), name="category-create"),
     path("categorias/<int:pk>/editar/", CategoryUpdateView.as_view(), name="category-update"),

@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views.inventario_views import ExistenciaListView, LoteListView
 from .views.correccion_views import corregir_lote_view, reportar_merma_view
+from .views.surtimiento_views import SurtimientoListView
 from .views.conversion_views import (
     ConversionListView,
     RecetaConversionCreateView,
@@ -17,6 +18,7 @@ urlpatterns = [
     path("lotes/<int:pk>/corregir/", corregir_lote_view, name="lote-corregir"),
     path("lotes/<int:pk>/merma/", reportar_merma_view, name="lote-merma"),
     path("existencias/", ExistenciaListView.as_view(), name="existencia-list"),
+    path("surtimiento/", SurtimientoListView.as_view(), name="surtimiento-list"),
     path("conversiones/", ConversionListView.as_view(), name="conversion-list"),
     path("conversiones/crear/", crear_conversion_view, name="conversion-create"),
     path("conversiones/recetas/", RecetaConversionListView.as_view(), name="receta-conversion-list"),

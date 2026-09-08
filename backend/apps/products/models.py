@@ -787,3 +787,77 @@ class ProductoPrecio(BaseAbstractModel):
         super().clean()
         if self.precio_con_impuesto is not None and self.precio_con_impuesto < 0:
             raise ValidationError({"precio_con_impuesto": "El precio de venta no puede ser negativo."})
+
+
+class ProductoStockSucursal(BaseAbstractModel):
+    """Mínimo y máximo de existencia de un producto en UNA sucursal en
+    particular -a diferencia de Producto.stock_minimo/stock_maximo, que
+    son globales y no distinguen entre sucursales-. Es la base del
+    análisis de surtimiento (ver inventario.views.surtimiento_views): qué
+    producto está por debajo de su mínimo, en qué sucursal.
+
+    No hace falta capturar esto para todos los productos -son miles-, solo
+    para los que de verdad importa vigilar: el reporte de surtimiento solo
+    alerta sobre las combinaciones producto+sucursal que sí tienen un
+    registro aquí."""
+
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name="stock_sucursales",
+        verbose_name="Producto",
+    )
+    almacen = models.ForeignKey(
+        Almacen,
+        on_delete=models.CASCADE,
+        related_name="stock_productos",
+        verbose_name="Sucursal",
+    )
+    stock_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock mínimo")
+    stock_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock máximo")
+
+    class Meta:
+        verbose_name = "Stock mínimo/máximo por sucursal"
+        verbose_name_plural = "Stock mínimo/máximo por sucursal"
+        ordering = ["producto__nombre", "almacen__nombre"]
+        constraints = [
+            models.UniqueConstraint(fields=["producto", "almacen"], name="unico_stock_por_producto_sucursal"),
+            models.CheckConstraint(condition=models.Q(stock_minimo__gte=0), name="pss_stock_minimo_no_negativo"),
+            models.CheckConstraint(condition=models.Q(stock_maximo__gte=0), name="pss_stock_maximo_no_negativo"),
+            models.CheckConstraint(
+                condition=models.Q(stock_maximo__gte=models.F("stock_minimo")),
+                name="pss_stock_maximo_mayor_igual_minimo",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["producto"]),
+            models.Index(fields=["almacen"]),
+        ]
+
+    def __str__(self):
+        return f"{self.producto.nombre} · {self.almacen.nombre}"
+
+    def get_folio_prefix(self):
+        return "PSS"
+
+    def get_slug_source(self):
+        return f"{self.producto_id}-{self.almacen_id}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    def clean(self):
+        super().clean()
+        if self.almacen_id and self.almacen.tipo != Almacen.Tipo.SUCURSAL:
+            raise ValidationError({
+                "almacen": "El stock mínimo/máximo por sucursal solo aplica a sucursales, no al CEDIS.",
+            })
+        if self.stock_minimo is not None and self.stock_minimo < 0:
+            raise ValidationError({"stock_minimo": "El stock mínimo no puede ser negativo."})
+        if (
+            self.stock_minimo is not None
+            and self.stock_maximo is not None
+            and self.stock_maximo < self.stock_minimo
+        ):
+            raise ValidationError({"stock_maximo": "El stock máximo no puede ser menor al mínimo."})

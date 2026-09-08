@@ -4,7 +4,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from apps.core.forms import BaseModelForm
 from .models import (
     Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente,
-    PuntoVenta, UnidadMedida, ProductoPrecio,
+    PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
 )
 
 
@@ -175,6 +175,49 @@ ProductoPrecioFormSet = inlineformset_factory(
     ProductoPrecio,
     form=ProductoPrecioForm,
     formset=ProductoPrecioBaseFormSet,
+    fk_name="producto",
+    extra=1,
+    can_delete=True,
+)
+
+
+class ProductoStockSucursalForm(BaseModelForm):
+    class Meta:
+        model = ProductoStockSucursal
+        fields = ["almacen", "stock_minimo", "stock_maximo"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
+        for campo in ("stock_minimo", "stock_maximo"):
+            existing = self.fields[campo].widget.attrs.get("class", "").strip()
+            self.fields[campo].widget.attrs.update({"class": f"{existing} pss-{campo}".strip(), "step": "0.01", "min": "0"})
+
+
+class ProductoStockSucursalBaseFormSet(BaseInlineFormSet):
+    """El UniqueConstraint de ProductoStockSucursal (producto, almacen) es
+    incondicional, pero igual se valida aquí para dar un mensaje claro por
+    fila en vez de un IntegrityError crudo hasta el .save()."""
+
+    def clean(self):
+        super().clean()
+        vistos = set()
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+                continue
+            almacen = form.cleaned_data.get("almacen")
+            if almacen is None:
+                continue
+            if almacen.id in vistos:
+                form.add_error("almacen", f"Ya hay otra fila para {almacen.nombre}.")
+            vistos.add(almacen.id)
+
+
+ProductoStockSucursalFormSet = inlineformset_factory(
+    Producto,
+    ProductoStockSucursal,
+    form=ProductoStockSucursalForm,
+    formset=ProductoStockSucursalBaseFormSet,
     fk_name="producto",
     extra=1,
     can_delete=True,
