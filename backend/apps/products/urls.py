@@ -11,11 +11,13 @@ from .views.unit_measure_views import UnitMeasureCreateView, UnitMeasureListView
 from .views.paquete_views import paquete_componentes_view
 from .views.precio_views import producto_precios_view
 from .views.stock_sucursal_views import producto_stock_sucursal_view
+from .views.export_views import producto_exportar_excel_view
 
 app_name = "products"
 
 urlpatterns = [
     path("", ProductListView.as_view(), name="product-list"),
+    path("exportar/", producto_exportar_excel_view, name="product-exportar"),
     path("crear/", ProductCreateView.as_view(), name="product-create"),
     path("<int:pk>/editar/", ProductUpdateView.as_view(), name="product-update"),
     path("<int:pk>/paquete/", paquete_componentes_view, name="paquete-componentes"),
