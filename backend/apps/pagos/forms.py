@@ -14,11 +14,28 @@ class BancoForm(BaseModelForm):
 class FormaPagoSelect(forms.Select):
     """Select de FormaPago con data-clave en cada <option>, para que
     pago-form.js muestre/oculte banco y número de referencia según la
-    forma de pago elegida sin otra consulta al servidor."""
+    forma de pago elegida sin otra consulta al servidor.
+
+    Ojo: la consulta a FormaPago NO va en __init__ a propósito. Cuando
+    este widget se declara directo en el cuerpo de una clase (como
+    PagoMultipleForm.forma_pago, a diferencia de un ModelForm que lo
+    trae vía Meta.widgets), Django lo instancia en cuanto se importa el
+    módulo -no cuando se crea un formulario-, así que una consulta aquí
+    revienta el arranque en un servidor nuevo antes de correr migrate
+    (pasó justo así en producción: "relation fiscal_formapago does not
+    exist"). Se difiere a _claves_por_id, que resuelve la consulta hasta
+    la primera vez que create_option() la necesita de verdad, ya en un
+    request real con la base de datos lista."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._claves_por_id = dict(FormaPago.objects.values_list("pk", "clave"))
+        self._claves_por_id_cache = None
+
+    @property
+    def _claves_por_id(self):
+        if self._claves_por_id_cache is None:
+            self._claves_por_id_cache = dict(FormaPago.objects.values_list("pk", "clave"))
+        return self._claves_por_id_cache
 
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
