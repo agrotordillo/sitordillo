@@ -1,0 +1,44 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Comisión por línea{% endblock title %}
+{% block title_layout %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} comisión por línea{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'comisiones:comision-linea-list' %}" class="text-gray-400 hover:text-primary-600">Comisiones por línea</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if form.instance.pk %}Editar{% else %}Nueva{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.linea.id_for_label }}" class="label">Línea</label>
+      {{ form.linea }}
+      {% if form.linea.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.linea.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.porcentaje.id_for_label }}" class="label">Comisión (%)</label>
+      {{ form.porcentaje }}
+      {% if form.porcentaje.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.porcentaje.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.observaciones }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'comisiones:comision-linea-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

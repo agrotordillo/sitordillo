@@ -54,6 +54,7 @@ LOCAL_APPS = [
     'apps.ventas',
     'apps.cotizaciones',
     'apps.cobros',
+    'apps.comisiones',
     'apps.pagos',
     'apps.facturacion',
     'apps.gastos',
@@ -73,6 +74,7 @@ MIDDLEWARE = [
 
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.middleware.CurrentUserMiddleware',
     'apps.accounts.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
 

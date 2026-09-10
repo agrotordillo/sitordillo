@@ -61,6 +61,17 @@ class BaseAbstractModel(models.Model):
         return slug
 
     def save(self, *args, **kwargs):
+        # Ver apps.core.middleware.CurrentUserMiddleware: fuera de una
+        # request (management command, migración) esto es None y no pasa
+        # nada, se comporta igual que antes.
+        from apps.core.middleware import get_current_user
+
+        usuario_actual = get_current_user()
+        if usuario_actual is not None:
+            if self.created_by_id is None and self.pk is None:
+                self.created_by = usuario_actual
+            self.updated_by = usuario_actual
+
         if not self.folio:
             self.folio = self._generate_unique_folio()
 

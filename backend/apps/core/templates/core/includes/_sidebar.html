@@ -18,7 +18,9 @@
     </div>
 
     <nav class="flex-1 py-2">
+      {% if perms.products.view_producto or perms.products.view_categoria or perms.products.view_subcategoria or perms.products.view_marca or perms.proveedores.view_proveedor or perms.products.view_unidadmedida or perms.products.view_almacen or perms.products.view_turno or perms.inventario.view_lote or perms.products.view_productostocksucursal or perms.inventario.view_movimientoinventario or perms.inventario.view_conversion or perms.inventario.view_recetaconversion or perms.traspasos.view_traspaso %}
       <div class="sidebar-section">Inventario</div>
+      {% if perms.products.view_producto %}
       <a href="{% url 'products:product-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#7ED957]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M11.644 1.59a.75.75 0 0 1 .712 0l9.75 5.25a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.712 0l-9.75-5.25a.75.75 0 0 1 0-1.32l9.75-5.25Z" />
@@ -27,14 +29,22 @@
         </svg>
         Productos
       </a>
+      {% endif %}
+      {% if perms.products.add_producto %}
       <a href="{% url 'products:product-create' %}" class="sidebar-sublink">Crear producto</a>
+      {% endif %}
+      {% if perms.products.view_categoria %}
       <a href="{% url 'products:category-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#3BA9FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M5.25 2.25a3 3 0 0 0-3 3v4.318a3 3 0 0 0 .879 2.121l9.58 9.581c.92.92 2.39.92 3.31 0l4.318-4.318a2.25 2.25 0 0 0 0-3.31l-9.58-9.581a3 3 0 0 0-2.122-.879H5.25ZM6.375 7.5a1.125 1.125 0 1 0 0-2.25 1.125 1.125 0 0 0 0 2.25Z" clip-rule="evenodd" />
         </svg>
         Categorías
       </a>
+      {% endif %}
+      {% if perms.products.add_categoria %}
       <a href="{% url 'products:category-create' %}" class="sidebar-sublink">Crear categoría</a>
+      {% endif %}
+      {% if perms.products.view_subcategoria %}
       <a href="{% url 'products:subcategory-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#60A5FA]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M2.25 4.125c0-1.036.84-1.875 1.875-1.875h5.25c1.036 0 1.875.84 1.875 1.875V17.25a4.5 4.5 0 1 1-9 0V4.125Zm4.5 14.25a1.125 1.125 0 1 0 0-2.25 1.125 1.125 0 0 0 0 2.25Z" clip-rule="evenodd" />
@@ -42,14 +52,22 @@
         </svg>
         Subcategorías
       </a>
+      {% endif %}
+      {% if perms.products.add_subcategoria %}
       <a href="{% url 'products:subcategory-create' %}" class="sidebar-sublink">Crear subcategoría</a>
+      {% endif %}
+      {% if perms.products.view_marca %}
       <a href="{% url 'products:brand-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#22C55E]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M5.25 2.25A2.25 2.25 0 0 0 3 4.5v15A2.25 2.25 0 0 0 5.25 21.75h13.5A2.25 2.25 0 0 0 21 19.5v-15a2.25 2.25 0 0 0-2.25-2.25H5.25Zm2.625 4.5a.75.75 0 0 0 0 1.5h8.25a.75.75 0 0 0 0-1.5h-8.25Zm0 4.5a.75.75 0 0 0 0 1.5h8.25a.75.75 0 0 0 0-1.5h-8.25Zm0 4.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z" clip-rule="evenodd" />
         </svg>
         Marcas
       </a>
+      {% endif %}
+      {% if perms.products.add_marca %}
       <a href="{% url 'products:brand-create' %}" class="sidebar-sublink">Crear marca</a>
+      {% endif %}
+      {% if perms.proveedores.view_proveedor %}
       <a href="{% url 'proveedores:supplier-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#14B8A6]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M1.5 6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v.372A6.489 6.489 0 0 0 12 6.25a6.489 6.489 0 0 0-1.5.122V6a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 1.5 6v6A1.5 1.5 0 0 0 3 13.5h3.414a6.47 6.47 0 0 0 .765 1.5H3A3 3 0 0 1 0 12V6a3 3 0 0 1 1.5-2.598Z" clip-rule="evenodd" />
@@ -57,14 +75,22 @@
         </svg>
         Proveedores
       </a>
+      {% endif %}
+      {% if perms.proveedores.add_proveedor %}
       <a href="{% url 'proveedores:supplier-create' %}" class="sidebar-sublink">Crear proveedor</a>
+      {% endif %}
+      {% if perms.products.view_unidadmedida %}
       <a href="{% url 'products:unit-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#4A87FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M2.25 7.5a.75.75 0 0 1 .75-.75h18a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75ZM5.25 11.25a.75.75 0 0 1 .75-.75H18a.75.75 0 0 1 0 1.5H6a.75.75 0 0 1-.75-.75Zm-3 3.75a.75.75 0 0 1 .75-.75h12a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm10.19 2.68a.75.75 0 0 1 1.06 0l1.19 1.19 2.81-2.81a.75.75 0 1 1 1.06 1.06l-3.34 3.34a.75.75 0 0 1-1.06 0l-1.72-1.72a.75.75 0 0 1 0-1.06Z" />
         </svg>
         Unidades de medida
       </a>
+      {% endif %}
+      {% if perms.products.add_unidadmedida %}
       <a href="{% url 'products:unit-create' %}" class="sidebar-sublink">Crear unidad</a>
+      {% endif %}
+      {% if perms.products.view_almacen %}
       <a href="{% url 'products:warehouse-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#FF7A70]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M11.584 2.376a.75.75 0 0 1 .832 0l9 6a.75.75 0 0 1-.832 1.248L12 3.901 3.416 9.624a.75.75 0 0 1-.832-1.248l9-6Z" />
@@ -72,8 +98,14 @@
         </svg>
         Almacenes
       </a>
+      {% endif %}
+      {% if perms.products.add_almacen %}
       <a href="{% url 'products:warehouse-create' %}" class="sidebar-sublink">Crear almacén</a>
+      {% endif %}
+      {% if perms.products.view_turno %}
       <a href="{% url 'products:turno-list' %}" class="sidebar-sublink">Turnos</a>
+      {% endif %}
+      {% if perms.inventario.view_lote %}
       <a href="{% url 'inventario:lote-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#F59E0B]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M6 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3H6Zm3 3a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-1.5 0V6.75A.75.75 0 0 1 9 6Zm3.75.75a.75.75 0 0 0-1.5 0v10.5a.75.75 0 0 0 1.5 0V6.75Zm3-.75a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-1.5 0V6.75a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" />
@@ -81,49 +113,85 @@
         Lotes
       </a>
       <a href="{% url 'inventario:existencia-list' %}" class="sidebar-sublink">Existencias por almacén</a>
+      {% endif %}
+      {% if perms.products.view_productostocksucursal %}
       <a href="{% url 'inventario:surtimiento-list' %}" class="sidebar-sublink">Surtimiento por sucursal</a>
+      {% endif %}
+      {% if perms.inventario.view_movimientoinventario %}
       <a href="{% url 'inventario:kardex-producto' %}" class="sidebar-sublink">Kardex de producto</a>
+      {% endif %}
+      {% if perms.inventario.view_lote %}
       <a href="{% url 'inventario:existencia-sin-movimiento' %}" class="sidebar-sublink">Existencia sin movimiento</a>
+      {% endif %}
+      {% if perms.inventario.view_movimientoinventario %}
       <a href="{% url 'inventario:movimiento-costo-list' %}" class="sidebar-sublink">Movimientos del almacén con costo</a>
+      {% endif %}
+      {% if perms.inventario.view_conversion %}
       <a href="{% url 'inventario:conversion-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#22C55E]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd" />
         </svg>
         Conversiones
       </a>
+      {% endif %}
+      {% if perms.inventario.add_conversion %}
       <a href="{% url 'inventario:conversion-create' %}" class="sidebar-sublink">Nueva conversión</a>
+      {% endif %}
+      {% if perms.inventario.view_recetaconversion %}
       <a href="{% url 'inventario:receta-conversion-list' %}" class="sidebar-sublink">Recetas de conversión</a>
+      {% endif %}
+      {% if perms.traspasos.view_traspaso %}
       <a href="{% url 'traspasos:traspaso-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#818CF8]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M4.755 10.059a7.5 7.5 0 0 1 12.548-3.364l1.903 1.903h-3.183a.75.75 0 1 0 0 1.5h4.992a.75.75 0 0 0 .75-.75V4.356a.75.75 0 0 0-1.5 0v3.18l-1.9-1.9A9 9 0 0 0 3.306 9.67a.75.75 0 1 0 1.45.388Zm15.408 3.352a.75.75 0 0 0-.919.53 7.5 7.5 0 0 1-12.548 3.364l-1.902-1.903h3.183a.75.75 0 0 0 0-1.5H2.984a.75.75 0 0 0-.75.75v4.992a.75.75 0 0 0 1.5 0v-3.18l1.9 1.9a9 9 0 0 0 15.059-4.035.75.75 0 0 0-.53-.918Z" clip-rule="evenodd" />
         </svg>
         Traspasos
       </a>
+      {% endif %}
+      {% if perms.traspasos.add_traspaso %}
       <a href="{% url 'traspasos:traspaso-create' %}" class="sidebar-sublink">Crear traspaso</a>
+      {% endif %}
+      {% endif %}
 
+      {% if perms.clientes.view_cliente or perms.compras.view_ordencompra or perms.compras.view_promocionproveedor or perms.compras.view_ordencompradetalle or perms.pagos.view_cuentaporpagar or perms.pagos.view_recibopago or perms.pagos.view_banco or perms.gastos.view_gasto or perms.gastos.view_categoriagasto or perms.gastos.view_centrocosto or perms.ventas.view_venta or perms.ventas.view_devolucioncliente or perms.cobros.view_cuentaporcobrar or perms.comisiones.view_comisionlinea or perms.comisiones.view_comisionproducto or perms.facturacion.view_factura or perms.facturacion.change_empresa %}
       <div class="sidebar-section">Operaciones</div>
+      {% if perms.clientes.view_cliente %}
       <a href="{% url 'clientes:cliente-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#F472B6]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
         </svg>
         Clientes
       </a>
+      {% endif %}
+      {% if perms.clientes.add_cliente %}
       <a href="{% url 'clientes:cliente-create' %}" class="sidebar-sublink">Crear cliente</a>
+      {% endif %}
+      {% if perms.ventas.add_venta %}
       <a href="#" class="sidebar-link">
         <svg class="w-5 h-5 text-[#9B7DFF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path fill-rule="evenodd" d="M7.5 6v.75H5.513c-.96 0-1.764.724-1.865 1.679l-1.263 12A1.875 1.875 0 0 0 4.25 22.5h15.5a1.875 1.875 0 0 0 1.865-2.071l-1.263-12a1.875 1.875 0 0 0-1.865-1.679H16.5V6a4.5 4.5 0 1 0-9 0ZM12 3a3 3 0 0 0-3 3v.75h6V6a3 3 0 0 0-3-3Zm-3 8.25a3 3 0 1 0 6 0v-.75a.75.75 0 0 1 1.5 0v.75a4.5 4.5 0 1 1-9 0v-.75a.75.75 0 0 1 1.5 0v.75Z" clip-rule="evenodd" />
         </svg>
         Punto de Venta
       </a>
+      {% endif %}
+      {% if perms.compras.view_ordencompra %}
       <a href="{% url 'compras:orden-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#12A57F]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM3.75 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM16.5 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Z" />
         </svg>
         Compras
       </a>
+      {% endif %}
+      {% if perms.compras.add_ordencompra %}
       <a href="{% url 'compras:orden-create' %}" class="sidebar-sublink">Crear orden de compra</a>
+      {% endif %}
+      {% if perms.compras.view_promocionproveedor %}
       <a href="{% url 'compras:promocion-list' %}" class="sidebar-sublink">Promociones de proveedor</a>
+      {% endif %}
+      {% if perms.compras.view_ordencompradetalle %}
       <a href="{% url 'compras:analisis-producto' %}" class="sidebar-sublink">Análisis de compra por producto</a>
+      {% endif %}
+      {% if perms.pagos.view_cuentaporpagar %}
       <a href="{% url 'pagos:cuenta-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#E5A700]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M4.5 3.75a3 3 0 0 0-3 3v.75h21v-.75a3 3 0 0 0-3-3h-15Z" />
@@ -131,8 +199,14 @@
         </svg>
         Cuentas por pagar
       </a>
+      {% endif %}
+      {% if perms.pagos.view_recibopago %}
       <a href="{% url 'pagos:recibo-list' %}" class="sidebar-sublink">Pagos - proveedores</a>
+      {% endif %}
+      {% if perms.pagos.view_banco %}
       <a href="{% url 'pagos:banco-list' %}" class="sidebar-sublink">Bancos</a>
+      {% endif %}
+      {% if perms.gastos.view_gasto %}
       <a href="{% url 'gastos:gasto-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#FB923C]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <ellipse cx="12" cy="6" rx="7" ry="2.5" />
@@ -142,10 +216,18 @@
         </svg>
         Gastos
       </a>
-      <a href="{% url 'gastos:gasto-create' %}" class="sidebar-sublink">Registrar gasto</a>
       <a href="{% url 'gastos:reporte' %}" class="sidebar-sublink">Punto de equilibrio</a>
+      {% endif %}
+      {% if perms.gastos.add_gasto %}
+      <a href="{% url 'gastos:gasto-create' %}" class="sidebar-sublink">Registrar gasto</a>
+      {% endif %}
+      {% if perms.gastos.view_categoriagasto %}
       <a href="{% url 'gastos:categoria-list' %}" class="sidebar-sublink">Categorías de gasto</a>
+      {% endif %}
+      {% if perms.gastos.view_centrocosto %}
       <a href="{% url 'gastos:centro-costo-list' %}" class="sidebar-sublink">Centros de costo</a>
+      {% endif %}
+      {% if perms.ventas.view_venta %}
       <a href="{% url 'ventas:venta-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#39E5E0]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 7.5a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" />
@@ -153,12 +235,32 @@
         </svg>
         Ventas
       </a>
+      {% endif %}
+      {% if perms.ventas.add_venta %}
       <a href="{% url 'ventas:venta-create' %}" class="sidebar-sublink">Registrar venta</a>
+      {% endif %}
+      {% if perms.ventas.view_devolucioncliente %}
       <a href="{% url 'ventas:devolucion-list' %}" class="sidebar-sublink">Devoluciones</a>
+      {% endif %}
+      {% if perms.cobros.view_cuentaporcobrar %}
       <a href="{% url 'cobros:cuenta-list' %}" class="sidebar-sublink">Cuentas por cobrar</a>
+      {% endif %}
+      {% if perms.comisiones.view_comisionlinea %}
+      <a href="{% url 'comisiones:reporte' %}" class="sidebar-sublink">Comisiones de mostrador</a>
+      <a href="{% url 'comisiones:comision-linea-list' %}" class="sidebar-sublink">Comisiones por línea</a>
+      {% endif %}
+      {% if perms.comisiones.view_comisionproducto %}
+      <a href="{% url 'comisiones:comision-producto-list' %}" class="sidebar-sublink">Comisiones por producto</a>
+      {% endif %}
+      {% if perms.facturacion.view_factura %}
       <a href="{% url 'facturacion:factura-list' %}" class="sidebar-sublink">Facturas</a>
+      {% endif %}
+      {% if perms.facturacion.change_empresa %}
       <a href="{% url 'facturacion:empresa-config' %}" class="sidebar-sublink">Datos de la empresa</a>
+      {% endif %}
+      {% endif %}
 
+      {% if user.is_superuser %}
       <div class="sidebar-section">Sistema</div>
       <a href="{% url 'accounts:usuario-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#64748B]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -175,6 +277,7 @@
         </svg>
         Configuración
       </a>
+      {% endif %}
     </nav>
 
     <div class="sidebar-footer">
