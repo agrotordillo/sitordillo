@@ -24,12 +24,20 @@
     </button>
     <div class="flex items-center gap-2 pl-2 ml-1 border-l border-gray-200">
       <div class="w-8 h-8 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
-        <span class="text-xs font-bold text-primary-700">U</span>
+        <span class="text-xs font-bold text-primary-700">{{ user.get_username|slice:":1"|upper }}</span>
       </div>
       <div class="hidden md:block">
-        <p class="text-sm font-semibold text-gray-700 leading-tight">Usuario</p>
-        <p class="text-xs text-gray-400 leading-tight">Mostrador</p>
+        <p class="text-sm font-semibold text-gray-700 leading-tight">{{ user.get_full_name|default:user.get_username }}</p>
+        <p class="text-xs text-gray-400 leading-tight">{% if user.is_superuser %}Administrador{% else %}{{ user.groups.first.name|default:"Sin rol" }}{% endif %}</p>
       </div>
+      <form method="post" action="{% url 'accounts:logout' %}" class="ml-1">
+        {% csrf_token %}
+        <button type="submit" class="btn-icon" title="Cerrar sesión" aria-label="Cerrar sesión">
+          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+          </svg>
+        </button>
+      </form>
     </div>
   </div>
 </header>

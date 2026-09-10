@@ -281,6 +281,15 @@
     </nav>
 
     <div class="sidebar-footer">
+      <form method="post" action="{% url 'accounts:logout' %}" class="mb-3">
+        {% csrf_token %}
+        <button type="submit" class="sidebar-link w-full text-left text-red-600">
+          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+          </svg>
+          Cerrar sesión
+        </button>
+      </form>
       <div class="flex items-center gap-3">
         <img src="{% static 'src/logo.png' %}" class="h-6 w-6 object-contain opacity-30" alt="" width="24" height="24" />
         <span class="text-xs text-gray-400">SIT El Tordillo v1.0</span>

@@ -7,12 +7,14 @@
 
   <div class="mb-9 sm:mb-10">
     <p class="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-primary-600 mb-2">Centro de operaciones</p>
-    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 leading-tight">Bienvenido, equipo El Tordillo</h1>
+    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 leading-tight">Bienvenido, {{ user.get_full_name|default:user.get_username }}</h1>
   </div>
 
+  {% if perms.products.view_producto or perms.products.view_categoria or perms.products.view_almacen or perms.ventas.add_venta or perms.compras.view_ordencompra or perms.ventas.view_venta or perms.proveedores.view_proveedor or perms.clientes.view_cliente or perms.gastos.view_gasto %}
   <h2 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Accesos rápidos</h2>
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
 
+    {% if perms.products.view_producto %}
     <a href="{% url 'products:product-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#7ED957]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#7ED957]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -29,7 +31,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.products.view_categoria %}
     <a href="{% url 'products:category-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#3BA9FF]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#3BA9FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -44,7 +48,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.products.view_almacen %}
     <a href="#" class="card-module group">
       <div class="card-module-icon bg-[#FF7A70]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#FF7A70]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -60,7 +66,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.ventas.add_venta %}
     <a href="#" class="card-module group">
       <div class="card-module-icon bg-[#9B7DFF]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#9B7DFF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -75,7 +83,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.compras.view_ordencompra %}
     <a href="{% url 'compras:orden-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#12A57F]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#12A57F]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -90,7 +100,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.ventas.view_venta %}
     <a href="{% url 'ventas:venta-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#39E5E0]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#39E5E0]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -106,7 +118,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.proveedores.view_proveedor %}
     <a href="{% url 'proveedores:supplier-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#FFCC47]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#FFCC47]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -121,7 +135,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.clientes.view_cliente %}
     <a href="{% url 'clientes:cliente-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#F472B6]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#F472B6]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -136,7 +152,9 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
+    {% if perms.gastos.view_gasto %}
     <a href="{% url 'gastos:gasto-list' %}" class="card-module group">
       <div class="card-module-icon bg-[#FB923C]/10">
         <svg class="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 text-[#FB923C]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -154,32 +172,44 @@
         <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </a>
+    {% endif %}
 
   </div>
+  {% endif %}
 
+  {% if perms.products.view_producto or perms.products.view_categoria or perms.products.view_almacen or perms.proveedores.view_proveedor %}
   <h2 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Resumen</h2>
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    {% if perms.products.view_producto %}
     <div class="stat-card">
       <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Productos</p>
       <p class="text-xl sm:text-2xl font-bold text-gray-800">--</p>
       <p class="text-xs text-gray-400 mt-1">Registrados</p>
     </div>
+    {% endif %}
+    {% if perms.products.view_categoria %}
     <div class="stat-card">
       <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Categorías</p>
       <p class="text-xl sm:text-2xl font-bold text-gray-800">--</p>
       <p class="text-xs text-gray-400 mt-1">Activas</p>
     </div>
+    {% endif %}
+    {% if perms.products.view_almacen %}
     <div class="stat-card">
       <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Almacenes</p>
       <p class="text-xl sm:text-2xl font-bold text-gray-800">--</p>
       <p class="text-xs text-gray-400 mt-1">Registrados</p>
     </div>
+    {% endif %}
+    {% if perms.proveedores.view_proveedor %}
     <div class="stat-card">
       <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Proveedores</p>
       <p class="text-xl sm:text-2xl font-bold text-gray-800">--</p>
       <p class="text-xs text-gray-400 mt-1">En directorio</p>
     </div>
+    {% endif %}
   </div>
+  {% endif %}
 
 </div>
 {% endblock content %}

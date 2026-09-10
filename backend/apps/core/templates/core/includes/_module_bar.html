@@ -9,6 +9,7 @@
       <span class="hidden sm:inline">Inicio</span>
     </a>
 
+    {% if perms.products.view_producto %}
     <a href="{% url 'products:product-list' %}"
       class="{% if active_module == 'products' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'products' %}text-primary-600{% else %}text-[#7ED957]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -18,7 +19,9 @@
       </svg>
       <span class="hidden sm:inline">Productos</span>
     </a>
+    {% endif %}
 
+    {% if perms.products.view_categoria %}
     <a href="{% url 'products:category-list' %}"
       class="{% if active_module == 'categories' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'categories' %}text-primary-600{% else %}text-[#3BA9FF]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -26,7 +29,9 @@
       </svg>
       <span class="hidden sm:inline">Categorías</span>
     </a>
+    {% endif %}
 
+    {% if perms.products.view_almacen %}
     <a href="{% url 'products:warehouse-list' %}"
       class="{% if active_module == 'warehouses' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'warehouses' %}text-primary-600{% else %}text-[#FF7A70]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -35,7 +40,9 @@
       </svg>
       <span class="hidden sm:inline">Almacenes</span>
     </a>
+    {% endif %}
 
+    {% if perms.ventas.add_venta %}
     <a href="#"
       class="{% if active_module == 'pos' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'pos' %}text-primary-600{% else %}text-[#9B7DFF]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -43,7 +50,9 @@
       </svg>
       <span class="hidden sm:inline">POS</span>
     </a>
+    {% endif %}
 
+    {% if perms.compras.view_ordencompra %}
     <a href="{% url 'compras:orden-list' %}"
       class="{% if active_module == 'purchases' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'purchases' %}text-primary-600{% else %}text-[#12A57F]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -51,7 +60,9 @@
       </svg>
       <span class="hidden sm:inline">Compras</span>
     </a>
+    {% endif %}
 
+    {% if perms.cotizaciones.view_cotizacion %}
     <a href="{% url 'cotizaciones:cotizacion-list' %}"
       class="{% if active_module == 'quotes' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'quotes' %}text-primary-600{% else %}text-[#A78BFA]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -59,7 +70,9 @@
       </svg>
       <span class="hidden sm:inline">Cotizaciones</span>
     </a>
+    {% endif %}
 
+    {% if perms.ventas.view_venta %}
     <a href="{% url 'ventas:venta-list' %}"
       class="{% if active_module == 'sales' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'sales' %}text-primary-600{% else %}text-[#39E5E0]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -68,7 +81,9 @@
       </svg>
       <span class="hidden sm:inline">Ventas</span>
     </a>
+    {% endif %}
 
+    {% if perms.proveedores.view_proveedor %}
     <a href="{% url 'proveedores:supplier-list' %}"
       class="{% if active_module == 'suppliers' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'suppliers' %}text-primary-600{% else %}text-[#FFCC47]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -77,7 +92,9 @@
       </svg>
       <span class="hidden sm:inline">Proveedores</span>
     </a>
+    {% endif %}
 
+    {% if perms.clientes.view_cliente %}
     <a href="{% url 'clientes:cliente-list' %}"
       class="{% if active_module == 'clients' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'clients' %}text-primary-600{% else %}text-[#F472B6]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -85,7 +102,9 @@
       </svg>
       <span class="hidden sm:inline">Clientes</span>
     </a>
+    {% endif %}
 
+    {% if perms.gastos.view_gasto %}
     <a href="{% url 'gastos:gasto-list' %}"
       class="{% if active_module == 'expenses' %}nav-pill-active{% else %}nav-pill{% endif %}">
       <svg class="w-5 h-5 {% if active_module == 'expenses' %}text-primary-600{% else %}text-[#FB923C]{% endif %}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -96,6 +115,7 @@
       </svg>
       <span class="hidden sm:inline">Gastos</span>
     </a>
+    {% endif %}
 
   </div>
 </nav>
