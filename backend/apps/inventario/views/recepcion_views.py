@@ -13,10 +13,10 @@ from apps.inventario.models import Lote, MovimientoInventario
 from apps.inventario.services import registrar_movimiento
 
 
-# Se recibe mercancía en el almacén físico -es la capacidad "Almacén" la
-# que gobierna esta vista, aunque se llegue a ella desde la pantalla de
-# Compras-, no la de Compras (que solo negocia/ordena, no resguarda
-# inventario).
+# Compras recibe el producto contra la factura/nota del proveedor; Almacén
+# resguarda el inventario físico y por eso también puede darle entrada.
+# Cualquier incidencia detectada en la recepción física se reporta a
+# Compras para su seguimiento.
 @permission_required("inventario.add_lote", raise_exception=True)
 def recepcion_compra_view(request, pk):
     orden = get_object_or_404(OrdenCompra, pk=pk)
