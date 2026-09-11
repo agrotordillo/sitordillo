@@ -8,21 +8,25 @@ from apps.inventario.services import registrar_movimiento, seleccionar_lotes_par
 from .models import Traspaso, TraspasoLote
 
 
-def validar_stock_disponible_traspaso(traspaso):
+def validar_stock_disponible_traspaso(almacen_origen, lineas):
     """Pre-valida (sin mutar nada) que haya stock suficiente para TODAS las
-    líneas del traspaso en el almacén de origen, igual que
-    ventas.services.validar_stock_disponible. Devuelve una lista de
-    mensajes de error -uno por cada producto que no alcanza-, en vez de
-    that enviar_traspaso() truene con el primero que encuentre: así quien
-    envía ve de una vez todo lo que falta, no un producto a la vez."""
+    líneas en el almacén de origen, igual que
+    ventas.services.validar_stock_disponible. `lineas` es un iterable de
+    (producto, cantidad, estrategia) -no hay paquetes que expandir aquí: ver
+    TraspasoDetalleForm, que ya excluye productos tipo PAQUETE-. Devuelve una
+    lista de mensajes de error -uno por cada producto que no alcanza-, en vez
+    de tronar con el primero que encuentre: así quien captura o envía ve de
+    una vez todo lo que falta, no un producto a la vez.
+
+    Se usa en dos momentos: al crear/editar el traspaso (formset en memoria,
+    nada guardado todavía) y al enviarlo (traspaso.detalles ya en BD, por si
+    el stock cambió entre que se creó el borrador y se envía)."""
     errores = []
-    for detalle in traspaso.detalles.select_related("producto"):
+    for producto, cantidad, estrategia in lineas:
         try:
-            seleccionar_lotes_para_salida(
-                detalle.producto, traspaso.almacen_origen, detalle.cantidad, estrategia=detalle.estrategia_salida,
-            )
+            seleccionar_lotes_para_salida(producto, almacen_origen, cantidad, estrategia=estrategia)
         except ValueError as e:
-            errores.append(f"{detalle.producto.nombre}: {e}")
+            errores.append(f"{producto.nombre}: {e}")
     return errores
 
 

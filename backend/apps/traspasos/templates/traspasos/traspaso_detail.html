@@ -1,0 +1,124 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}Traspaso {{ traspaso.folio }}{% endblock title %}
+{% block title_layout %}Traspaso {{ traspaso.folio }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'traspasos:traspaso-list' %}" class="text-gray-400 hover:text-primary-600">Traspasos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{{ traspaso.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="grid gap-8">
+
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-700">Datos generales</h3>
+      <span class="inline-flex items-center gap-1.5 text-xs font-medium
+          {% if traspaso.estatus == 'recibido' %}text-emerald-600
+          {% elif traspaso.estatus == 'cancelado' %}text-red-500
+          {% elif traspaso.estatus == 'enviado' %}text-amber-600
+          {% else %}text-gray-500{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full
+              {% if traspaso.estatus == 'recibido' %}bg-emerald-500
+              {% elif traspaso.estatus == 'cancelado' %}bg-red-400
+              {% elif traspaso.estatus == 'enviado' %}bg-amber-500
+              {% else %}bg-gray-400{% endif %}"></span>
+          {{ traspaso.get_estatus_display }}
+      </span>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 text-sm">
+      <div>
+        <span class="block text-xs text-gray-400">Folio</span>
+        <span class="font-mono text-gray-700">{{ traspaso.folio }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Creado por</span>
+        <span class="text-gray-700">{{ traspaso.created_by.get_full_name|default:traspaso.created_by.username|default:"—" }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Almacén origen</span>
+        <span class="text-gray-700">{{ traspaso.almacen_origen.nombre }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Almacén destino</span>
+        <span class="text-gray-700">{{ traspaso.almacen_destino.nombre }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Fecha de envío</span>
+        <span class="text-gray-700">{{ traspaso.fecha_envio|date:"d/m/Y" }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Fecha de recepción</span>
+        <span class="text-gray-700">{{ traspaso.fecha_recepcion|date:"d/m/Y"|default:"Pendiente" }}</span>
+      </div>
+      {% if traspaso.observaciones %}
+      <div class="sm:col-span-2">
+        <span class="block text-xs text-gray-400">Observaciones</span>
+        <span class="text-gray-700">{{ traspaso.observaciones }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
+    <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad solicitada</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Estrategia</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Lotes movidos</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for detalle in traspaso.detalles.all %}
+          <tr class="align-top">
+            <td class="px-3 py-2.5 font-medium text-gray-800">{{ detalle.producto.nombre }}</td>
+            <td class="px-3 py-2.5">{{ detalle.cantidad }}</td>
+            <td class="px-3 py-2.5">{{ detalle.get_estrategia_salida_display }}</td>
+            <td class="px-3 py-2.5">
+              {% if detalle.lotes.all %}
+              <div class="grid gap-1.5">
+                {% for tl in detalle.lotes.all %}
+                <div class="text-xs text-gray-500 border border-gray-100 rounded-lg px-2.5 py-1.5">
+                  <span class="text-gray-700 font-medium">{{ tl.cantidad }}</span> de lote
+                  <span class="font-mono">{{ tl.lote_origen.numero_lote|default:tl.lote_origen.folio }}</span>
+                  {% if tl.recibido %}
+                  <span class="text-emerald-600">→ recibido en lote <span class="font-mono">{{ tl.lote_destino.numero_lote|default:tl.lote_destino.folio }}</span></span>
+                  {% else %}
+                  <span class="text-amber-600">→ pendiente de recibir</span>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="text-xs text-gray-400">Aún no se envía (sin descontar inventario)</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="px-3 py-8 text-center text-sm text-gray-400">Este traspaso no tiene productos.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+  <a href="{% url 'traspasos:traspaso-list' %}" class="btn-secondary">Volver</a>
+  {% if traspaso.estatus == 'borrador' %}
+  <a href="{% url 'traspasos:traspaso-update' traspaso.pk %}" class="btn-primary">Editar</a>
+  {% endif %}
+</div>
+{% endblock main_content %}

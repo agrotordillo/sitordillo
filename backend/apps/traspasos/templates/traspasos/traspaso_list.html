@@ -34,7 +34,9 @@
     <tbody class="divide-y divide-gray-100">
       {% for traspaso in traspasos %}
       <tr class="hover:bg-gray-50/50 transition-colors">
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ traspaso.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs">
+          <a href="{% url 'traspasos:traspaso-detail' traspaso.pk %}" class="text-primary-600 hover:text-primary-700">{{ traspaso.folio }}</a>
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ traspaso.almacen_origen.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">{{ traspaso.almacen_destino.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ traspaso.fecha_envio|date:"d/m/Y" }}</td>
@@ -54,6 +56,9 @@
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           {% if traspaso.estatus == 'borrador' %}
+            {% if not almacenes_propios_ids or traspaso.almacen_origen_id in almacenes_propios_ids or traspaso.almacen_destino_id in almacenes_propios_ids %}
+            <a href="{% url 'traspasos:traspaso-update' traspaso.pk %}" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Editar</a>
+            {% endif %}
             {% if not almacenes_propios_ids or traspaso.almacen_origen_id in almacenes_propios_ids %}
             <form method="post" action="{% url 'traspasos:traspaso-enviar' traspaso.pk %}" class="inline">
               {% csrf_token %}
