@@ -9,6 +9,7 @@ from django.http import HttpResponseRedirect
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
@@ -51,11 +52,26 @@ class OrdenCompraListView(PermissionRequiredMixin, ListView):
                 | Q(proveedor__nombre_comercial__icontains=q)
                 | Q(proveedor__rfc__icontains=q)
             )
+
+        proveedor_id = self.request.GET.get("proveedor", "").strip()
+        if proveedor_id:
+            queryset = queryset.filter(proveedor_id=proveedor_id)
+
+        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        if fecha_desde:
+            queryset = queryset.filter(fecha_orden__gte=fecha_desde)
+        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_orden__lte=fecha_hasta)
+
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["q"] = self.request.GET.get("q", "").strip()
+        context["proveedor_id"] = self.request.GET.get("proveedor", "")
+        context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
+        context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         return context
 
 

@@ -1,5 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
-{% load core_extras %}
+{% load core_extras static proveedor_extras %}
 {% block title %}Órdenes de compra{% endblock title %}
 {% block title_layout %}Órdenes de compra{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -12,23 +12,42 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-  <form method="get" class="flex items-center gap-2">
-    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por folio o proveedor..." class="input w-full sm:w-64">
-    <button type="submit" class="btn-icon-outline" aria-label="Buscar" title="Buscar">
-      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
-      </svg>
-    </button>
-    {% if q %}
-    <a href="{% url 'compras:orden-list' %}" class="btn-icon-outline" aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
-      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-      </svg>
-    </a>
-    {% endif %}
+<div class="flex flex-col gap-2 w-full">
+  <form method="get" class="grid gap-2 sm:grid-cols-4 items-end w-full">
+    <div class="sm:col-span-1">
+      <label class="label">Buscar</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Folio o proveedor..." class="input w-full">
+    </div>
+    <div>
+      <label class="label">Proveedor</label>
+      <div class="proveedor-search relative" data-proveedor-search-url="{% url 'api:proveedor-buscar' %}">
+        <input type="hidden" name="proveedor" id="id_proveedor" value="{{ proveedor_id }}">
+        <input type="text" class="input proveedor-search-input w-full" placeholder="RFC o nombre..." value="{{ proveedor_id|proveedor_label }}" autocomplete="off">
+        <div class="proveedor-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <div class="flex-1">
+        <label class="label">Orden desde</label>
+        <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input w-full">
+      </div>
+      <div class="flex-1">
+        <label class="label">Hasta</label>
+        <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input w-full">
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="submit" class="btn-primary">Filtrar</button>
+      {% if q or proveedor_id or fecha_desde or fecha_hasta %}
+      <a href="{% url 'compras:orden-list' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+        </svg>
+      </a>
+      {% endif %}
+    </div>
   </form>
-  <a href="{% url 'compras:orden-create' %}" class="btn-primary w-full sm:w-auto">
+  <a href="{% url 'compras:orden-create' %}" class="btn-primary w-full sm:w-auto sm:self-end">
     <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
       <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
     </svg>
@@ -96,9 +115,9 @@
                         <svg class="w-10 h-10 text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9A2.25 2.25 0 0 1 5.25 16.5v-9A2.25 2.25 0 0 1 7.5 5.25h9A2.25 2.25 0 0 1 18.75 7.5v9a2.25 2.25 0 0 1-2.25 2.25Zm-9-9h9" />
                         </svg>
-                        {% if q %}
-                        <p class="text-sm text-gray-400">No hay órdenes que coincidan con "{{ q }}"</p>
-                        <a href="{% url 'compras:orden-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar búsqueda</a>
+                        {% if q or proveedor_id or fecha_desde or fecha_hasta %}
+                        <p class="text-sm text-gray-400">No hay órdenes que coincidan con los filtros aplicados</p>
+                        <a href="{% url 'compras:orden-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar filtros</a>
                         {% else %}
                         <p class="text-sm text-gray-400">No hay órdenes de compra registradas</p>
                         <a href="{% url 'compras:orden-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
@@ -117,12 +136,15 @@
     </p>
     <div class="flex items-center gap-2">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Anterior</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if proveedor_id %}&proveedor={{ proveedor_id }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}" class="btn-secondary">Anterior</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn-secondary">Siguiente</a>
+        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if proveedor_id %}&proveedor={{ proveedor_id }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}" class="btn-secondary">Siguiente</a>
         {% endif %}
     </div>
 </div>
 {% endif %}
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/proveedor-search.js' %}"></script>
+{% endblock extra_js %}
