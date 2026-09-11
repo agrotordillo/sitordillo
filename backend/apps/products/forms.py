@@ -80,7 +80,7 @@ class BrandForm(BaseModelForm):
 class WarehouseForm(BaseModelForm):
     class Meta:
         model = Almacen
-        fields = ["nombre", "tipo"]
+        fields = ["nombre", "tipo", "direccion"]
 
 
 class PuntoVentaForm(BaseModelForm):

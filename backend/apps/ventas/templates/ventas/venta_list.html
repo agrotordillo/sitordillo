@@ -42,6 +42,7 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ venta.fecha_venta|date:"d/m/Y H:i" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+          <a href="{% url 'ventas:venta-ticket' venta.pk %}" target="_blank" rel="noopener" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Ticket</a>
           {% if not venta.factura %}
           <a href="{% url 'facturacion:factura-generar' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Facturar</a>
           {% endif %}

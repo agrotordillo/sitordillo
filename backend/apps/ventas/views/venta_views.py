@@ -2,8 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
-from django.urls import reverse_lazy
-from django.views.generic import ListView
+from django.urls import reverse
+from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView
 
 from apps.core.scoping import almacenes_visibles
@@ -34,14 +34,45 @@ class VentaListView(PermissionRequiredMixin, ListView):
         return queryset
 
 
+class VentaTicketView(PermissionRequiredMixin, DetailView):
+    permission_required = "ventas.view_venta"
+    model = Venta
+    template_name = "ventas/venta_ticket.html"
+    context_object_name = "venta"
+
+    def get_queryset(self):
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related("cliente", "almacen", "forma_pago")
+            .prefetch_related("detalles__producto")
+        )
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(almacen__in=visibles)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        from apps.facturacion.models import Empresa
+
+        context = super().get_context_data(**kwargs)
+        context["empresa"] = Empresa.objects.first()
+        return context
+
+
 class VentaCreateView(PermissionRequiredMixin, CreateView):
     permission_required = "ventas.add_venta"
     model = Venta
     form_class = VentaForm
     template_name = "ventas/venta_form.html"
-    success_url = reverse_lazy("ventas:venta-list")
     success_message = "Venta registrada correctamente."
     extra_context = {"active_module": "sales"}
+
+    def get_success_url(self):
+        # Al terminar de registrar la venta, directo al ticket listo para
+        # imprimir -no al listado-, para no obligar a un clic extra en el
+        # mostrador.
+        return reverse("ventas:venta-ticket", args=[self.object.pk])
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

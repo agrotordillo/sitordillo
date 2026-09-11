@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -64,6 +64,18 @@ class Venta(BaseAbstractModel):
     def total(self):
         # Sin desglose de impuestos por ahora: se incorpora en la fase de Facturación.
         return self.subtotal
+
+    @property
+    def importe_sin_impuesto(self):
+        """Suma del desglose informativo de cada línea (ver
+        VentaDetalle.importe_sin_impuesto) para el ticket de venta -no
+        cambia `total`, que sigue siendo el precio final tal cual se
+        cobró."""
+        return sum((detalle.importe_sin_impuesto for detalle in self.detalles.all()), Decimal("0.00"))
+
+    @property
+    def importe_iva(self):
+        return sum((detalle.importe_iva for detalle in self.detalles.all()), Decimal("0.00"))
 
     def clean(self):
         super().clean()
@@ -132,6 +144,37 @@ class VentaDetalle(BaseAbstractModel):
         bruto = (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
         neto = bruto * (Decimal("1") - (self.descuento or Decimal("0")) / Decimal("100"))
         return neto.quantize(Decimal("0.01"))
+
+    @property
+    def _tasa_iva(self):
+        producto = self.producto
+        return (producto.tasa_iva / Decimal("100")) if producto.tipo_iva == producto.TipoIVA.GRAVADO else Decimal("0")
+
+    @property
+    def _tasa_ieps(self):
+        producto = self.producto
+        return (producto.tasa_ieps / Decimal("100")) if producto.aplica_ieps and producto.tasa_ieps else Decimal("0")
+
+    @property
+    def importe_sin_impuesto(self):
+        """Desglosa `subtotal` (precio final con impuestos, ya con el
+        descuento de la línea aplicado) en su base sin IVA/IEPS -misma
+        fórmula que products.PrecioProducto.precio_sin_impuesto, usando la
+        tasa vigente del producto-. Es solo el desglose informativo que se
+        imprime en el ticket; el cobro real sigue siendo `subtotal`."""
+        factor = (Decimal("1") + self._tasa_ieps) * (Decimal("1") + self._tasa_iva)
+        return (self.subtotal / factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def importe_ieps(self):
+        return (self.importe_sin_impuesto * self._tasa_ieps).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def importe_iva(self):
+        # Por resta (no por la tasa directa) para que
+        # base + IEPS + IVA sume exactamente `subtotal` en el ticket, sin
+        # descuadres de centavo por redondeos encadenados.
+        return self.subtotal - self.importe_sin_impuesto - self.importe_ieps
 
     @property
     def cantidad_devuelta(self):

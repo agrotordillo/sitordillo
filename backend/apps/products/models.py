@@ -132,6 +132,12 @@ class Almacen(BaseAbstractModel):
         default=Tipo.SUCURSAL,
         verbose_name="Tipo de almacén",
     )
+    direccion = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Dirección",
+        help_text="Se muestra en el ticket de venta impreso en esta sucursal.",
+    )
 
     class Meta:
         verbose_name = "Almacén"

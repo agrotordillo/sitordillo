@@ -1,0 +1,146 @@
+{% load static core_extras %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ticket {{ venta.folio }}</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #e5e7eb;
+    font-family: "Courier New", Courier, monospace;
+    color: #111827;
+  }
+  .ticket {
+    width: 80mm;
+    margin: 12px auto;
+    background: #fff;
+    padding: 8px 6px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: 700; }
+  .logo { max-width: 55mm; max-height: 22mm; margin: 0 auto 4px; display: block; }
+  .nombre-negocio { font-size: 14px; font-weight: 700; }
+  .muted { color: #4b5563; }
+  .sep { border: none; border-top: 1px dashed #6b7280; margin: 6px 0; }
+  table.lineas { width: 100%; border-collapse: collapse; }
+  table.lineas th { text-align: left; font-weight: 700; border-bottom: 1px solid #111827; padding-bottom: 2px; }
+  table.lineas td { vertical-align: top; padding: 2px 0; }
+  table.lineas td.num, table.lineas th.num { text-align: right; }
+  .producto-nombre { display: block; }
+  .producto-detalle { display: block; font-size: 10.5px; color: #4b5563; }
+  .totales td { padding: 1px 0; }
+  .totales td.label { text-align: right; padding-right: 8px; }
+  .totales td.valor { text-align: right; white-space: nowrap; }
+  .total-final td { font-size: 13.5px; font-weight: 700; border-top: 1px solid #111827; padding-top: 3px; }
+  .footer { margin-top: 8px; font-size: 10.5px; }
+  .acciones { width: 80mm; margin: 0 auto 16px; text-align: center; }
+  .btn-imprimir {
+    background: #308e3f;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn-volver {
+    display: inline-block;
+    margin-left: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  @media print {
+    html, body { background: #fff; }
+    .no-print { display: none !important; }
+    .ticket { margin: 0 auto; box-shadow: none; }
+    @page { size: 80mm auto; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ticket">
+  <div class="center">
+    <img src="{% static 'src/logo.png' %}" alt="Logo" class="logo">
+    {% if empresa %}
+    <div class="nombre-negocio">{{ empresa.display_name }}</div>
+    {% if empresa.rfc %}<div class="muted">RFC: {{ empresa.rfc }}</div>{% endif %}
+    {% if empresa.telefono %}<div class="muted">Tel: {{ empresa.telefono }}</div>{% endif %}
+    {% endif %}
+    {% if venta.almacen.direccion %}<div class="muted">{{ venta.almacen.direccion }}</div>{% endif %}
+    <div class="muted">{{ venta.almacen.nombre }}</div>
+  </div>
+
+  <hr class="sep">
+
+  <div>Folio: <span class="bold">{{ venta.folio }}</span></div>
+  <div>Fecha: {{ venta.fecha_venta|date:"d/m/Y" }} &nbsp; Hora: {{ venta.fecha_venta|date:"H:i" }}</div>
+  <div>Cliente: {{ venta.cliente.display_name }}</div>
+  <div>Forma de pago: {{ venta.forma_pago.descripcion }}</div>
+
+  <hr class="sep">
+
+  <table class="lineas">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th class="num">Importe</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for detalle in venta.detalles.all %}
+      <tr>
+        <td>
+          <span class="producto-nombre">{{ detalle.producto.nombre }}</span>
+          <span class="producto-detalle">
+            {{ detalle.cantidad }} x ${{ detalle.precio_unitario|moneda }}{% if detalle.descuento %} (-{{ detalle.descuento }}%){% endif %}
+          </span>
+        </td>
+        <td class="num">${{ detalle.subtotal|moneda }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr class="sep">
+
+  <table class="totales" style="width:100%">
+    <tr>
+      <td class="label">Subtotal:</td>
+      <td class="valor">${{ venta.importe_sin_impuesto|moneda }}</td>
+    </tr>
+    <tr>
+      <td class="label">IVA:</td>
+      <td class="valor">${{ venta.importe_iva|moneda }}</td>
+    </tr>
+    <tr class="total-final">
+      <td class="label">TOTAL:</td>
+      <td class="valor">${{ venta.total|moneda }}</td>
+    </tr>
+  </table>
+
+  {% if venta.observaciones %}
+  <hr class="sep">
+  <div class="muted">{{ venta.observaciones }}</div>
+  {% endif %}
+
+  <div class="footer center">
+    <hr class="sep">
+    Gracias por su compra
+  </div>
+</div>
+
+<div class="acciones no-print">
+  <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir ticket</button>
+  <a href="{% url 'ventas:venta-list' %}" class="btn-volver">Volver a ventas</a>
+</div>
+
+</body>
+</html>
