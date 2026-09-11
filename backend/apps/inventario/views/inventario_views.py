@@ -1,10 +1,12 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Sum
+from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
+from apps.products.models import Almacen
 
 
 class LoteListView(PermissionRequiredMixin, ListView):
@@ -49,8 +51,35 @@ class ExistenciaListView(PermissionRequiredMixin, ListView):
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
+
+        almacen_id = self.request.GET.get("almacen", "").strip()
+        if almacen_id:
+            queryset = queryset.filter(almacen_id=almacen_id)
+
+        # Fecha de ingreso del lote: cuándo entró esa mercancía, no cuándo
+        # se registró en el sistema (created_at es solo auditoría).
+        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        if fecha_desde:
+            queryset = queryset.filter(fecha_ingreso__gte=fecha_desde)
+        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_ingreso__lte=fecha_hasta)
+
         return (
             queryset.values("producto__nombre", "producto__sku", "almacen__nombre")
             .annotate(total=Sum("cantidad_disponible"))
             .order_by("producto__nombre", "almacen__nombre")
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["almacen_id"] = self.request.GET.get("almacen", "")
+        context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
+        context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
+
+        almacenes = Almacen.objects.filter(is_active=True)
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
+        context["almacenes"] = almacenes
+        return context

@@ -10,6 +10,30 @@
   </ol>
 </nav>
 {% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-3 items-end w-full">
+  <div>
+    <label class="label">Almacén</label>
+    <select name="almacen" class="input w-full">
+      <option value="">Todos</option>
+      {% for a in almacenes %}
+      <option value="{{ a.pk }}" {% if almacen_id == a.pk|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <div class="flex-1">
+      <label class="label">Ingresó desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input w-full">
+    </div>
+  </div>
+  <button type="submit" class="btn-primary">Filtrar</button>
+</form>
+{% endblock table_actions %}
 {% block main_content %}
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
