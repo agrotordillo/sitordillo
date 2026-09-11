@@ -16,3 +16,17 @@ def almacenes_visibles(user):
     if not almacen_ids:
         return None
     return Almacen.objects.filter(pk__in=almacen_ids)
+
+
+def almacen_principal(user):
+    """La sucursal fija de un usuario de mostrador (su AsignacionSucursal
+    con es_principal=True), para precargarla en cotización/venta sin que
+    tenga que elegirla cada vez. Devuelve `None` si el usuario no tiene una
+    sola sucursal principal clara -sin restricción (Administrador/Auxiliar
+    administrador), sin ninguna asignación, o con varias y ninguna marcada
+    principal-, caso en el que sigue teniendo que elegirla a mano."""
+    if user.is_superuser or not user.is_authenticated:
+        return None
+
+    asignacion = user.asignaciones_sucursal.filter(es_principal=True).first()
+    return asignacion.almacen if asignacion else None

@@ -42,14 +42,17 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="{{ form.cliente.id_for_label }}" class="label">Cliente</label>
-          {{ form.cliente }}
-          {% if form.cliente.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cliente.errors.0 }}</p>{% endif %}
+          {% include "clientes/includes/_cliente_search_field.html" %}
         </div>
+        {% if not form.almacen.is_hidden %}
         <div>
           <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal</label>
           {{ form.almacen }}
           {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
         </div>
+        {% else %}
+        {{ form.almacen }}
+        {% endif %}
         <div>
           <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
           {{ form.forma_pago }}
@@ -127,5 +130,6 @@
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

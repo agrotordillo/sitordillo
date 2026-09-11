@@ -1,0 +1,7 @@
+{% load cliente_extras %}
+<div class="cliente-search relative" data-cliente-search-url="{% url 'api:cliente-buscar' %}">
+  {{ form.cliente }}
+  <input type="text" class="input cliente-search-input" placeholder="Nombre, RFC o folio..." value="{{ form.cliente.value|cliente_label }}" autocomplete="off">
+  <div class="cliente-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+</div>
+{% if form.cliente.errors %}<p class="mt-1 text-xs text-red-600">{{ form.cliente.errors.0 }}</p>{% endif %}

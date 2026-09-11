@@ -6,6 +6,11 @@ from apps.core.validators import RFC_PATTERN
 
 
 class Cliente(BaseAbstractModel):
+    # Folio fijo del cliente genérico sembrado por la migración de datos
+    # 0002_seed_cliente_publico_general; sirve para ubicarlo sin depender de
+    # su nombre (editable desde el CRUD de clientes).
+    FOLIO_PUBLICO_GENERAL = "CLI-PUBLICO"
+
     class TipoPersona(models.TextChoices):
         FISICA = "fisica", "Persona física"
         MORAL = "moral", "Persona moral"
@@ -83,6 +88,12 @@ class Cliente(BaseAbstractModel):
 
     def __str__(self):
         return f"{self.nombre} ({self.rfc})" if self.rfc else self.nombre
+
+    @classmethod
+    def publico_general(cls):
+        """El cliente genérico que se precarga por defecto en cotizaciones
+        y ventas de mostrador (ver FOLIO_PUBLICO_GENERAL)."""
+        return cls.objects.filter(folio=cls.FOLIO_PUBLICO_GENERAL, is_active=True).first()
 
     def get_folio_prefix(self):
         return "CLI"

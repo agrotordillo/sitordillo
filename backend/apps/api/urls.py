@@ -8,6 +8,7 @@ from .views.products import (
     SubcategoriesByCategoryView,
     UnitMeasureQuickCreateView,
 )
+from .views.clientes import ClienteBuscarView
 from .views.compras import PromocionVigenteView
 from .views.proveedores import ProveedorBuscarView
 from .views.fiscal import ClaveProdServBuscarView, ClaveUnidadBuscarView
@@ -54,6 +55,11 @@ urlpatterns = [
         "proveedores/buscar/",
         ProveedorBuscarView.as_view(),
         name="proveedor-buscar",
+    ),
+    path(
+        "clientes/buscar/",
+        ClienteBuscarView.as_view(),
+        name="cliente-buscar",
     ),
     path(
         "fiscal/claves-prod-serv/buscar/",

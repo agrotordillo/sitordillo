@@ -39,18 +39,21 @@
         <div>
           <label for="{{ form.cliente.id_for_label }}" class="label">Cliente</label>
           <div class="flex items-center gap-2">
-            {{ form.cliente }}
+            {% include "clientes/includes/_cliente_search_field.html" %}
             <a href="{% url 'clientes:cliente-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo cliente" title="Crear nuevo cliente (se abre en una pestaña nueva)">
               <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
             </a>
           </div>
-          {% if form.cliente.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cliente.errors.0 }}</p>{% endif %}
         </div>
+        {% if not form.almacen.is_hidden %}
         <div>
           <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal</label>
           {{ form.almacen }}
           {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
         </div>
+        {% else %}
+        {{ form.almacen }}
+        {% endif %}
         <div>
           <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
           {{ form.forma_pago }}
@@ -128,5 +131,6 @@
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}
