@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
@@ -8,7 +8,7 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, TemplateView, UpdateView, View
 
 from apps.core.permissions import SuperuserRequiredMixin
-from .forms import AsignacionSucursalForm, AsignacionSucursalInlineFormSet, UsuarioCreateForm
+from .forms import AsignacionSucursalForm, AsignacionSucursalInlineFormSet, UsuarioCreateForm, UsuarioUpdateForm
 from .models import AsignacionSucursal
 
 User = get_user_model()
@@ -62,6 +62,47 @@ class UsuarioCreateView(SuperuserRequiredMixin, CreateView):
 
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible crear el usuario. Revisa los campos.")
+        return super().form_invalid(form)
+
+
+class UsuarioUpdateView(SuperuserRequiredMixin, UpdateView):
+    model = User
+    form_class = UsuarioUpdateForm
+    template_name = "accounts/usuario_form.html"
+    success_url = reverse_lazy("accounts:usuario-list")
+    success_message = "Usuario actualizado correctamente."
+    extra_context = {"active_module": "system"}
+
+    def get_context_data(self, **kwargs):
+        data = super().get_context_data(**kwargs)
+        if "formset" not in data:
+            if self.request.method == "POST":
+                data["formset"] = AsignacionSucursalInlineFormSet(self.request.POST, instance=self.object, prefix="asignaciones")
+            else:
+                data["formset"] = AsignacionSucursalInlineFormSet(instance=self.object, prefix="asignaciones")
+        return data
+
+    def form_valid(self, form):
+        formset = AsignacionSucursalInlineFormSet(self.request.POST, instance=self.object, prefix="asignaciones")
+        if not formset.is_valid():
+            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+
+        with transaction.atomic():
+            self.object = form.save()
+            formset.instance = self.object
+            formset.save()
+
+        # Si el Administrador se edita a sí mismo y cambia su propia
+        # contraseña, set_password() invalida el hash de sesión guardado;
+        # sin esto lo cerraría de su propia sesión al terminar de guardar.
+        if self.object.pk == self.request.user.pk and form.cleaned_data.get("password1"):
+            update_session_auth_hash(self.request, self.object)
+
+        messages.success(self.request, self.success_message)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        messages.error(self.request, "No fue posible actualizar el usuario. Revisa los campos.")
         return super().form_invalid(form)
 
 

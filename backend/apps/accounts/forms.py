@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, password_validation
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import Group
 from django.forms import inlineformset_factory
@@ -77,6 +77,82 @@ class UsuarioCreateForm(UserCreationForm):
         # Necesita is_staff para poder usar /admin/ (gestión de Grupos);
         # sin esto un Administrador no podría entrar ahí.
         user.is_staff = user.is_superuser
+        if commit:
+            user.save()
+            user.groups.set(self.cleaned_data.get("groups") or [])
+        return user
+
+
+class UsuarioUpdateForm(forms.ModelForm):
+    """Edición de un usuario existente: mismos campos de capacidades que
+    UsuarioCreateForm. La contraseña es opcional aquí -dejarla en blanco no
+    la toca-, a diferencia del alta donde siempre es obligatoria."""
+
+    groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.all().order_by("name"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Capacidades",
+        help_text="Puede tener varias a la vez (p. ej. la persona única de una sucursal chica).",
+    )
+    is_superuser = forms.BooleanField(
+        required=False,
+        label="Es Administrador",
+        help_text="Acceso total al sistema, sin restricción de sucursal ni de capacidades.",
+    )
+    password1 = forms.CharField(
+        label="Nueva contraseña",
+        widget=forms.PasswordInput,
+        required=False,
+        help_text="Déjala en blanco para no cambiarla.",
+    )
+    password2 = forms.CharField(
+        label="Confirmar nueva contraseña",
+        widget=forms.PasswordInput,
+        required=False,
+    )
+
+    class Meta:
+        model = get_user_model()
+        fields = ("username", "first_name", "last_name", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["first_name"].required = False
+        self.fields["last_name"].required = False
+        self.fields["email"].required = False
+        if self.instance and self.instance.pk:
+            self.fields["is_superuser"].initial = self.instance.is_superuser
+            self.fields["groups"].initial = self.instance.groups.all()
+        for name, field in self.fields.items():
+            if name == "groups":
+                continue
+            if isinstance(field.widget, forms.CheckboxInput):
+                css_class = "h-4 w-4 border border-gray-300 rounded-base text-primary-600 cursor-pointer"
+            else:
+                css_class = "input"
+            existing = field.widget.attrs.get("class", "").strip()
+            field.widget.attrs["class"] = f"{existing} {css_class}".strip()
+
+    def clean_password2(self):
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+        if not password1 and not password2:
+            return password2
+        if password1 != password2:
+            raise forms.ValidationError("Las dos contraseñas no coinciden.")
+        password_validation.validate_password(password1, self.instance)
+        return password2
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_superuser = self.cleaned_data.get("is_superuser", False)
+        # Necesita is_staff para poder usar /admin/ (gestión de Grupos);
+        # sin esto un Administrador no podría entrar ahí.
+        user.is_staff = user.is_superuser
+        password1 = self.cleaned_data.get("password1")
+        if password1:
+            user.set_password(password1)
         if commit:
             user.save()
             user.groups.set(self.cleaned_data.get("groups") or [])

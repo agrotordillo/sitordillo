@@ -10,6 +10,7 @@ from .views import (
     UsuarioCreateView,
     UsuarioListView,
     UsuarioToggleActivoView,
+    UsuarioUpdateView,
 )
 
 app_name = 'accounts'
@@ -28,6 +29,7 @@ urlpatterns = [
     path('lockout/', LockoutView.as_view(), name='lockout'),
     path('usuarios/', UsuarioListView.as_view(), name='usuario-list'),
     path('usuarios/crear/', UsuarioCreateView.as_view(), name='usuario-create'),
+    path('usuarios/<int:pk>/editar/', UsuarioUpdateView.as_view(), name='usuario-update'),
     path('usuarios/<int:pk>/toggle-activo/', UsuarioToggleActivoView.as_view(), name='usuario-toggle-activo'),
     path('usuarios/sucursales/', AsignacionSucursalListView.as_view(), name='asignacion-sucursal-list'),
     path('usuarios/sucursales/crear/', AsignacionSucursalCreateView.as_view(), name='asignacion-sucursal-create'),
