@@ -58,11 +58,6 @@
           {{ form.forma_pago }}
           {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
         </div>
-        <div>
-          <label for="{{ form.fecha_venta.id_for_label }}" class="label">Fecha y hora</label>
-          {{ form.fecha_venta }}
-          {% if form.fecha_venta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha_venta.errors.0 }}</p>{% endif %}
-        </div>
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
           {{ form.observaciones }}

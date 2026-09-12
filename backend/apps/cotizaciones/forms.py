@@ -11,13 +11,15 @@ from .models import Cotizacion, CotizacionDetalle
 class CotizacionForm(BaseModelForm):
     class Meta:
         model = Cotizacion
-        fields = ["cliente", "almacen", "fecha_cotizacion", "observaciones"]
+        # fecha_cotizacion no se captura: toma el default del modelo
+        # (timezone.now al momento de guardar). observaciones se oculta por
+        # ahora (puede volver a exponerse más adelante si hace falta).
+        fields = ["cliente", "almacen"]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
             # cliente-search.js): con el catálogo completo de clientes un
             # <select> deja de ser práctico.
             "cliente": forms.HiddenInput,
-            "fecha_cotizacion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -47,8 +49,6 @@ class CotizacionForm(BaseModelForm):
             self.fields["almacen"].widget = forms.HiddenInput()
             if not self.instance.pk and "almacen" not in self.initial:
                 self.initial["almacen"] = fijo.pk
-
-        self.fields["fecha_cotizacion"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 
 class CotizacionDetalleForm(BaseModelForm):

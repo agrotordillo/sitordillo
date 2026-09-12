@@ -11,13 +11,14 @@ from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDet
 class VentaForm(BaseModelForm):
     class Meta:
         model = Venta
-        fields = ["cliente", "almacen", "forma_pago", "fecha_venta", "observaciones"]
+        # fecha_venta no se captura: toma el default del modelo
+        # (timezone.now al momento de guardar).
+        fields = ["cliente", "almacen", "forma_pago", "observaciones"]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
             # cliente-search.js): con el catálogo completo de clientes un
             # <select> deja de ser práctico.
             "cliente": forms.HiddenInput,
-            "fecha_venta": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -51,8 +52,6 @@ class VentaForm(BaseModelForm):
             self.fields["almacen"].widget = forms.HiddenInput()
             if not self.instance.pk and "almacen" not in self.initial:
                 self.initial["almacen"] = fijo.pk
-
-        self.fields["fecha_venta"].input_formats = ["%Y-%m-%dT%H:%M"]
 
 
 class VentaDetalleForm(BaseModelForm):
