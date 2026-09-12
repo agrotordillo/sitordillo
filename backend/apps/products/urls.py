@@ -4,6 +4,8 @@ from .views.product_views import ProductCreateView, ProductListView, ProductUpda
 from .views.category_views import CategoryCreateView, CategoryListView, CategoryUpdateView
 from .views.subcategory_views import SubcategoryCreateView, SubcategoryListView, SubcategoryUpdateView
 from .views.brand_views import BrandCreateView, BrandListView
+from .views.linea_views import LineaCreateView, LineaListView
+from .views.clase_views import ClaseCreateView, ClaseListView
 from .views.warehouse_views import WarehouseCreateView, WarehouseListView, WarehouseUpdateView
 from .views.punto_venta_views import PuntoVentaCreateView, PuntoVentaListView, PuntoVentaUpdateView
 from .views.turno_views import TurnoListView, abrir_turno_view, cerrar_turno_view
@@ -31,6 +33,10 @@ urlpatterns = [
     path("subcategorias/<int:pk>/editar/", SubcategoryUpdateView.as_view(), name="subcategory-update"),
     path("marcas/", BrandListView.as_view(), name="brand-list"),
     path("marcas/crear/", BrandCreateView.as_view(), name="brand-create"),
+    path("lineas/", LineaListView.as_view(), name="linea-list"),
+    path("lineas/crear/", LineaCreateView.as_view(), name="linea-create"),
+    path("clases/", ClaseListView.as_view(), name="clase-list"),
+    path("clases/crear/", ClaseCreateView.as_view(), name="clase-create"),
     path("almacenes/", WarehouseListView.as_view(), name="warehouse-list"),
     path("almacenes/crear/", WarehouseCreateView.as_view(), name="warehouse-create"),
     path("almacenes/<int:pk>/editar/", WarehouseUpdateView.as_view(), name="warehouse-update"),

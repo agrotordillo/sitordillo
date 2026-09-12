@@ -6,7 +6,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.products.forms import BrandForm, UnitMeasureForm
+from apps.products.forms import BrandForm, ClaseForm, LineaForm, UnitMeasureForm
 from apps.products.models import Producto, Subcategoria
 from apps.api.serializers.products import OptionSerializer
 
@@ -32,6 +32,28 @@ class BrandQuickCreateView(APIView):
 
     def post(self, request):
         form = BrandForm(request.data)
+        if not form.is_valid():
+            return Response({"errors": form.errors}, status=400)
+        obj = form.save()
+        return Response({"value": obj.id, "label": obj.nombre}, status=201)
+
+
+class LineaQuickCreateView(APIView):
+    """Alta rápida de Línea desde el formulario de producto."""
+
+    def post(self, request):
+        form = LineaForm(request.data)
+        if not form.is_valid():
+            return Response({"errors": form.errors}, status=400)
+        obj = form.save()
+        return Response({"value": obj.id, "label": obj.nombre}, status=201)
+
+
+class ClaseQuickCreateView(APIView):
+    """Alta rápida de Clase desde el formulario de producto."""
+
+    def post(self, request):
+        form = ClaseForm(request.data)
         if not form.is_valid():
             return Response({"errors": form.errors}, status=400)
         obj = form.save()

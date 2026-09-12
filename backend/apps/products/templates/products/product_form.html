@@ -91,6 +91,24 @@
                 </div>
               </div>
               <div>
+                <label for="{{ form.linea.id_for_label }}" class="label">Línea <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_linea',
+                  url: '{% url 'api:linea-quick-create' %}',
+                  title: 'Nueva línea',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+                  ]
+                })">
+                  {{ form.linea }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva línea" title="Agregar nueva línea">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
+              </div>
+              <div>
                 <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor <span class="text-gray-400 font-normal">(opcional)</span></label>
                 <div class="flex items-center gap-2">
                   {{ form.proveedor }}
@@ -155,6 +173,24 @@
                   </svg>
                   Cargando subcategorías…
                 </p>
+              </div>
+              <div>
+                <label for="{{ form.clase.id_for_label }}" class="label">Clase <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_clase',
+                  url: '{% url 'api:clase-quick-create' %}',
+                  title: 'Nueva clase',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+                  ]
+                })">
+                  {{ form.clase }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva clase" title="Agregar nueva clase">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
               </div>
               <div>
                 <label for="{{ form.unidad_medida.id_for_label }}" class="label">Unidad de medida <span class="text-gray-400 font-normal">(opcional)</span></label>

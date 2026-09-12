@@ -9,7 +9,7 @@ from apps.products.views.product_views import LISTAS_PRECIO_TABLA
 
 ENCABEZADOS = [
     "Folio", "SKU", "Código de barras", "Nombre", "Tipo", "Estatus",
-    "Categoría", "Subcategoría", "Línea", "Marca", "Proveedor", "Código de proveedor",
+    "Categoría", "Subcategoría", "Línea", "Clase", "Marca", "Proveedor", "Código de proveedor",
     "Unidad de medida", "IVA", "Tasa IVA (%)", "Aplica IEPS", "Tasa IEPS (%)",
     "Método de costeo", "Precio de costo", "Precio de venta (general)",
 ] + [nombre.title() for nombre, _ in LISTAS_PRECIO_TABLA] + [
@@ -20,16 +20,33 @@ ENCABEZADOS = [
 @permission_required("products.view_producto", raise_exception=True)
 def producto_exportar_excel_view(request):
     """Descarga en Excel el mismo listado de Productos que se ve en
-    pantalla -respeta el filtro `q` si se llega desde ahí buscando algo-,
-    con toda su información incluidos los 5 precios generales de lista
-    (los mismos que se muestran como columnas en el listado)."""
+    pantalla -respeta los filtros de búsqueda, marca, línea, categoría y
+    clase si se llega desde ahí-, con toda su información incluidos los 5
+    precios generales de lista (los mismos que se muestran como columnas
+    en el listado)."""
     queryset = Producto.objects.select_related(
-        "categoria", "subcategoria", "linea", "marca", "proveedor", "unidad_medida",
+        "categoria", "subcategoria", "linea", "clase", "marca", "proveedor", "unidad_medida",
     ).order_by("nombre")
 
     q = request.GET.get("q", "").strip()
     if q:
         queryset = queryset.filter(Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q))
+
+    marca_id = request.GET.get("marca", "").strip()
+    if marca_id:
+        queryset = queryset.filter(marca_id=marca_id)
+
+    linea_id = request.GET.get("linea", "").strip()
+    if linea_id:
+        queryset = queryset.filter(linea_id=linea_id)
+
+    categoria_id = request.GET.get("categoria", "").strip()
+    if categoria_id:
+        queryset = queryset.filter(categoria_id=categoria_id)
+
+    clase_id = request.GET.get("clase", "").strip()
+    if clase_id:
+        queryset = queryset.filter(clase_id=clase_id)
 
     annotations = {
         campo: Subquery(
@@ -58,6 +75,7 @@ def producto_exportar_excel_view(request):
             producto.categoria.nombre if producto.categoria_id else "",
             producto.subcategoria.nombre if producto.subcategoria_id else "",
             producto.linea.nombre if producto.linea_id else "",
+            producto.clase.nombre if producto.clase_id else "",
             producto.marca.nombre if producto.marca_id else "",
             producto.proveedor.display_name if producto.proveedor_id else "",
             producto.codigo_proveedor or "",

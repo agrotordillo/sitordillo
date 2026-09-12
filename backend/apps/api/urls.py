@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views.products import (
     BrandQuickCreateView,
+    ClaseQuickCreateView,
+    LineaQuickCreateView,
     ProductoActualizarCostoView,
     ProductoBuscarView,
     ProductoResolverSkusView,
@@ -30,6 +32,16 @@ urlpatterns = [
         "products/units/create/",
         UnitMeasureQuickCreateView.as_view(),
         name="unit-quick-create",
+    ),
+    path(
+        "products/lineas/create/",
+        LineaQuickCreateView.as_view(),
+        name="linea-quick-create",
+    ),
+    path(
+        "products/clases/create/",
+        ClaseQuickCreateView.as_view(),
+        name="clase-quick-create",
     ),
     path(
         "products/buscar/",

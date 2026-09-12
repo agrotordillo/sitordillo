@@ -120,6 +120,34 @@ class Marca(BaseAbstractModel):
         return self.nombre.strip()
 
 
+class Clase(BaseAbstractModel):
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre de la clase",
+        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
+    )
+    descripcion = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Clase"
+        verbose_name_plural = "Clases"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "CLS"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+
 class Almacen(BaseAbstractModel):
     class Tipo(models.TextChoices):
         CEDIS = "cedis", "CEDIS"
@@ -137,6 +165,25 @@ class Almacen(BaseAbstractModel):
         blank=True,
         verbose_name="Dirección",
         help_text="Se muestra en el ticket de venta impreso en esta sucursal.",
+    )
+    impresora_nombre = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Nombre de la impresora de tickets",
+        help_text='Debe coincidir exactamente con el nombre de la impresora tal como '
+        'quedó agregada en Windows (y como la ve QZ Tray en esa PC de caja).',
+    )
+    impresora_ancho_columnas = models.PositiveSmallIntegerField(
+        default=40,
+        verbose_name="Ancho de la impresora (columnas)",
+        help_text="Caracteres por línea que soporta la impresora de esta sucursal "
+        "(40 en las Epson TM-U220 de impacto).",
+    )
+    imprimir_ticket_automatico = models.BooleanField(
+        default=False,
+        verbose_name="Imprimir ticket automáticamente al cerrar la venta",
+        help_text="Actívalo solo cuando ya se haya probado que QZ Tray y la impresora "
+        "de esta sucursal funcionan correctamente.",
     )
 
     class Meta:
@@ -433,6 +480,14 @@ class Producto(BaseAbstractModel):
         related_name="productos",
         verbose_name="Línea",
     )
+    clase = models.ForeignKey(
+        Clase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="productos",
+        verbose_name="Clase",
+    )
     tipo = models.CharField(
         max_length=20,
         choices=TipoProducto.choices,
@@ -509,6 +564,7 @@ class Producto(BaseAbstractModel):
     stock_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock mínimo")
     stock_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock máximo")
     peso = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Peso (kg)")
+    volumen = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Volumen (m³)")
     dias_reserva = models.PositiveIntegerField(
         default=0,
         verbose_name="Días de reserva",
@@ -537,6 +593,10 @@ class Producto(BaseAbstractModel):
                 condition=models.Q(peso__isnull=True) | models.Q(peso__gte=0),
                 name="producto_peso_no_negativo",
             ),
+            models.CheckConstraint(
+                condition=models.Q(volumen__isnull=True) | models.Q(volumen__gte=0),
+                name="producto_volumen_no_negativo",
+            ),
         ]
         indexes = [
             models.Index(fields=["sku"]),
@@ -546,6 +606,7 @@ class Producto(BaseAbstractModel):
             models.Index(fields=["categoria"]),
             models.Index(fields=["subcategoria"]),
             models.Index(fields=["linea"]),
+            models.Index(fields=["clase"]),
             models.Index(fields=["tipo"]),
         ]
 

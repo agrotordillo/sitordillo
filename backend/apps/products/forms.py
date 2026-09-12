@@ -3,7 +3,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from apps.core.forms import BaseModelForm
 from .models import (
-    Producto, Categoria, Subcategoria, Marca, Almacen, PaqueteComponente,
+    Producto, Categoria, Subcategoria, Marca, Linea, Clase, Almacen, PaqueteComponente,
     PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
 )
 
@@ -14,6 +14,8 @@ class ProductForm(BaseModelForm):
         fields = [
             "nombre",
             "marca",
+            "linea",
+            "clase",
             "proveedor",
             "sku",
             "codigo_barras",
@@ -77,10 +79,29 @@ class BrandForm(BaseModelForm):
         fields = ["nombre", "descripcion"]
 
 
+class LineaForm(BaseModelForm):
+    class Meta:
+        model = Linea
+        fields = ["nombre", "descripcion"]
+
+
+class ClaseForm(BaseModelForm):
+    class Meta:
+        model = Clase
+        fields = ["nombre", "descripcion"]
+
+
 class WarehouseForm(BaseModelForm):
     class Meta:
         model = Almacen
-        fields = ["nombre", "tipo", "direccion"]
+        fields = [
+            "nombre",
+            "tipo",
+            "direccion",
+            "impresora_nombre",
+            "impresora_ancho_columnas",
+            "imprimir_ticket_automatico",
+        ]
 
 
 class PuntoVentaForm(BaseModelForm):

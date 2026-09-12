@@ -16,8 +16,11 @@ migración de datos de apps.products):
   - Línea vive como catálogo/FK independiente en Producto (no anidada bajo
     Categoría: en los datos reales el 31% de las categorías aparece bajo más
     de una línea).
-  - Clase se descarta por completo (catch-all sin significado de negocio
-    consistente).
+  - Clase (clase.sql, id_clase en producto.sql) se importa igual que Línea:
+    catálogo/FK independiente en Producto (apps.products.models.Clase). Se
+    había descartado en una fase anterior por considerarse un catch-all sin
+    significado de negocio consistente; se revisó de nuevo y sí es una
+    clasificación real, así que ahora se trae.
   - id_punto_entrega se ignora (100% vacío en los datos reales).
   - Las 10 columnas de precio/utilidad se mapean así:
       1 PUBLICO (general), 2 MEDIO MAYOREO (general), 3 MAYOREO (general),
@@ -29,6 +32,25 @@ migración de datos de apps.products):
     oficial del SAT (fiscal.ClaveProdServSAT / ClaveUnidadSAT) todavía está
     vacío en este sistema: no se crean claves "stub" para no ensuciar ese
     catálogo cuando se siembre con los datos oficiales en una fase aparte.
+
+Modo --sync (resincronizar productos ya importados):
+  Sin --sync, el comando es de carga única: si un producto con el mismo SKU
+  ya existe, esa fila se omite como error (no se duplica ni se actualiza).
+  Con --sync, por cada SKU del dump se sobrescribe con el dato del sistema
+  anterior: nombre, marca, categoría, línea, clase, tipo, unidad de medida,
+  IVA/IEPS, descripción, costeo, precio de costo, precio de venta general,
+  stock mínimo/máximo, peso, días de reserva, código de proveedor, código
+  de barras y estatus activo/inactivo -incluye precio y existencias, tal
+  como se decidió con el usuario-. Si el SKU no existe, se crea igual que
+  en la carga única. Los precios por lista (ProductoPrecio) también se
+  sincronizan (update_or_create), nunca se duplican.
+  Campos que NO vienen del sistema anterior (subcategoría, proveedor de
+  apps.proveedores, claves SAT, notas, imagen) nunca se tocan en --sync:
+  no hay valor "legado" con el cual sincronizarlos, así que lo que ya se
+  haya capturado en el sistema nuevo se conserva tal cual.
+  Los catálogos (Marca/Categoría/Línea/Clase/UnidadMedida) siempre se
+  reutilizan por nombre si ya existen -esto no depende de --sync-, nunca
+  se duplican entre corridas.
 """
 import ast
 import re
@@ -42,6 +64,7 @@ from django.db import transaction
 from apps.products.models import (
     Almacen,
     Categoria,
+    Clase,
     Linea,
     ListaPrecio,
     Marca,
@@ -142,22 +165,47 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="No escribe nada, solo reporta.")
-        parser.add_argument("--force", action="store_true", help="Permite correr aunque ya existan productos.")
+        parser.add_argument(
+            "--force", action="store_true",
+            help="Permite correr aunque ya existan productos (carga única: los SKU repetidos se omiten como error).",
+        )
+        parser.add_argument(
+            "--sync", action="store_true",
+            help=(
+                "Resincroniza: por SKU, actualiza los productos existentes con el dato del "
+                "sistema anterior (incluye precio y existencias) en vez de omitirlos, y crea "
+                "los que todavía no existan. Implica --force."
+            ),
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         force = options["force"]
+        sync = options["sync"]
 
-        if not dry_run and Producto.objects.exists() and not force:
+        if not dry_run and not sync and Producto.objects.exists() and not force:
             raise CommandError(
-                "Ya existen productos en la base de datos. Usa --force si de verdad "
-                "quieres volver a importar (puede duplicar datos)."
+                "Ya existen productos en la base de datos. Usa --sync para resincronizar "
+                "(actualiza los existentes por SKU) o --force si de verdad quieres volver a "
+                "importar sin actualizar (los SKU repetidos se omiten como error)."
             )
 
         for name in ("marca", "categoria", "linea", "unidad_medida", "producto"):
             path = DATA_DIR / f"{name}.sql"
             if not path.exists():
                 raise CommandError(f"No encuentro {path}")
+
+        # clase.sql es opcional: se agregó después de que este comando ya
+        # corría en producción. Si no está, los productos simplemente se
+        # importan sin Clase (se puede volver a importar solo esa parte
+        # más adelante corriendo el comando con --force una vez que se
+        # tenga el archivo).
+        clase_path = DATA_DIR / "clase.sql"
+        clase_rows = parse_sql_rows(clase_path) if clase_path.exists() else []
+        if not clase_rows:
+            self.stdout.write(self.style.WARNING(
+                f"No encuentro {clase_path} (o está vacío): los productos se importan sin Clase."
+            ))
 
         marca_rows = parse_sql_rows(DATA_DIR / "marca.sql")
         categoria_rows = parse_sql_rows(DATA_DIR / "categoria.sql")
@@ -167,12 +215,15 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"Filas leídas: marca={len(marca_rows)} categoria={len(categoria_rows)} "
-            f"linea={len(linea_rows)} unidad_medida={len(unidad_rows)} producto={len(producto_rows)}"
+            f"linea={len(linea_rows)} clase={len(clase_rows)} unidad_medida={len(unidad_rows)} "
+            f"producto={len(producto_rows)}"
         )
 
         try:
             with transaction.atomic():
-                stats = self._import_all(marca_rows, categoria_rows, linea_rows, unidad_rows, producto_rows)
+                stats = self._import_all(
+                    marca_rows, categoria_rows, linea_rows, clase_rows, unidad_rows, producto_rows, sync,
+                )
                 if dry_run:
                     raise _DryRunRollback()
         except _DryRunRollback:
@@ -180,10 +231,11 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f"Listo. Marcas={stats['marcas']} Categorias={stats['categorias']} "
-            f"Lineas={stats['lineas']} UnidadesMedida={stats['unidades']} "
+            f"Lineas={stats['lineas']} Clases={stats['clases']} UnidadesMedida={stats['unidades']} "
             f"Almacenes creados={stats['almacenes_creados']} "
             f"ListasPrecio={stats['listas_precio']} "
-            f"Productos={stats['productos']} (omitidos por error: {stats['productos_omitidos']}) "
+            f"Productos creados={stats['productos_creados']} actualizados={stats['productos_actualizados']} "
+            f"(omitidos por error: {stats['productos_omitidos']}) "
             f"ProductoPrecio={stats['producto_precios']} "
             f"Nombres desambiguados={stats['nombres_desambiguados']}"
         ))
@@ -192,15 +244,18 @@ class Command(BaseCommand):
             for e in stats["errores"][:20]:
                 self.stdout.write(f"  - {e}")
 
-    def _import_all(self, marca_rows, categoria_rows, linea_rows, unidad_rows, producto_rows):
+    def _import_all(self, marca_rows, categoria_rows, linea_rows, clase_rows, unidad_rows, producto_rows, sync):
         stats = {
-            "marcas": 0, "categorias": 0, "lineas": 0, "unidades": 0,
+            "marcas": 0, "categorias": 0, "lineas": 0, "clases": 0, "unidades": 0,
             "almacenes_creados": 0, "listas_precio": 0,
-            "productos": 0, "productos_omitidos": 0, "producto_precios": 0,
-            "nombres_desambiguados": 0, "errores": [],
+            "productos_creados": 0, "productos_actualizados": 0, "productos_omitidos": 0,
+            "producto_precios": 0, "nombres_desambiguados": 0, "errores": [],
         }
 
         # --- Marca (con fusión de duplicados) ---
+        # get_or_create contra la BD (no solo un dict en memoria): así el
+        # comando se puede volver a correr (--sync o --force) sin chocar
+        # con la restricción de nombre único de una corrida anterior.
         marca_by_legacy_id = {}
         marca_by_nombre = {}
         for row in marca_rows:
@@ -210,9 +265,10 @@ class Command(BaseCommand):
                 continue  # se resuelve cuando procesemos el id canónico
             obj = marca_by_nombre.get(nombre.lower())
             if obj is None:
-                obj = Marca.objects.create(nombre=nombre)
+                obj, created = Marca.objects.get_or_create(nombre__iexact=nombre, defaults={"nombre": nombre})
                 marca_by_nombre[nombre.lower()] = obj
-                stats["marcas"] += 1
+                if created:
+                    stats["marcas"] += 1
             marca_by_legacy_id[legacy_id] = obj
         for loser_id, winner_id in MARCA_MERGE.items():
             marca_by_legacy_id[loser_id] = marca_by_legacy_id[winner_id]
@@ -234,6 +290,15 @@ class Command(BaseCommand):
             if created:
                 stats["lineas"] += 1
             linea_by_legacy_id[legacy_id] = obj
+
+        # --- Clase (mismo formato de tabla que Linea: id, codigo, nombre) ---
+        clase_by_legacy_id = {}
+        for row in clase_rows:
+            legacy_id, _codigo, nombre = row[0], row[1], row[2].strip()
+            obj, created = Clase.objects.get_or_create(nombre__iexact=nombre, defaults={"nombre": nombre})
+            if created:
+                stats["clases"] += 1
+            clase_by_legacy_id[legacy_id] = obj
 
         # --- UnidadMedida ---
         unidad_by_legacy_id = {}
@@ -279,30 +344,32 @@ class Command(BaseCommand):
 
         # --- Productos ---
         nombres_usados = {}
+        total_procesados = 0
         for row in producto_rows:
             r = dict(zip(PRODUCTO_COLS, row))
             try:
                 # savepoint por producto: si uno falla, solo se revierte ese
                 # producto y sus precios, no toda la importación.
                 with transaction.atomic():
-                    producto, precios_creados = self._crear_producto(
-                        r, marca_by_legacy_id, categoria_by_legacy_id, linea_by_legacy_id,
-                        unidad_by_legacy_id, lista_by_nombre, almacen_por_nombre, nombres_usados, stats,
+                    producto, creado, precios_creados = self._crear_o_actualizar_producto(
+                        r, marca_by_legacy_id, categoria_by_legacy_id, linea_by_legacy_id, clase_by_legacy_id,
+                        unidad_by_legacy_id, lista_by_nombre, almacen_por_nombre, nombres_usados, stats, sync,
                     )
             except Exception as exc:  # noqa: BLE001 - queremos seguir con los demás productos
                 stats["productos_omitidos"] += 1
                 stats["errores"].append(f"id={r['id']} codigo={r['codigo']!r}: {exc}")
                 continue
-            stats["productos"] += 1
+            stats["productos_creados" if creado else "productos_actualizados"] += 1
             stats["producto_precios"] += precios_creados
-            if stats["productos"] % 1000 == 0:
-                self.stdout.write(f"  ... {stats['productos']} productos importados")
+            total_procesados += 1
+            if total_procesados % 1000 == 0:
+                self.stdout.write(f"  ... {total_procesados} productos procesados")
 
         return stats
 
-    def _crear_producto(
-        self, r, marca_by_legacy_id, categoria_by_legacy_id, linea_by_legacy_id,
-        unidad_by_legacy_id, lista_by_nombre, almacen_por_nombre, nombres_usados, stats,
+    def _crear_o_actualizar_producto(
+        self, r, marca_by_legacy_id, categoria_by_legacy_id, linea_by_legacy_id, clase_by_legacy_id,
+        unidad_by_legacy_id, lista_by_nombre, almacen_por_nombre, nombres_usados, stats, sync,
     ):
         sku = r["codigo"].strip()
         nombre = r["nombre"].strip()
@@ -339,6 +406,7 @@ class Command(BaseCommand):
         marca = marca_by_legacy_id.get(r["id_marca"])
         categoria = categoria_by_legacy_id.get(r["id_categoria"])
         linea = linea_by_legacy_id.get(r["id_linea"])
+        clase = clase_by_legacy_id.get(r["id_clase"])
         unidad_medida = unidad_by_legacy_id.get(r["id_unidad_medida"])
 
         precio_costo = to_decimal(r["costo"]) or Decimal("0.00")
@@ -354,14 +422,17 @@ class Command(BaseCommand):
         costeo_legado = (r["costeo"] or "").strip().lower()
         costeo = costeo_legado if costeo_legado in Producto.Costeo.values else Producto.Costeo.MANUAL
 
-        producto = Producto(
+        # Campos que sí vienen del sistema anterior: en --sync se
+        # sobrescriben tal cual sobre un producto ya existente. Los que NO
+        # vienen del legado (subcategoria, proveedor, claves SAT, notas,
+        # imagen) quedan fuera a propósito y nunca se tocan aquí.
+        campos = dict(
             nombre=nombre,
-            sku=sku,
             codigo_barras=codigo_barras,
             marca=marca,
             categoria=categoria,
-            subcategoria=None,
             linea=linea,
+            clase=clase,
             tipo=tipo,
             unidad_medida=unidad_medida,
             tipo_iva=tipo_iva,
@@ -371,18 +442,26 @@ class Command(BaseCommand):
             descripcion=(r["descripcion"] or "").strip(),
             costeo=costeo,
             precio_costo=precio_costo,
-            precio_venta=Decimal("0.00"),
             stock_minimo=stock_minimo,
             stock_maximo=stock_maximo,
             peso=peso,
             dias_reserva=dias_reserva,
             codigo_proveedor=codigo_proveedor,
         )
+
+        producto = Producto.objects.filter(sku=sku).first() if sync else None
+        creado = producto is None
+        if creado:
+            producto = Producto(sku=sku, subcategoria=None, precio_venta=Decimal("0.00"), **campos)
+        else:
+            for campo, valor in campos.items():
+                setattr(producto, campo, valor)
         producto.is_active = is_active
         producto.save()
 
         # Precio de venta "público" por defecto, para no dejar precio_venta en 0
-        # mientras el resto del sistema migra a ProductoPrecio.
+        # mientras el resto del sistema migra a ProductoPrecio. En --sync
+        # también se sobrescribe con el valor del sistema anterior.
         precio_publico = to_decimal(r["precio_con_impuesto_1"])
         if precio_publico:
             producto.precio_venta = precio_publico
@@ -398,16 +477,17 @@ class Command(BaseCommand):
                 # ProductoPrecio.utilidad_pct es solo referencia (max_digits=7);
                 # un valor legado fuera de rango no debe tumbar la importación.
                 utilidad_val = None
-            ProductoPrecio.objects.create(
+            # update_or_create (no create): en --sync sobre un producto ya
+            # existente, este precio de lista/sucursal puede ya existir.
+            ProductoPrecio.objects.update_or_create(
                 producto=producto,
                 lista_precio=lista_by_nombre[lista_nombre],
                 almacen=almacen_por_nombre.get(almacen_nombre) if almacen_nombre else None,
-                utilidad_pct=utilidad_val,
-                precio_con_impuesto=precio_val,
+                defaults={"utilidad_pct": utilidad_val, "precio_con_impuesto": precio_val},
             )
             precios_creados += 1
 
-        return producto, precios_creados
+        return producto, creado, precios_creados
 
 
 class _DryRunRollback(Exception):
