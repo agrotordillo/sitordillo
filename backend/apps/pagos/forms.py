@@ -88,7 +88,7 @@ class PagoMultipleForm(forms.Form):
                 self.add_error("banco", "Indica el banco de la transferencia.")
             if clave not in Pago.CLAVES_CON_BANCO and banco:
                 self.add_error(
-                    "banco", "El banco solo aplica cuando la forma de pago es transferencia o pago con tarjeta."
+                    "banco", "El banco solo aplica cuando la forma de pago es transferencia, cheque o pago con tarjeta."
                 )
             if clave in (Pago.CLAVE_CHEQUE, Pago.CLAVE_COMPENSACION) and not numero_referencia:
                 etiqueta = "cheque" if clave == Pago.CLAVE_CHEQUE else "nota de crédito"

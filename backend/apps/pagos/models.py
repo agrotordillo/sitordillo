@@ -245,8 +245,8 @@ class Pago(BaseAbstractModel):
     CLAVE_TARJETA_CREDITO = "04"
     CLAVE_TARJETA_DEBITO = "28"
     # El banco es obligatorio en transferencia y opcional (para reconciliar
-    # el estado de cuenta) en pago con tarjeta.
-    CLAVES_CON_BANCO = (CLAVE_TRANSFERENCIA, CLAVE_TARJETA_CREDITO, CLAVE_TARJETA_DEBITO)
+    # el estado de cuenta) en pago con tarjeta o cheque.
+    CLAVES_CON_BANCO = (CLAVE_TRANSFERENCIA, CLAVE_CHEQUE, CLAVE_TARJETA_CREDITO, CLAVE_TARJETA_DEBITO)
 
     cuenta_por_pagar = models.ForeignKey(
         CuentaPorPagar,
@@ -278,7 +278,7 @@ class Pago(BaseAbstractModel):
         blank=True,
         related_name="pagos",
         verbose_name="Banco",
-        help_text="Requerido para transferencia; opcional para pago con tarjeta de crédito o débito.",
+        help_text="Requerido para transferencia; opcional para pago con cheque, tarjeta de crédito o débito.",
     )
     numero_referencia = models.CharField(
         max_length=50,
@@ -347,7 +347,7 @@ class Pago(BaseAbstractModel):
                 raise ValidationError({"banco": "Indica el banco de la transferencia."})
             if clave not in self.CLAVES_CON_BANCO and self.banco_id:
                 raise ValidationError({
-                    "banco": "El banco solo aplica cuando la forma de pago es transferencia o pago con tarjeta.",
+                    "banco": "El banco solo aplica cuando la forma de pago es transferencia, cheque o pago con tarjeta.",
                 })
             if clave in (self.CLAVE_CHEQUE, self.CLAVE_COMPENSACION) and not self.numero_referencia:
                 etiqueta = "cheque" if clave == self.CLAVE_CHEQUE else "nota de crédito"
