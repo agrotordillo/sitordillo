@@ -45,6 +45,10 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
         if fecha_hasta:
             qs = qs.filter(fecha_vencimiento__lte=fecha_hasta)
 
+        estatus = self.request.GET.get("estatus", "").strip()
+        if estatus in CuentaPorPagar.Estatus.values:
+            qs = qs.filter(estatus=estatus)
+
         return qs.order_by(
             "orden_compra__proveedor__nombre_comercial",
             "orden_compra__proveedor__nombre_fiscal",
@@ -81,8 +85,10 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
         context["periodo"] = self.request.GET.get("periodo", "")
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
+        context["estatus"] = self.request.GET.get("estatus", "")
+        context["estatus_choices"] = CuentaPorPagar.Estatus.choices
         context["hay_filtros"] = bool(
-            context["q"] or context["periodo"]
+            context["q"] or context["periodo"] or context["estatus"]
         )
         cuentas = context["cuentas"]
         context["grupos"] = self._agrupar_por_proveedor(cuentas)

@@ -6,7 +6,7 @@ from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.fiscal.models import FormaPago
-from apps.pagos.models import ReciboPago
+from apps.pagos.models import Banco, ReciboPago
 
 
 class ReciboPagoListView(PermissionRequiredMixin, ListView):
@@ -38,6 +38,12 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
                 | Q(proveedor__rfc__icontains=buscar)
             )
 
+        documento = self.request.GET.get("documento", "").strip()
+        if documento:
+            queryset = queryset.filter(
+                pagos__cuenta_por_pagar__orden_compra__documento__icontains=documento
+            ).distinct()
+
         fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
         if fecha_desde:
             queryset = queryset.filter(fecha_pago__gte=fecha_desde)
@@ -48,6 +54,10 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
         forma_pago_id = self.request.GET.get("forma_pago", "").strip()
         if forma_pago_id:
             queryset = queryset.filter(forma_pago_id=forma_pago_id)
+
+        banco_id = self.request.GET.get("banco", "").strip()
+        if banco_id:
+            queryset = queryset.filter(banco_id=banco_id)
 
         if self.request.GET.get("solo_activos") == "1":
             # "Realmente ya pagado": ningún pago del recibo está Inactivo
@@ -61,18 +71,27 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
             queryset = queryset.annotate(
                 total_pagos=Count("pagos"),
                 pagos_inactivos=Count("pagos", filter=Q(pagos__is_active=False)),
-            ).filter(total_pagos__gt=0, pagos_inactivos=0).order_by("-numero")
+            ).filter(total_pagos__gt=0, pagos_inactivos=0)
+
+        if self.request.GET.get("orden") == "alfabetico":
+            queryset = queryset.order_by("proveedor__nombre_comercial", "proveedor__nombre_fiscal")
+        else:
+            queryset = queryset.order_by("-numero")
 
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["q"] = self.request.GET.get("q", "")
+        context["documento"] = self.request.GET.get("documento", "")
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         context["solo_activos"] = self.request.GET.get("solo_activos") == "1"
         context["forma_pago_id"] = self.request.GET.get("forma_pago", "")
         context["formas_pago"] = FormaPago.objects.all()
+        context["banco_id"] = self.request.GET.get("banco", "")
+        context["bancos"] = Banco.objects.all()
+        context["orden"] = self.request.GET.get("orden", "")
 
         for recibo in context["recibos"]:
             self._anotar_totales_fiscales(recibo)
@@ -81,15 +100,24 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
 
     @staticmethod
     def _anotar_totales_fiscales(recibo):
-        """Subtotal/IVA/IEPS son de la compra (OrdenCompra), no del pago -un
-        recibo puede cubrir varias cuentas, y una cuenta puede recibir más
-        de un pago (abonos)-, así que se suman una sola vez por cada orden
-        distinta que el recibo cubre, para no duplicar sus impuestos cuando
-        hay más de un pago sobre la misma cuenta."""
-        ordenes = {}
+        """Subtotal/IVA/IEPS se calculan proporcionales a lo realmente
+        pagado en cada `Pago` respecto al total de su cuenta por pagar -si
+        una cuenta de $10,000 (con impuestos) se liquida en abonos de
+        $3,000 y $2,000, cada recibo debe reflejar solo la fracción de
+        impuestos que corresponde a lo que efectivamente pagó ese abono,
+        no los impuestos completos de la orden de compra-."""
+        subtotal_total = Decimal("0.00")
+        iva_total = Decimal("0.00")
+        ieps_total = Decimal("0.00")
         for pago in recibo.pagos.all():
-            orden = pago.cuenta_por_pagar.orden_compra
-            ordenes[orden.pk] = orden
-        recibo.subtotal_total = sum((o.subtotal for o in ordenes.values()), Decimal("0.00"))
-        recibo.iva_total = sum((o.iva for o in ordenes.values()), Decimal("0.00"))
-        recibo.ieps_total = sum((o.ieps for o in ordenes.values()), Decimal("0.00"))
+            cuenta = pago.cuenta_por_pagar
+            orden = cuenta.orden_compra
+            if not cuenta.monto_total:
+                continue
+            proporcion = pago.monto_pagado / cuenta.monto_total
+            subtotal_total += orden.subtotal * proporcion
+            iva_total += orden.iva * proporcion
+            ieps_total += orden.ieps * proporcion
+        recibo.subtotal_total = subtotal_total
+        recibo.iva_total = iva_total
+        recibo.ieps_total = ieps_total
