@@ -80,6 +80,17 @@
 
   <hr class="sep">
 
+  {% if venta.turno %}
+  <div class="muted">Turno: {{ venta.turno.fecha|date:"d/m/Y" }} · Apertura: {{ venta.turno.hora_apertura|date:"H:i" }}</div>
+  <div class="muted">Punto de venta: {{ venta.turno.punto_venta.codigo }} {{ venta.turno.punto_venta.nombre }}</div>
+  <div class="muted">Cajero: {{ venta.turno.usuario.get_full_name|default:venta.turno.usuario.get_username }}</div>
+  {% endif %}
+  {% if venta.cotizacion_origen.created_by %}
+  <div class="muted">Vendedor (mostrador): {{ venta.cotizacion_origen.created_by.get_full_name|default:venta.cotizacion_origen.created_by.get_username }}</div>
+  {% endif %}
+
+  <hr class="sep">
+
   <div>Folio: <span class="bold">{{ venta.folio }}</span></div>
   <div class="muted">Impresión: {{ venta.veces_impreso }}</div>
   <div>Fecha: {{ venta.fecha_venta|date:"d/m/Y" }} &nbsp; Hora: {{ venta.fecha_venta|date:"H:i" }}</div>

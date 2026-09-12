@@ -13,6 +13,7 @@ from apps.ventas.models import Venta
 from apps.ventas.forms import VentaForm, VentaDetalleFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
+    obtener_turno_abierto,
     procesar_lineas_venta,
     validar_stock_disponible,
     validar_turno_abierto,
@@ -45,8 +46,17 @@ class VentaTicketView(PermissionRequiredMixin, DetailView):
         queryset = (
             super()
             .get_queryset()
-            .select_related("cliente", "almacen", "forma_pago")
-            .prefetch_related("detalles__producto")
+            .select_related(
+                "cliente",
+                "almacen",
+                "forma_pago",
+                "turno",
+                "turno__punto_venta",
+                "turno__usuario",
+                "cotizacion_origen",
+                "cotizacion_origen__created_by",
+            )
+            .prefetch_related("detalles__producto__unidad_medida")
         )
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
@@ -140,6 +150,7 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
         if error_turno:
             form.add_error(None, error_turno)
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
+        form.instance.turno = obtener_turno_abierto(almacen, self.request.user)
 
         lineas = [
             (cd["producto"], cd["cantidad"], cd["estrategia_salida"])

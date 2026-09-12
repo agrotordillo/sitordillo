@@ -12,6 +12,7 @@ from apps.products.models import Turno
 from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.services import (
+    obtener_turno_abierto,
     procesar_lineas_venta,
     validar_stock_disponible,
     validar_turno_abierto,
@@ -85,6 +86,7 @@ def convertir_cotizacion_view(request, pk):
                     form.add_error(None, error)
 
                 if not errores_stock:
+                    form.instance.turno = obtener_turno_abierto(almacen, request.user)
                     try:
                         with transaction.atomic():
                             venta = form.save()

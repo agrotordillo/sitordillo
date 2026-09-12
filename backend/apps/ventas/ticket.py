@@ -14,6 +14,8 @@ tal cual a QZ Tray como impresión raw.
 
 from textwrap import wrap
 
+from django.utils import timezone
+
 from apps.core.templatetags.core_extras import moneda
 
 _ESC = "\x1b"
@@ -28,6 +30,10 @@ _CODEPAGE_CP850 = _ESC + "t" + "\x02"
 _CORTE_PAPEL = _GS + "V" + "\x01"
 
 _CODIFICACION = "cp850"
+
+
+def _nombre_usuario(usuario):
+    return usuario.get_full_name() or usuario.get_username()
 
 
 def _fila(izquierda, derecha, ancho):
@@ -63,9 +69,19 @@ def construir_ticket(venta, empresa=None):
 
     partes.append(_ALINEAR_IZQUIERDA)
     partes.append(separador)
+    if venta.turno:
+        apertura_local = timezone.localtime(venta.turno.hora_apertura)
+        partes.append(f"Turno: {venta.turno.fecha:%d/%m/%Y}  Apertura: {apertura_local:%H:%M}\n")
+        partes.append(f"Punto de venta: {venta.turno.punto_venta.codigo} {venta.turno.punto_venta.nombre}\n")
+        partes.append(f"Cajero: {_nombre_usuario(venta.turno.usuario)}\n")
+    cotizacion_origen = getattr(venta, "cotizacion_origen", None)
+    if cotizacion_origen and cotizacion_origen.created_by_id:
+        partes.append(f"Vendedor (mostrador): {_nombre_usuario(cotizacion_origen.created_by)}\n")
+    partes.append(separador)
     partes.append(f"Folio: {venta.folio}\n")
     partes.append(f"Impresión: {venta.veces_impreso}\n")
-    partes.append(f"Fecha: {venta.fecha_venta:%d/%m/%Y}  Hora: {venta.fecha_venta:%H:%M}\n")
+    fecha_local = timezone.localtime(venta.fecha_venta)
+    partes.append(f"Fecha: {fecha_local:%d/%m/%Y}  Hora: {fecha_local:%H:%M}\n")
     partes.append(f"Cliente: {venta.cliente.display_name}\n")
     if venta.cliente.direccion:
         for renglon in wrap(venta.cliente.direccion, ancho) or [venta.cliente.direccion]:

@@ -30,6 +30,16 @@ class Venta(BaseAbstractModel):
         related_name="ventas",
         verbose_name="Forma de pago",
     )
+    turno = models.ForeignKey(
+        "products.Turno",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ventas",
+        verbose_name="Turno",
+        help_text="El turno propio y abierto del usuario que cobró, tomado automáticamente "
+        "(ver ventas.services.obtener_turno_abierto). No lo elige el usuario.",
+    )
     fecha_venta = models.DateTimeField(default=timezone.now, verbose_name="Fecha de venta")
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
     veces_impreso = models.PositiveIntegerField(

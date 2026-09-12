@@ -44,6 +44,18 @@ def validar_turno_abierto(almacen, usuario):
     return None
 
 
+def obtener_turno_abierto(almacen, usuario):
+    """El turno propio y abierto de `usuario` en alguna caja de `almacen`
+    -mismo criterio que validar_turno_abierto-, para dejarlo guardado en
+    la Venta (ver Venta.turno) y así poder imprimir en el ticket con qué
+    caja y bajo qué turno se cobró. Se llama siempre después de que
+    validar_turno_abierto ya confirmó que existe uno; si por una
+    condición de carrera ya no lo hay, regresa None."""
+    return Turno.objects.filter(
+        punto_venta__almacen=almacen, usuario=usuario, estatus=Turno.Estatus.ABIERTO
+    ).select_related("punto_venta").first()
+
+
 def expandir_linea(producto, cantidad, estrategia):
     """Convierte una línea de venta en las líneas de producto real que
     afectan inventario. Para un producto normal, es la misma línea sin
