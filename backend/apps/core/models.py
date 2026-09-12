@@ -5,6 +5,7 @@ import uuid
 # django imports
 from django.db import IntegrityError
 from django.db import models
+from django.db import transaction
 from django.conf import settings
 from django.utils.text import slugify
 
@@ -80,7 +81,16 @@ class BaseAbstractModel(models.Model):
 
         for _ in range(3):
             try:
-                super().save(*args, **kwargs)
+                # El save() real va en su propio savepoint: en Postgres,
+                # cualquier error dentro de un atomic() deja la transacción
+                # abortada hasta hacer rollback. Sin este savepoint propio,
+                # las consultas de _generate_unique_folio()/_generate_unique_slug()
+                # de abajo fallarían con "current transaction is aborted" y
+                # taparían el error real (p. ej. un SKU duplicado que nada
+                # tiene que ver con folio/slug) cuando este save() ocurre
+                # dentro de un transaction.atomic() del código que llama.
+                with transaction.atomic():
+                    super().save(*args, **kwargs)
                 return
             except IntegrityError:
                 # Rare concurrent collision: regenerate identifiers and retry.
