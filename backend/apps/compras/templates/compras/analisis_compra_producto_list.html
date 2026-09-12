@@ -1,5 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
-{% load core_extras %}
+{% load core_extras static %}
 {% block title %}Análisis de compra por producto{% endblock title %}
 {% block title_layout %}Análisis de compra por producto{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -14,26 +14,50 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-  <input type="text" name="q" value="{{ q }}" placeholder="Producto, SKU, proveedor, RFC o No. de factura..." class="input w-full sm:w-72">
-  <div class="flex items-center gap-2">
-    <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input">
-    <span class="text-sm text-gray-400">a</span>
-    <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input">
+<div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  <form method="get" class="flex flex-wrap items-center gap-2 flex-1">
+    <input type="text" name="q" value="{{ q }}" placeholder="Producto, SKU, proveedor, RFC o No. de factura..." class="input w-full sm:w-72">
+    <div class="flex items-center gap-2">
+      <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input">
+      <span class="text-sm text-gray-400">a</span>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input">
+    </div>
+    <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+    {% if hay_filtros %}
+    <a href="{% url 'compras:analisis-producto' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+    {% endif %}
+  </form>
+  <div class="relative">
+    <button type="button" data-column-toggle-btn="#panel-columnas" class="btn-secondary">
+      <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" />
+      </svg>
+      Columnas
+    </button>
+    <div id="panel-columnas" data-column-toggle-panel class="hidden absolute right-0 z-20 mt-1.5 w-48 bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 p-2 space-y-1">
+      <label class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
+        <input type="checkbox" data-col-toggle="recibida" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+        Recibida
+      </label>
+      <label class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
+        <input type="checkbox" data-col-toggle="precio_neto" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+        Precio neto
+      </label>
+      <label class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
+        <input type="checkbox" data-col-toggle="estatus" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+        Estatus
+      </label>
+    </div>
   </div>
-  <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
-    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
-    </svg>
-  </button>
-  {% if hay_filtros %}
-  <a href="{% url 'compras:analisis-producto' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
-    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-    </svg>
-  </a>
-  {% endif %}
-</form>
+</div>
 {% endblock table_actions %}
 {% block main_content %}
 <div class="relative overflow-x-auto">
@@ -41,30 +65,32 @@
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Fecha</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">SKU</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Documento</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">No. Factura</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Código</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Cantidad</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Recibida</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Precio unitario</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right hidden lg:table-cell">Precio neto</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Importe</th>
+        <th scope="col" data-col="recibida" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">Recibida</th>
+        <th scope="col" data-col="precio_neto" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">Precio neto</th>
+        <th scope="col" data-col="estatus" class="hidden px-4 sm:px-6 py-3 font-semibold">Estatus</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for detalle in detalles %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ detalle.orden_compra.fecha_orden|date:"d/m/Y" }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ detalle.producto.nombre }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 font-mono text-xs hidden sm:table-cell">{{ detalle.producto.sku }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">{{ detalle.orden_compra.proveedor.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ detalle.orden_compra.documento|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">{{ detalle.orden_compra.proveedor.display_name }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 font-mono text-xs hidden sm:table-cell">{{ detalle.producto.sku }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ detalle.producto.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600">{{ detalle.cantidad }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden lg:table-cell">{{ detalle.cantidad_recibida }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ detalle.precio_unitario|moneda:4 }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500 hidden lg:table-cell">${{ detalle.precio_neto|moneda }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-800 font-semibold">${{ detalle.subtotal|moneda }}</td>
+        <td data-col="recibida" class="hidden px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">{{ detalle.cantidad_recibida }}</td>
+        <td data-col="precio_neto" class="hidden px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">${{ detalle.precio_neto|moneda }}</td>
+        <td data-col="estatus" class="hidden px-4 sm:px-6 py-3.5 sm:py-4">
           <span class="inline-flex items-center gap-1.5 text-xs font-medium
               {% if detalle.orden_compra.estatus == 'recibida' %}text-emerald-600
               {% elif detalle.orden_compra.estatus == 'cancelada' %}text-red-500
@@ -81,7 +107,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="10" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="11" class="px-4 sm:px-6 py-12 text-center">
           <p class="text-sm text-gray-400">No hay compras que coincidan con la búsqueda</p>
         </td>
       </tr>
@@ -105,3 +131,6 @@
 </div>
 {% endif %}
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/ui/column-toggle.js' %}"></script>
+{% endblock extra_js %}

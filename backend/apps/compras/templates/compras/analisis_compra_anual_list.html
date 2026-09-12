@@ -1,0 +1,101 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras product_extras proveedor_extras %}
+{% block title %}Análisis de compras anual{% endblock title %}
+{% block title_layout %}Análisis de compras anual{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'compras:orden-list' %}" class="text-gray-400 hover:text-primary-600">Compras</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Análisis de compras anual</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-4 items-end w-full">
+  <div>
+    <label class="label">Año</label>
+    <select name="anio" class="input w-full">
+      {% for a in anios_disponibles %}
+      <option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Producto</label>
+    <div class="producto-search relative" data-producto-search-url="{% url 'api:producto-buscar' %}">
+      <input type="hidden" name="producto" id="id_producto" value="{{ producto_id }}">
+      <input type="text" class="input producto-search-input w-full" placeholder="SKU o nombre..." value="{{ producto_id|producto_label }}" autocomplete="off">
+      <div class="producto-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+    </div>
+  </div>
+  <div>
+    <label class="label">Proveedor</label>
+    <div class="proveedor-search relative" data-proveedor-search-url="{% url 'api:proveedor-buscar' %}">
+      <input type="hidden" name="proveedor" id="id_proveedor" value="{{ proveedor_id }}">
+      <input type="text" class="input proveedor-search-input w-full" placeholder="RFC o nombre..." value="{{ proveedor_id|proveedor_label }}" autocomplete="off">
+      <div class="proveedor-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <div class="flex-1">
+      <label class="label">Almacén</label>
+      <select name="almacen" class="input w-full">
+        <option value="">Todos</option>
+        {% for almacen in almacenes %}
+        <option value="{{ almacen.pk }}" {% if almacen_id == almacen.pk|stringformat:"s" %}selected{% endif %}>{{ almacen.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+    {% if hay_filtros %}
+    <a href="?anio={{ anio }}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+    {% endif %}
+  </div>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold sticky left-0 bg-gray-50">Producto</th>
+        {% for mes in meses %}
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap">{{ mes }}/{{ anio }}</th>
+        {% endfor %}
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right bg-amber-50/70 whitespace-nowrap">Total</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800 sticky left-0 bg-white">
+          {{ fila.nombre }}
+          <span class="block text-xs text-gray-400 font-mono">{{ fila.sku }}</span>
+        </td>
+        {% for cantidad in fila.meses %}
+        <td class="px-3 py-3.5 sm:py-4 text-right text-gray-600">{{ cantidad|floatformat:2 }}</td>
+        {% endfor %}
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-gray-800 bg-amber-50/70">{{ fila.total|floatformat:2 }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="14" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay compras recibidas en {{ anio }} que coincidan con los filtros</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

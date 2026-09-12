@@ -1,7 +1,7 @@
 from django.urls import path
 
 from apps.inventario.views.recepcion_views import recepcion_compra_view
-from .views.analisis_views import AnalisisCompraProductoListView
+from .views.analisis_views import AnalisisCompraAnualListView, AnalisisCompraProductoListView
 from .views.orden_compra_views import (
     OrdenCompraCreateView,
     OrdenCompraListView,
@@ -21,4 +21,5 @@ urlpatterns = [
     path("promociones/", PromocionProveedorListView.as_view(), name="promocion-list"),
     path("promociones/crear/", PromocionProveedorCreateView.as_view(), name="promocion-create"),
     path("analisis-por-producto/", AnalisisCompraProductoListView.as_view(), name="analisis-producto"),
+    path("analisis-anual/", AnalisisCompraAnualListView.as_view(), name="analisis-anual"),
 ]
