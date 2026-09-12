@@ -32,6 +32,26 @@
       <p class="mt-1.5 text-xs text-gray-400">Se muestra en el ticket de venta impreso en esta sucursal.</p>
       {% if form.direccion.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.direccion.errors.0 }}</p>{% endif %}
     </div>
+    <div>
+      <label for="{{ form.impresora_nombre.id_for_label }}" class="label">Nombre de la impresora de tickets <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.impresora_nombre }}
+      <p class="mt-1.5 text-xs text-gray-400">Tal como quedó agregada en Windows y como la ve QZ Tray en esa PC de caja.</p>
+      {% if form.impresora_nombre.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.impresora_nombre.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.impresora_ancho_columnas.id_for_label }}" class="label">Ancho de la impresora (columnas)</label>
+      {{ form.impresora_ancho_columnas }}
+      <p class="mt-1.5 text-xs text-gray-400">40 en las Epson TM-U220 de impacto.</p>
+      {% if form.impresora_ancho_columnas.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.impresora_ancho_columnas.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="md:col-span-2">
+      <div class="flex items-center gap-2">
+        {{ form.imprimir_ticket_automatico }}
+        <label for="{{ form.imprimir_ticket_automatico.id_for_label }}" class="label mb-0">Imprimir ticket automáticamente al cerrar la venta</label>
+      </div>
+      <p class="mt-1.5 text-xs text-gray-400">Actívalo solo después de probar que QZ Tray y la impresora de esta sucursal funcionan.</p>
+      {% if form.imprimir_ticket_automatico.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.imprimir_ticket_automatico.errors.0 }}</p>{% endif %}
+    </div>
   </div>
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
     <a href="{% url 'products:warehouse-list' %}" class="btn-secondary">Cancelar</a>

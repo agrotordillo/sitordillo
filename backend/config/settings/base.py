@@ -241,7 +241,18 @@ CONTENT_SECURITY_POLICY = {
         'img-src': ["'self'", 'data:'],
         'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        'connect-src': ["'self'"],
+        'connect-src': [
+            "'self'",
+            # QZ Tray corre en la PC de cada caja y escucha por WebSocket en
+            # localhost, probando varios puertos si el default está ocupado
+            # (8181/8182, 8282/8283, ...) -sin esto el navegador bloquea la
+            # conexión aunque QZ Tray esté abierto, y el ticket cae siempre
+            # al respaldo de window.print() en vez de imprimir por ESC/POS.
+            'ws://localhost:*',
+            'wss://localhost:*',
+            'ws://localhost.qz.io:*',
+            'wss://localhost.qz.io:*',
+        ],
     }
 }
 

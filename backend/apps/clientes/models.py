@@ -65,6 +65,12 @@ class Cliente(BaseAbstractModel):
         help_text="Lista de precios que se aplica por defecto a este cliente en ventas y cotizaciones.",
     )
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="Descuento (%)")
+    direccion = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Dirección",
+        help_text="Se muestra en el ticket de venta impreso.",
+    )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
     class Meta:

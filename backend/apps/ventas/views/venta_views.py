@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
@@ -52,11 +53,37 @@ class VentaTicketView(PermissionRequiredMixin, DetailView):
             queryset = queryset.filter(almacen__in=visibles)
         return queryset
 
+    def get(self, request, *args, **kwargs):
+        # Cada carga de esta pantalla es un intento de impresión (automática
+        # o vía el botón), así que aquí -no en get_context_data, que puede
+        # llamarse más de una vez- es donde se cuenta: "Impresión: 1" la
+        # primera vez, "Impresión: 2" en una reimpresión, etc.
+        self.object = self.get_object()
+        Venta.objects.filter(pk=self.object.pk).update(veces_impreso=F("veces_impreso") + 1)
+        self.object.refresh_from_db(fields=["veces_impreso"])
+        context = self.get_context_data(object=self.object)
+        return self.render_to_response(context)
+
     def get_context_data(self, **kwargs):
+        import base64
+
         from apps.facturacion.models import Empresa
+        from apps.ventas.ticket import construir_ticket
 
         context = super().get_context_data(**kwargs)
-        context["empresa"] = Empresa.objects.first()
+        empresa = Empresa.objects.first()
+        context["empresa"] = empresa
+
+        almacen = self.object.almacen
+        if almacen.impresora_nombre:
+            # Solo se arma/embebe el payload ESC/POS si la sucursal ya tiene
+            # una impresora configurada -si no, el ticket se comporta igual
+            # que antes (solo el botón "Imprimir ticket" con window.print).
+            context["ticket_data"] = {
+                "printer": almacen.impresora_nombre,
+                "data": base64.b64encode(construir_ticket(self.object, empresa)).decode("ascii"),
+                "auto": almacen.imprimir_ticket_automatico,
+            }
         return context
 
 

@@ -32,6 +32,12 @@ class Venta(BaseAbstractModel):
     )
     fecha_venta = models.DateTimeField(default=timezone.now, verbose_name="Fecha de venta")
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+    veces_impreso = models.PositiveIntegerField(
+        default=0,
+        editable=False,
+        verbose_name="Veces impreso",
+        help_text="Se incrementa cada vez que se abre el ticket para imprimirlo o reimprimirlo.",
+    )
 
     class Meta:
         verbose_name = "Venta"
@@ -76,6 +82,24 @@ class Venta(BaseAbstractModel):
     @property
     def importe_iva(self):
         return sum((detalle.importe_iva for detalle in self.detalles.all()), Decimal("0.00"))
+
+    @property
+    def importe_ieps(self):
+        return sum((detalle.importe_ieps for detalle in self.detalles.all()), Decimal("0.00"))
+
+    @property
+    def peso_total(self):
+        return sum(
+            ((detalle.producto.peso or Decimal("0")) * detalle.cantidad for detalle in self.detalles.all()),
+            Decimal("0.00"),
+        )
+
+    @property
+    def volumen_total(self):
+        return sum(
+            ((detalle.producto.volumen or Decimal("0")) * detalle.cantidad for detalle in self.detalles.all()),
+            Decimal("0.00"),
+        )
 
     def clean(self):
         super().clean()

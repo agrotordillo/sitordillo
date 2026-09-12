@@ -81,8 +81,10 @@
   <hr class="sep">
 
   <div>Folio: <span class="bold">{{ venta.folio }}</span></div>
+  <div class="muted">Impresión: {{ venta.veces_impreso }}</div>
   <div>Fecha: {{ venta.fecha_venta|date:"d/m/Y" }} &nbsp; Hora: {{ venta.fecha_venta|date:"H:i" }}</div>
   <div>Cliente: {{ venta.cliente.display_name }}</div>
+  {% if venta.cliente.direccion %}<div class="muted">{{ venta.cliente.direccion }}</div>{% endif %}
   <div>Forma de pago: {{ venta.forma_pago.descripcion }}</div>
 
   <hr class="sep">
@@ -98,9 +100,9 @@
       {% for detalle in venta.detalles.all %}
       <tr>
         <td>
-          <span class="producto-nombre">{{ detalle.producto.nombre }}</span>
+          <span class="producto-nombre">{{ detalle.producto.sku }} · {{ detalle.producto.nombre }}</span>
           <span class="producto-detalle">
-            {{ detalle.cantidad }} x ${{ detalle.precio_unitario|moneda }}{% if detalle.descuento %} (-{{ detalle.descuento }}%){% endif %}
+            {{ detalle.producto.unidad_medida.abreviatura }} {{ detalle.cantidad }} x ${{ detalle.precio_unitario|moneda }}{% if detalle.descuento %} (-{{ detalle.descuento }}%){% endif %}
           </span>
         </td>
         <td class="num">${{ detalle.subtotal|moneda }}</td>
@@ -120,11 +122,19 @@
       <td class="label">IVA:</td>
       <td class="valor">${{ venta.importe_iva|moneda }}</td>
     </tr>
+    <tr>
+      <td class="label">IEPS:</td>
+      <td class="valor">${{ venta.importe_ieps|moneda }}</td>
+    </tr>
     <tr class="total-final">
       <td class="label">TOTAL:</td>
       <td class="valor">${{ venta.total|moneda }}</td>
     </tr>
   </table>
+
+  <hr class="sep">
+  <div class="muted">Peso en kilos: {{ venta.peso_total|moneda }}</div>
+  <div class="muted">Volumen (m³): {{ venta.volumen_total|moneda }}</div>
 
   {% if venta.observaciones %}
   <hr class="sep">
@@ -138,9 +148,58 @@
 </div>
 
 <div class="acciones no-print">
-  <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir ticket</button>
+  <button type="button" id="btn-imprimir-ticket" class="btn-imprimir" {% if not ticket_data %}onclick="window.print()"{% endif %}>Imprimir ticket</button>
   <a href="{% url 'ventas:venta-list' %}" class="btn-volver">Volver a ventas</a>
+  <p id="qz-estado" class="mt-2 text-xs text-gray-500"></p>
 </div>
+
+{% if ticket_data %}
+{{ ticket_data|json_script:"ticket-data" }}
+<script src="{% static 'js/vendor/qz-tray.js' %}"></script>
+<script>
+(function () {
+  var datos = JSON.parse(document.getElementById('ticket-data').textContent);
+  var estado = document.getElementById('qz-estado');
+  var boton = document.getElementById('btn-imprimir-ticket');
+
+  function mostrarEstado(texto) {
+    if (estado) { estado.textContent = texto; }
+  }
+
+  function enviarAImpresora() {
+    var conectar = qz.websocket.isActive() ? Promise.resolve() : qz.websocket.connect();
+    return conectar.then(function () {
+      var config = qz.configs.create(datos.printer);
+      var payload = [{ type: 'raw', format: 'command', flavor: 'base64', data: datos.data }];
+      return qz.print(config, payload);
+    });
+  }
+
+  if (boton) {
+    boton.addEventListener('click', function () {
+      mostrarEstado('Enviando a la impresora...');
+      enviarAImpresora()
+        .then(function () { mostrarEstado('Ticket enviado a la impresora.'); })
+        .catch(function (err) {
+          console.error('QZ Tray:', err);
+          mostrarEstado('No se pudo imprimir con QZ Tray (¿está abierto en esta PC?). Se abre la vista de impresión normal.');
+          window.print();
+        });
+    });
+  }
+
+  if (datos.auto) {
+    mostrarEstado('Imprimiendo automáticamente...');
+    enviarAImpresora()
+      .then(function () { mostrarEstado('Ticket enviado a la impresora.'); })
+      .catch(function (err) {
+        console.error('QZ Tray:', err);
+        mostrarEstado('No se pudo imprimir automáticamente (¿QZ Tray está abierto en esta PC?). Usa el botón "Imprimir ticket".');
+      });
+  }
+})();
+</script>
+{% endif %}
 
 </body>
 </html>

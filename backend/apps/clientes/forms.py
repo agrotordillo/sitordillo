@@ -15,6 +15,7 @@ class ClienteForm(BaseModelForm):
             "codigo_postal",
             "contacto_telefono",
             "contacto_email",
+            "direccion",
             "tiene_credito",
             "limite_credito",
             "dias_credito",
