@@ -173,6 +173,24 @@
   var estado = document.getElementById('qz-estado');
   var boton = document.getElementById('btn-imprimir-ticket');
 
+  // Firma cada solicitud con el certificado del servidor (ver
+  // apps/ventas/views/qz_views.py) para que QZ Tray confíe en esta
+  // conexión -sin esto, cada conexión es "anónima" y el diálogo de "Remember
+  // this decision" de QZ Tray no persiste porque no hay ningún certificado
+  // estable contra el cual recordarla-. Una vez que ese mismo certificado se
+  // instale como override.crt en QZ Tray de esa PC, deja de preguntar.
+  qz.security.setCertificatePromise(function (resolve, reject) {
+    fetch("{% url 'ventas:qz-certificado' %}", { cache: 'no-store' })
+      .then(function (data) { data.ok ? resolve(data.text()) : reject(data.text()); });
+  });
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise(function (toSign) {
+    return function (resolve, reject) {
+      fetch("{% url 'ventas:qz-firmar' %}?request=" + encodeURIComponent(toSign), { cache: 'no-store' })
+        .then(function (data) { data.ok ? resolve(data.text()) : reject(data.text()); });
+    };
+  });
+
   function mostrarEstado(texto) {
     if (estado) { estado.textContent = texto; }
   }
