@@ -559,7 +559,7 @@ class Producto(BaseAbstractModel):
         verbose_name="Método de costeo",
         help_text="Cómo se actualiza el costo del producto a partir de las compras.",
     )
-    precio_costo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de costo")
+    precio_costo = models.DecimalField(max_digits=14, decimal_places=4, default=Decimal("0.0000"), verbose_name="Precio de costo")
     precio_venta = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Precio de venta")
     stock_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock mínimo")
     stock_maximo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Stock máximo")

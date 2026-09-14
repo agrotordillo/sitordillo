@@ -409,7 +409,7 @@ class Command(BaseCommand):
         clase = clase_by_legacy_id.get(r["id_clase"])
         unidad_medida = unidad_by_legacy_id.get(r["id_unidad_medida"])
 
-        precio_costo = to_decimal(r["costo"]) or Decimal("0.00")
+        precio_costo = to_decimal(r["costo"], Decimal("0.0001")) or Decimal("0.0000")
         stock_minimo = Decimal(r["existencia_minima"] or 0)
         stock_maximo = Decimal(r["existencia_maxima"] or 0)
         if stock_maximo < stock_minimo:
