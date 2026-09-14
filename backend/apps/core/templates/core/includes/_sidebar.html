@@ -275,6 +275,10 @@
       {% if perms.comisiones.view_comisionproducto %}
       <a href="{% url 'comisiones:comision-producto-list' %}" class="sidebar-sublink">Comisiones por producto</a>
       {% endif %}
+      {% if perms.comisiones_ruta.view_comisioncolaboradorlinea %}
+      <a href="{% url 'comisiones_ruta:reporte' %}" class="sidebar-sublink">Comisiones por colaborador</a>
+      <a href="{% url 'comisiones_ruta:comision-colaborador-linea-list' %}" class="sidebar-sublink">Comisiones por colaborador (%)</a>
+      {% endif %}
       {% if perms.facturacion.view_factura %}
       <a href="{% url 'facturacion:factura-list' %}" class="sidebar-sublink">Facturas</a>
       {% endif %}

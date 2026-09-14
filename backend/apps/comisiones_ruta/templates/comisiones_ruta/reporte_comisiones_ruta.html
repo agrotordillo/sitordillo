@@ -1,0 +1,111 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Comisiones por colaborador{% endblock title %}
+{% block title_layout %}Comisiones por colaborador{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Comisiones por colaborador</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-4 items-end w-full">
+  <div class="flex items-center gap-1.5">
+    <div class="flex-1">
+      <label class="label">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input w-full">
+    </div>
+  </div>
+  <div>
+    <label class="label">Sucursal</label>
+    <select name="almacen" class="input w-full">
+      <option value="">Todas</option>
+      {% for a in almacenes %}
+      <option value="{{ a.pk }}" {% if almacen_id == a.pk|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Colaborador</label>
+    <select name="empleado" class="input w-full">
+      <option value="">Todos</option>
+      {% for e in empleados %}
+      <option value="{{ e.pk }}" {% if empleado_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.get_full_name|default:e.username }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn-primary">Consultar</button>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Se atribuye a quien levantó el pedido en mostrador (o a quien registró la venta directa, si no pasó por
+  cotización). Incluye ventas de contado y a crédito; descuenta lo que se haya devuelto. % propio de cada
+  colaborador en PUBLICO/MEDIO MAYOREO, 1% fijo en cualquier otra lista de precio — configura los
+  porcentajes en
+  <a href="{% url 'comisiones_ruta:comision-colaborador-linea-list' %}" class="text-primary-600 hover:text-primary-700 font-medium">Comisiones por colaborador</a>.
+</p>
+
+<div class="mb-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-sm">
+  <span class="text-gray-500">Comisión total del periodo: <span class="font-semibold text-gray-800">${{ total_general|moneda }}</span></span>
+</div>
+
+{% if sin_lista_precio %}
+<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+  {{ sin_lista_precio }} línea{{ sin_lista_precio|pluralize }} de venta con comisión configurada no se incluyeron
+  por no tener registrada su lista de precio (ventas de antes de este cambio, o capturadas sin elegirla).
+</div>
+{% endif %}
+
+{% for grupo in grupos %}
+<div class="relative overflow-x-auto mb-6 border border-gray-100 rounded-xl">
+  <div class="flex items-center justify-between px-4 sm:px-6 py-2.5 bg-gray-50/80 border-b border-gray-100">
+    <span class="font-semibold text-gray-700">
+      {{ grupo.empleado.get_full_name|default:grupo.empleado.username }}
+      {% if grupo.plaza %}<span class="text-gray-400 font-normal text-xs ms-1">· {{ grupo.plaza.nombre }}</span>{% endif %}
+    </span>
+    <div class="flex items-center gap-4 text-xs text-gray-500">
+      <span>Vendido: <span class="text-gray-700 font-medium">${{ grupo.total_importe|moneda }}</span></span>
+      <span>Comisión: <span class="text-emerald-600 font-semibold">${{ grupo.total_comision|moneda }}</span></span>
+    </div>
+  </div>
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Venta</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Lista</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Cantidad</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Importe</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">%</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Comisión</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in grupo.filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-2.5 font-mono text-xs text-gray-400">{{ fila.venta.folio }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-gray-700">{{ fila.producto.nombre }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-gray-500">{{ fila.lista_precio.nombre }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right">{{ fila.cantidad }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right">${{ fila.importe|moneda }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right text-gray-500">{{ fila.porcentaje }}%</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right font-medium text-gray-800">${{ fila.comision|moneda }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% empty %}
+<div class="rounded-xl border border-gray-100 px-4 sm:px-6 py-12 text-center">
+  <p class="text-sm text-gray-400">No hay comisiones que coincidan con el periodo/filtros seleccionados</p>
+</div>
+{% endfor %}
+{% endblock main_content %}

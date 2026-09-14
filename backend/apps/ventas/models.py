@@ -137,6 +137,15 @@ class VentaDetalle(BaseAbstractModel):
     cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad")
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Precio unitario")
     descuento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), verbose_name="Descuento (%)")
+    lista_precio = models.ForeignKey(
+        "products.ListaPrecio",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Lista de precio",
+        help_text="De qué lista salió el precio_unitario capturado -no se usa para calcularlo, solo se registra para reportes como la comisión por colaborador.",
+    )
     estrategia_salida = models.CharField(
         max_length=10,
         choices=Estrategia.choices,

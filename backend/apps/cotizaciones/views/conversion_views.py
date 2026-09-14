@@ -129,6 +129,7 @@ def convertir_cotizacion_view(request, pk):
                 "cantidad": d.cantidad,
                 "precio_unitario": d.precio_unitario,
                 "descuento": d.descuento,
+                "lista_precio": d.lista_precio_id,
                 "estrategia_salida": d.estrategia_salida,
             }
             for d in detalles

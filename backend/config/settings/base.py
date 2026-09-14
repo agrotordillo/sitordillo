@@ -55,6 +55,7 @@ LOCAL_APPS = [
     'apps.cotizaciones',
     'apps.cobros',
     'apps.comisiones',
+    'apps.comisiones_ruta',
     'apps.pagos',
     'apps.facturacion',
     'apps.gastos',

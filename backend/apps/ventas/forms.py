@@ -4,7 +4,7 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BaseModelForm
 from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.clientes.models import Cliente
-from apps.products.models import Almacen, Producto
+from apps.products.models import Almacen, ListaPrecio, Producto
 from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle
 
 
@@ -57,7 +57,7 @@ class VentaForm(BaseModelForm):
 class VentaDetalleForm(BaseModelForm):
     class Meta:
         model = VentaDetalle
-        fields = ["producto", "cantidad", "precio_unitario", "descuento", "estrategia_salida"]
+        fields = ["producto", "cantidad", "precio_unitario", "descuento", "lista_precio", "estrategia_salida"]
         widgets = {
             # Con ~300 mil productos, un <select> normal es inviable: se
             # busca por texto (ver producto-search.js) y este campo solo
@@ -84,6 +84,17 @@ class VentaDetalleForm(BaseModelForm):
             "min": "0",
             "max": "100",
         })
+        self.fields["lista_precio"].queryset = ListaPrecio.objects.filter(is_active=True)
+        self.fields["lista_precio"].widget.attrs.update({
+            "class": (self.fields["lista_precio"].widget.attrs.get("class", "") + " fs-lista-precio").strip(),
+        })
+        # Casi toda sucursal vende solo en PUBLICO -salvo Bodega Sur, la
+        # única que de verdad maneja mayoreo/medio mayoreo/sub distribuidor-,
+        # así que se precarga sola y el cajero normal ni la nota.
+        if not self.instance.pk and "lista_precio" not in self.initial:
+            publico = ListaPrecio.objects.filter(nombre="PUBLICO").first()
+            if publico is not None:
+                self.initial["lista_precio"] = publico.pk
 
 
 VentaDetalleFormSet = inlineformset_factory(
