@@ -113,7 +113,7 @@ class Cliente(BaseAbstractModel):
 
     @property
     def facturable(self):
-        return bool(self.rfc and self.nombre_fiscal and self.regimen_fiscal_id and self.uso_cfdi_id)
+        return bool(self.rfc and self.nombre_fiscal and self.regimen_fiscal_id)
 
     def clean(self):
         super().clean()
@@ -122,11 +122,12 @@ class Cliente(BaseAbstractModel):
         # entre varios clientes "público en general" sin RFC.
         self.rfc = (self.rfc or "").upper().strip() or None
 
-        campos_fiscales = [self.rfc, self.nombre_fiscal, self.regimen_fiscal_id, self.uso_cfdi_id, self.codigo_postal]
+        campos_fiscales = [self.rfc, self.nombre_fiscal, self.regimen_fiscal_id, self.codigo_postal]
         if any(campos_fiscales) and not all(campos_fiscales):
             raise ValidationError(
                 "Para poder facturarle a este cliente se necesitan todos los datos fiscales: "
-                "RFC, nombre fiscal, régimen fiscal, uso de CFDI y código postal."
+                "RFC, nombre fiscal, régimen fiscal y código postal. El uso de CFDI se define "
+                "al momento de facturar la venta."
             )
 
         if self.rfc:

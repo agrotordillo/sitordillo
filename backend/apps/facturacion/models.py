@@ -161,7 +161,7 @@ class Factura(BaseAbstractModel):
         if not cliente.facturable:
             raise ValidationError(
                 "El cliente de esta venta no tiene datos fiscales completos "
-                "(RFC, nombre fiscal, régimen fiscal, uso de CFDI, código postal)."
+                "(RFC, nombre fiscal, régimen fiscal)."
             )
 
         productos_sin_clave = [
