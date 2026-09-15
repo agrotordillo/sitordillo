@@ -51,9 +51,9 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
         if fecha_hasta:
             queryset = queryset.filter(fecha_pago__lte=fecha_hasta)
 
-        forma_pago_id = self.request.GET.get("forma_pago", "").strip()
-        if forma_pago_id:
-            queryset = queryset.filter(forma_pago_id=forma_pago_id)
+        forma_pago_ids = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
+        if forma_pago_ids:
+            queryset = queryset.filter(forma_pago_id__in=forma_pago_ids)
 
         banco_id = self.request.GET.get("banco", "").strip()
         if banco_id:
@@ -87,7 +87,7 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         context["solo_activos"] = self.request.GET.get("solo_activos") == "1"
-        context["forma_pago_id"] = self.request.GET.get("forma_pago", "")
+        context["forma_pago_ids"] = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
         context["formas_pago"] = FormaPago.objects.all()
         context["banco_id"] = self.request.GET.get("banco", "")
         context["bancos"] = Banco.objects.all()

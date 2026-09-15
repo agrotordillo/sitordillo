@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
+from apps.fiscal.models import FormaPago
 from apps.pagos.forms import GenerarCuentaForm
 from apps.pagos.models import CuentaPorPagar
 from apps.pagos.services import generar_cuenta_por_pagar
@@ -48,6 +49,10 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
         estatus = self.request.GET.get("estatus", "").strip()
         if estatus in CuentaPorPagar.Estatus.values:
             qs = qs.filter(estatus=estatus)
+
+        forma_pago_ids = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
+        if forma_pago_ids:
+            qs = qs.filter(pagos__forma_pago_id__in=forma_pago_ids).distinct()
 
         return qs.order_by(
             "orden_compra__proveedor__nombre_comercial",
@@ -87,8 +92,10 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         context["estatus"] = self.request.GET.get("estatus", "")
         context["estatus_choices"] = CuentaPorPagar.Estatus.choices
+        context["forma_pago_ids"] = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
+        context["formas_pago"] = FormaPago.objects.all()
         context["hay_filtros"] = bool(
-            context["q"] or context["periodo"] or context["estatus"]
+            context["q"] or context["periodo"] or context["estatus"] or context["forma_pago_ids"]
         )
         cuentas = context["cuentas"]
         context["grupos"] = self._agrupar_por_proveedor(cuentas)
