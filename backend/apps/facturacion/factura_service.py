@@ -75,7 +75,7 @@ def construir_payload_cfdi(factura):
         total_impuestos = d["iva_monto"] + d["ieps_monto"]
         total_linea = d["base"] - d["descuento_monto"] + total_impuestos
 
-        items.append({
+        item = {
             "ProductCode": producto.clave_prod_serv_sat.clave,
             "IdentificationNumber": producto.sku,
             "Description": producto.nombre,
@@ -89,8 +89,13 @@ def construir_payload_cfdi(factura):
             "Discount": float(d["descuento_monto"]),
             "Total": float(total_linea),
             "TaxObject": "02" if taxes else "01",
-            "Taxes": taxes,
-        })
+        }
+        # Facturama rechaza la solicitud si el nodo Taxes está presente
+        # (aunque sea una lista vacía) cuando TaxObject no es "02": no basta
+        # con mandar taxes=[], la clave "Taxes" no debe existir en absoluto.
+        if taxes:
+            item["Taxes"] = taxes
+        items.append(item)
 
     return {
         # Serie/Folio no se envían: Facturama los asigna según la serie
