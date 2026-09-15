@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function buscar(wrapper, input) {
     const url = wrapper.dataset.productoSearchUrl;
     const almacenFieldId = wrapper.dataset.productoSearchAlmacenField;
+    const precioCampo = wrapper.dataset.productoSearchPrecioCampo || "costo";
     const resultsEl = wrapper.querySelector(".producto-search-results");
     const hiddenInput = wrapper.querySelector('input[type="hidden"]');
     const q = input.value.trim();
@@ -89,13 +90,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${url}?${params.toString()}`, { headers: { Accept: "application/json" } });
       if (!res.ok) return;
       const items = await res.json();
-      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue));
+      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue), precioCampo);
     } catch (err) {
       if (window.App?.isDev) console.error("[producto-search]", err);
     }
   }
 
-  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen) {
+  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen, precioCampo) {
     if (!items.length) {
       const mensaje = filtradoPorAlmacen
         ? "Sin existencia de este producto en el almacén origen"
@@ -119,13 +120,18 @@ document.addEventListener("DOMContentLoaded", () => {
         hiddenInput.value = item.id;
         hiddenInput.dataset.precioCosto = item.precio_costo;
 
-        // Sugiere el precio unitario de la línea de compra con el costo del
-        // producto (solo si el campo está vacío, para no pisar un precio ya
-        // capturado a mano).
+        // Sugiere el precio unitario de la línea (solo si el campo está
+        // vacío, para no pisar un precio ya capturado a mano): costo del
+        // producto en compras (precio_costo, 4 decimales), o precio de
+        // venta en ventas/cotizaciones (precio_venta, 2 decimales) -según
+        // data-producto-search-precio-campo en el wrapper-. Usar el campo
+        // equivocado no es solo un tema de decimales: en una venta
+        // sugeriría el costo de compra, no el precio al público.
+        const precioSugerido = precioCampo === "venta" ? item.precio_venta : item.precio_costo;
         const row = hiddenInput.closest(".formset-row");
         const precioInput = row?.querySelector(".fs-precio");
-        if (precioInput && !precioInput.value && item.precio_costo) {
-          precioInput.value = item.precio_costo;
+        if (precioInput && !precioInput.value && precioSugerido) {
+          precioInput.value = precioSugerido;
           precioInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 

@@ -3,6 +3,7 @@
   class="producto-search relative"
   data-producto-search-url="{% url 'api:producto-buscar' %}"
   {% if almacen_field_id %}data-producto-search-almacen-field="{{ almacen_field_id }}"{% endif %}
+  data-producto-search-precio-campo="{{ precio_campo|default:'costo' }}"
 >
   {{ form.producto }}
   <input type="text" class="input producto-search-input" placeholder="Folio, SKU, código o nombre..." value="{{ form.producto.value|producto_label }}" autocomplete="off">
