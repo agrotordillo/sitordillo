@@ -1,7 +1,9 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import DecimalField, OuterRef, Q, Subquery
+from django.shortcuts import get_object_or_404, redirect
+from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
@@ -65,6 +67,27 @@ class ProductUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextUrlMix
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar el producto. Revisa los campos.")
         return super().form_invalid(form)
+
+
+class ProductToggleActivoView(PermissionRequiredMixin, View):
+    """Baja lógica: un producto nunca se elimina, solo se desactiva. Los
+    buscadores de producto usados al vender, traspasar, cotizar o comprar
+    ya filtran por is_active=True, así que un producto inactivo deja de
+    poder elegirse en operaciones nuevas, pero se conserva íntegro en el
+    historial (ventas, traspasos, kardex, etc.) ya registrado."""
+
+    permission_required = "products.change_producto"
+
+    def post(self, request, pk):
+        producto = get_object_or_404(Producto, pk=pk)
+        producto.is_active = not producto.is_active
+        producto.save(update_fields=["is_active"])
+        if producto.is_active:
+            messages.success(request, f"Producto {producto.nombre} reactivado.")
+        else:
+            messages.success(request, f"Producto {producto.nombre} desactivado.")
+        next_url = request.POST.get("next") or reverse("products:product-list")
+        return redirect(next_url)
 
 
 class ProductListView(PermissionRequiredMixin, ListView):
