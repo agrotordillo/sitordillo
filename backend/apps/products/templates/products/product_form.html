@@ -25,6 +25,7 @@
         placeholder: 'Selecciona primero una categoría'
       })">
   {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next_url }}">
 
   <div class="product-form-cards">
     <div class="form-card-layout">
@@ -496,7 +497,7 @@
     </div>
 
     <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-5 pt-4 border-t border-gray-200/80">
-      <a href="{% url 'products:product-list' %}" class="btn-secondary">Cancelar</a>
+      <a href="{{ next_url }}" class="btn-secondary">Cancelar</a>
       <button type="submit" class="btn-primary">Guardar</button>
     </div>
   </div>

@@ -19,7 +19,27 @@ LISTAS_PRECIO_TABLA = [
 ]
 
 
-class ProductCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
+class NextUrlMixin:
+    """Permite que "Guardar" y "Cancelar" regresen a la búsqueda/filtro
+    desde donde se entró al formulario (?next=...) en vez de mandar
+    siempre al listado sin filtros. El listado arma el enlace con
+    ?next={{ request.get_full_path }} y el formulario reenvía ese mismo
+    valor en un input oculto para que sobreviva a un reenvío por error
+    de validación."""
+
+    def get_next_url(self):
+        return self.request.POST.get("next") or self.request.GET.get("next") or str(self.success_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["next_url"] = self.get_next_url()
+        return context
+
+    def get_success_url(self):
+        return self.get_next_url()
+
+
+class ProductCreateView(PermissionRequiredMixin, SuccessMessageMixin, NextUrlMixin, CreateView):
     permission_required = "products.add_producto"
     model = Producto
     form_class = ProductForm
@@ -33,7 +53,7 @@ class ProductCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView
         return super().form_invalid(form)
 
 
-class ProductUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView):
+class ProductUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextUrlMixin, UpdateView):
     permission_required = "products.change_producto"
     model = Producto
     form_class = ProductForm
