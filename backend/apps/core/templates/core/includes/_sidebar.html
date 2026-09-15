@@ -148,6 +148,9 @@
       {% if perms.inventario.view_movimientoinventario %}
       <a href="{% url 'inventario:movimiento-costo-list' %}" class="sidebar-sublink">Movimientos del almacén con costo</a>
       {% endif %}
+      {% if perms.inventario.view_lote %}
+      <a href="{% url 'inventario:costeo-producto-list' %}" class="sidebar-sublink">Costeo de producto</a>
+      {% endif %}
       {% if perms.inventario.view_conversion %}
       <a href="{% url 'inventario:conversion-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#22C55E]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">

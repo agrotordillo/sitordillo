@@ -1,0 +1,83 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Costeo de producto{% endblock title %}
+{% block title_layout %}Costeo de producto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Costeo de producto</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto por nombre o SKU..." class="input w-full sm:w-60">
+  <select name="almacen" class="input w-full sm:w-auto">
+    <option value="">Todas las sucursales</option>
+    {% for almacen in almacenes %}
+    <option value="{{ almacen.pk }}" {% if almacen_id == almacen.pk|stringformat:"s" %}selected{% endif %}>{{ almacen.nombre }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
+    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+    </svg>
+  </button>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Compara el costo capturado en el catálogo del producto contra el costo real de sus compras: el último costo
+  pagado y el costo promedio ponderado de lo que hay actualmente en existencia. Solo aparecen productos que ya
+  tienen al menos una compra recibida. Es un reporte de consulta: no cambia el costo del producto por sí solo.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">SKU</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Costeo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo en catálogo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Último costo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo promedio</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for producto in productos %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ producto.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-400 font-mono text-xs hidden sm:table-cell">{{ producto.sku }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ producto.get_costeo_display }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">{{ producto.precio_costo|moneda:4 }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">{{ producto.ultimo_costo|moneda|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">{{ producto.costo_promedio|moneda|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay productos con compras registradas todavía</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+  <p class="text-sm text-gray-400">
+    Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} producto{{ paginator.count|pluralize }}
+  </p>
+  <div class="flex items-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if almacen_id %}&almacen={{ almacen_id }}{% endif %}" class="btn-secondary">Anterior</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if almacen_id %}&almacen={{ almacen_id }}{% endif %}" class="btn-secondary">Siguiente</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock main_content %}
