@@ -1,10 +1,11 @@
 from django import forms
+from django.db.models import Case, IntegerField, Value, When
 from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from apps.core.forms import BaseModelForm
 from .models import (
     Producto, Categoria, Subcategoria, Marca, Linea, Clase, Almacen, PaqueteComponente,
-    PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
+    PRECIO_POSICIONES, PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
 )
 
 
@@ -173,6 +174,31 @@ class ProductoPrecioBaseFormSet(BaseInlineFormSet):
     de formulario (solo a nivel de base de datos) — sin este clean(), un
     duplicado pasaría is_valid() y tronaría hasta el .save() con un
     IntegrityError crudo."""
+
+    def get_queryset(self):
+        # ProductoPrecio.Meta.ordering solo ordena por lista_precio__orden:
+        # una fila general y sus overrides por sucursal comparten la misma
+        # lista_precio, así que entre ellas el orden queda indefinido. Se
+        # ordena aquí con la misma posición "canónica" del sistema anterior
+        # (ver apps.products.models.PRECIO_POSICIONES): general, luego los
+        # overrides por sucursal en su orden fijo. Cualquier lista/override
+        # que no esté en esa tabla (un catálogo nuevo, por ejemplo) cae al
+        # final, ordenado por lo que ya define el modelo.
+        whens = []
+        for posicion, nombre_lista, nombre_almacen in PRECIO_POSICIONES:
+            condicion = {"lista_precio__nombre": nombre_lista}
+            if nombre_almacen is None:
+                condicion["almacen__isnull"] = True
+            else:
+                condicion["almacen__nombre"] = nombre_almacen
+            whens.append(When(**condicion, then=Value(posicion)))
+        orden_legado = Case(*whens, default=Value(99), output_field=IntegerField())
+        return (
+            super()
+            .get_queryset()
+            .annotate(orden_legado=orden_legado)
+            .order_by("orden_legado", "lista_precio__orden", "almacen__nombre", "pk")
+        )
 
     def clean(self):
         super().clean()

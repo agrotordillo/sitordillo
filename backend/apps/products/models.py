@@ -421,6 +421,31 @@ class ListaPrecio(BaseAbstractModel):
         return self.nombre.strip()
 
 
+# Orden "canónico" en el que el sistema anterior mostraba las listas de
+# precio de un producto: primero las 5 listas generales, luego los
+# overrides por sucursal en este orden fijo (no es alfabético ni se puede
+# derivar de ningún campo existente, es una convención de negocio).
+# (posición, nombre de la lista, nombre del almacén del override o None
+# para el precio general). Fuente única de verdad: la usan tanto
+# apps.products.management.commands.import_legacy_productos (para saber
+# qué overrides crear) como ProductoPrecioBaseFormSet (para ordenar la
+# pantalla de Precios de un producto igual que se veía en el sistema
+# anterior, en vez de un orden arbitrario cuando dos filas comparten la
+# misma lista de precios).
+LISTA_PRECIO_NOMBRES_GENERALES = ["PUBLICO", "MEDIO MAYOREO", "MAYOREO", "SUB DISTRIBUIDOR", "PROMOCION"]
+PRECIO_POSICIONES = [
+    (1, "PUBLICO", None),
+    (2, "MEDIO MAYOREO", None),
+    (3, "MAYOREO", None),
+    (4, "SUB DISTRIBUIDOR", None),
+    (5, "PROMOCION", None),
+    (6, "PUBLICO", "IQUINUAPA"),
+    (7, "PUBLICO", "HUIMANGUILLO"),
+    (8, "PUBLICO", "BODEGA SUR"),
+    (9, "MAYOREO", "BODEGA SUR"),
+]
+
+
 class Producto(BaseAbstractModel):
     class TipoProducto(models.TextChoices):
         PRODUCTO = "producto", "Producto"

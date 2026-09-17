@@ -66,8 +66,10 @@ from apps.products.models import (
     Categoria,
     Clase,
     Linea,
+    LISTA_PRECIO_NOMBRES_GENERALES,
     ListaPrecio,
     Marca,
+    PRECIO_POSICIONES,
     Producto,
     ProductoPrecio,
     UnidadMedida,
@@ -108,19 +110,11 @@ PRODUCTO_COLS = [
     "fecha_modificacion", "codigo_proveedor", "id_punto_entrega",
 ]
 
-# (posicion, nombre_lista, nombre_almacen_override_o_None)
-PRECIO_POSICIONES = [
-    (1, "PUBLICO", None),
-    (2, "MEDIO MAYOREO", None),
-    (3, "MAYOREO", None),
-    (4, "SUB DISTRIBUIDOR", None),
-    (5, "PROMOCION", None),
-    (6, "PUBLICO", "IQUINUAPA"),
-    (7, "PUBLICO", "HUIMANGUILLO"),
-    (8, "PUBLICO", "BODEGA SUR"),
-    (9, "MAYOREO", "BODEGA SUR"),
-]
-LISTA_NOMBRES = ["PUBLICO", "MEDIO MAYOREO", "MAYOREO", "SUB DISTRIBUIDOR", "PROMOCION"]
+# PRECIO_POSICIONES y LISTA_NOMBRES viven en apps.products.models (como
+# PRECIO_POSICIONES y LISTA_PRECIO_NOMBRES_GENERALES): es la misma
+# convención que usa ProductoPrecioBaseFormSet para ordenar la pantalla de
+# Precios de un producto, no tiene sentido tener dos copias.
+LISTA_NOMBRES = LISTA_PRECIO_NOMBRES_GENERALES
 
 MARCA_MERGE = {115: 114, 203: 140, 180: 173}
 
