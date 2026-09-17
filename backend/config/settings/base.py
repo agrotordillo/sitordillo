@@ -78,6 +78,7 @@ MIDDLEWARE = [
     'apps.core.middleware.CurrentUserMiddleware',
     'apps.accounts.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'apps.core.middleware.PermisoDenegadoMiddleware',
 
     'django.middleware.gzip.GZipMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

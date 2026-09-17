@@ -1,5 +1,9 @@
 import threading
 
+from django.core.exceptions import PermissionDenied
+
+from apps.core.views import permiso_denegado_view
+
 _hilo_local = threading.local()
 
 
@@ -36,3 +40,26 @@ class CurrentUserMiddleware:
             return self.get_response(request)
         finally:
             _hilo_local.user = None
+
+
+class PermisoDenegadoMiddleware:
+    """Convierte cualquier PermissionDenied -de
+    @permission_required(..., raise_exception=True), de
+    PermissionRequiredMixin, o de cualquier vista que la lance a mano- en
+    la página 403 con el mismo diseño del resto del sistema
+    (apps.core.views.permiso_denegado_view), en vez de la respuesta
+    genérica de Django. Va después de LoginRequiredMiddleware en
+    MIDDLEWARE (ver settings): a quien no está autenticado ese middleware
+    ya lo mandó a la pantalla de login antes de llegar aquí, así que un
+    403 real siempre es "sí eres alguien, pero no tienes este permiso"."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        if isinstance(exception, PermissionDenied):
+            return permiso_denegado_view(request, exception)
+        return None

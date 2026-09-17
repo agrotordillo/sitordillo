@@ -5,6 +5,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
 
+from apps.core.views import permiso_denegado_view
+
+# Respaldo: en circunstancias normales, PermisoDenegadoMiddleware
+# (apps.core.middleware) ya intercepta cualquier PermissionDenied antes de
+# que llegue aquí. handler403 solo entraría si por algún motivo la
+# excepción se lanzara fuera del alcance de ese middleware.
+handler403 = permiso_denegado_view
+
 urlpatterns = [
     # Autenticación y administración
     path("", include("apps.accounts.urls")),
