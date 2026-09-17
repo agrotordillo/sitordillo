@@ -50,12 +50,16 @@ class FacturamaClient:
         return resp.json()
 
     def obtener_pdf_base64(self, facturama_id, tipo="issued"):
+        # La respuesta es JSON -{"ContentEncoding":"base64","ContentType":
+        # "pdf","ContentLength":N,"Content":"<base64>"}-, no el base64 como
+        # texto plano: hay que extraer "Content", no decodificar el JSON
+        # completo (eso da "Incorrect padding" al hacer b64decode).
         resp = self._request("GET", f"/Cfdi/pdf/{tipo}/{facturama_id}")
-        return resp.text
+        return resp.json()["Content"]
 
     def obtener_xml_base64(self, facturama_id, tipo="issued"):
         resp = self._request("GET", f"/Cfdi/xml/{tipo}/{facturama_id}")
-        return resp.text
+        return resp.json()["Content"]
 
     def cancelar_cfdi(self, facturama_id, motivo="02", uuid_reemplazo=None, tipo="issued"):
         # NOTA: a diferencia de crear_cfdi (probado con éxito real), esta ruta

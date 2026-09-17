@@ -1,3 +1,4 @@
+import base64
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -152,6 +153,18 @@ def generar_factura(venta, uso_cfdi, metodo_pago, serie=None, observaciones=""):
 
 
 def timbrar_factura(factura):
+    # generar_factura() copia lugar_expedicion de Empresa.codigo_postal UNA
+    # sola vez, al crear el borrador. Si el primer intento de timbrado falla
+    # porque ese CP no coincide con lo registrado en Facturama y se corrige
+    # después en "Datos de la empresa", el reintento debe usar el valor ya
+    # corregido -no el que quedó congelado en la factura-. Una vez timbrada
+    # el CFDI es un documento legal ya emitido, así que no se toca.
+    if factura.estatus != Factura.Estatus.TIMBRADA:
+        empresa = Empresa.objects.first()
+        if empresa and factura.lugar_expedicion != empresa.codigo_postal:
+            factura.lugar_expedicion = empresa.codigo_postal
+            factura.save(update_fields=["lugar_expedicion", "updated_at", "updated_by"])
+
     payload = construir_payload_cfdi(factura)
     client = FacturamaClient()
     try:
@@ -177,6 +190,23 @@ def timbrar_factura(factura):
     factura.mensaje_error = ""
     factura.save()
     return factura, data
+
+
+def _validar_timbrada(factura):
+    if factura.estatus != Factura.Estatus.TIMBRADA or not factura.facturama_id:
+        raise ValueError("Esta factura todavía no está timbrada.")
+
+
+def obtener_pdf(factura):
+    _validar_timbrada(factura)
+    contenido_b64 = FacturamaClient().obtener_pdf_base64(factura.facturama_id)
+    return base64.b64decode(contenido_b64)
+
+
+def obtener_xml(factura):
+    _validar_timbrada(factura)
+    contenido_b64 = FacturamaClient().obtener_xml_base64(factura.facturama_id)
+    return base64.b64decode(contenido_b64)
 
 
 def cancelar_factura(factura, motivo="02", uuid_reemplazo=None):

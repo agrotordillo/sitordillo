@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView
 
@@ -11,7 +12,13 @@ from apps.ventas.models import Venta
 from apps.facturacion.facturama_client import FacturamaError
 from apps.facturacion.forms import GenerarFacturaForm
 from apps.facturacion.models import Factura
-from apps.facturacion.factura_service import cancelar_factura, generar_factura, timbrar_factura
+from apps.facturacion.factura_service import (
+    cancelar_factura,
+    generar_factura,
+    obtener_pdf,
+    obtener_xml,
+    timbrar_factura,
+)
 
 
 def _facturas_visibles(user):
@@ -116,3 +123,29 @@ def cancelar_factura_view(request, pk):
     except FacturamaError as e:
         messages.error(request, f"No se pudo cancelar la factura: {e}")
     return redirect("facturacion:factura-list")
+
+
+@permission_required("facturacion.view_factura", raise_exception=True)
+def factura_pdf_view(request, pk):
+    factura = get_object_or_404(_facturas_visibles(request.user), pk=pk)
+    try:
+        contenido = obtener_pdf(factura)
+    except (ValueError, FacturamaError) as e:
+        messages.error(request, f"No se pudo obtener el PDF: {e}")
+        return redirect("facturacion:factura-list")
+    response = HttpResponse(contenido, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{factura.serie}-{factura.numero_folio}.pdf"'
+    return response
+
+
+@permission_required("facturacion.view_factura", raise_exception=True)
+def factura_xml_view(request, pk):
+    factura = get_object_or_404(_facturas_visibles(request.user), pk=pk)
+    try:
+        contenido = obtener_xml(factura)
+    except (ValueError, FacturamaError) as e:
+        messages.error(request, f"No se pudo obtener el XML: {e}")
+        return redirect("facturacion:factura-list")
+    response = HttpResponse(contenido, content_type="application/xml")
+    response["Content-Disposition"] = f'attachment; filename="{factura.serie}-{factura.numero_folio}.xml"'
+    return response

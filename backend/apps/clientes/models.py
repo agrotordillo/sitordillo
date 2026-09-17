@@ -122,6 +122,15 @@ class Cliente(BaseAbstractModel):
         # entre varios clientes "público en general" sin RFC.
         self.rfc = (self.rfc or "").upper().strip() or None
 
+        # Facturama valida el nombre del receptor contra el registrado en el
+        # SAT para ese RFC, y esa validación es sensible a mayúsculas -las
+        # constancias de situación fiscal siempre están en mayúsculas-. Se
+        # normaliza aquí para no depender de cómo se haya capturado a mano;
+        # no corrige el orden de apellidos/nombre si no coincide con el SAT,
+        # eso sigue siendo responsabilidad de capturarlo tal como aparece en
+        # la constancia.
+        self.nombre_fiscal = (self.nombre_fiscal or "").strip().upper()
+
         campos_fiscales = [self.rfc, self.nombre_fiscal, self.regimen_fiscal_id, self.codigo_postal]
         if any(campos_fiscales) and not all(campos_fiscales):
             raise ValidationError(

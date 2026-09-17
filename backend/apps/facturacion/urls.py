@@ -5,6 +5,8 @@ from .views.empresa_views import empresa_config_view
 from .views.factura_views import (
     FacturaListView,
     cancelar_factura_view,
+    factura_pdf_view,
+    factura_xml_view,
     generar_factura_view,
     timbrar_factura_view,
 )
@@ -19,4 +21,6 @@ urlpatterns = [
     path("ventas/<int:venta_pk>/generar/", generar_factura_view, name="factura-generar"),
     path("<int:pk>/timbrar/", timbrar_factura_view, name="factura-timbrar"),
     path("<int:pk>/cancelar/", cancelar_factura_view, name="factura-cancelar"),
+    path("<int:pk>/pdf/", factura_pdf_view, name="factura-pdf"),
+    path("<int:pk>/xml/", factura_xml_view, name="factura-xml"),
 ]
