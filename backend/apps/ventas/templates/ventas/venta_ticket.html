@@ -96,7 +96,14 @@
   <div>Fecha: {{ venta.fecha_venta|date:"d/m/Y" }} &nbsp; Hora: {{ venta.fecha_venta|date:"H:i" }}</div>
   <div>Cliente: {{ venta.cliente.display_name }}</div>
   {% if venta.cliente.direccion %}<div class="muted">{{ venta.cliente.direccion }}</div>{% endif %}
+  {% if venta.pago_dividido %}
+  <div>Forma de pago (dividido):</div>
+  {% for pago in venta.pagos.all %}
+  <div class="muted">&nbsp;&nbsp;{{ pago.forma_pago.descripcion }}: ${{ pago.monto|moneda }}</div>
+  {% endfor %}
+  {% else %}
   <div>Forma de pago: {{ venta.forma_pago.descripcion }}</div>
+  {% endif %}
 
   <hr class="sep">
 

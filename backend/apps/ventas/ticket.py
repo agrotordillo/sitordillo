@@ -86,7 +86,12 @@ def construir_ticket(venta, empresa=None):
     if venta.cliente.direccion:
         for renglon in wrap(venta.cliente.direccion, ancho) or [venta.cliente.direccion]:
             partes.append(renglon + "\n")
-    partes.append(f"Forma de pago: {venta.forma_pago.descripcion}\n")
+    if venta.pago_dividido:
+        partes.append("Forma de pago (dividido):\n")
+        for pago in venta.pagos.all():
+            partes.append(_fila(f"  {pago.forma_pago.descripcion}", f"${moneda(pago.monto)}", ancho))
+    else:
+        partes.append(f"Forma de pago: {venta.forma_pago.descripcion}\n")
     partes.append(separador)
 
     for detalle in venta.detalles.all():

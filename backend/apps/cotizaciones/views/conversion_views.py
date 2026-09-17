@@ -90,6 +90,13 @@ def convertir_cotizacion_view(request, pk):
 
             if error_turno:
                 form.add_error(None, error_turno)
+            elif not form.cleaned_data.get("forma_pago"):
+                # VentaForm.forma_pago ya no es obligatorio a nivel de
+                # formulario -se puede dejar vacío cuando se divide el
+                # cobro (ver VentaCreateView)-, pero esta pantalla no
+                # ofrece esa opción: aquí sigue siendo obligatorio elegir
+                # una sola forma de pago.
+                form.add_error("forma_pago", "Indica la forma de pago.")
             elif not lineas:
                 form.add_error(None, "Agrega al menos un producto a la venta.")
             else:
@@ -110,7 +117,7 @@ def convertir_cotizacion_view(request, pk):
                             if error_credito:
                                 raise ValueError(error_credito)
                             procesar_lineas_venta(venta)
-                            if venta.forma_pago.clave == Venta.CLAVE_CREDITO:
+                            if venta.forma_pago and venta.forma_pago.clave == Venta.CLAVE_CREDITO:
                                 generar_cuenta_por_cobrar(venta)
                             cotizacion.venta = venta
                             cotizacion.estatus = Cotizacion.Estatus.CONVERTIDA

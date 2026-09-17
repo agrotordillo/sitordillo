@@ -107,7 +107,13 @@ def construir_payload_cfdi(factura):
         "Currency": factura.moneda,
         "ExpeditionPlace": factura.lugar_expedicion,
         "CfdiType": "I",
-        "PaymentForm": venta.forma_pago.clave,
+        # "99 Por definir" (misma clave que ventas.Venta.CLAVE_CREDITO)
+        # cuando el cobro se dividió en varias formas de pago
+        # (venta.forma_pago vacío, ver Venta.pago_dividido): el SAT no
+        # tiene una clave de "pago mixto", así que se declara ésta -se
+        # sigue facturando por el total completo, el desglose real queda
+        # en el registro interno de la venta (VentaPago)-.
+        "PaymentForm": venta.forma_pago.clave if venta.forma_pago_id else "99",
         "PaymentMethod": factura.metodo_pago.clave,
         "Exportation": "01",
         "Receiver": {

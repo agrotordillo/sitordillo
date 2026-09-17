@@ -4,25 +4,50 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BaseModelForm
 from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.clientes.models import Cliente
+from apps.fiscal.models import FormaPago
+from apps.pagos.forms import FormaPagoSelect
 from apps.products.models import Almacen, Producto
-from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle
+from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle, VentaPago
 
 
 class VentaForm(BaseModelForm):
+    # No es un campo de Venta: es el toggle que decide si el cobro se
+    # captura con una sola forma de pago (forma_pago) o dividido en varias
+    # (ver VentaPagoFormSet); VentaCreateView.form_valid() lo lee de
+    # cleaned_data y decide cuál de las dos guardar -nunca ambas-.
+    pago_dividido = forms.BooleanField(required=False, label="Dividir el cobro en varias formas de pago")
+
     class Meta:
         model = Venta
         # fecha_venta no se captura: toma el default del modelo
         # (timezone.now al momento de guardar).
-        fields = ["cliente", "almacen", "forma_pago", "observaciones"]
+        fields = [
+            "cliente", "almacen", "forma_pago", "referencia_pago", "efectivo_recibido", "observaciones",
+        ]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
             # cliente-search.js): con el catálogo completo de clientes un
             # <select> deja de ser práctico.
             "cliente": forms.HiddenInput,
+            # data-clave en cada <option> (ver FormaPagoSelect) es lo que
+            # usa venta-cambio.js para saber, sin ir al servidor, cuándo
+            # forma_pago es Efectivo y mostrar el campo de "recibido".
+            "forma_pago": FormaPagoSelect,
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # No siempre es obligatorio: si se dividió el cobro, forma_pago se
+        # deja vacío a propósito (ver Venta.pago_dividido). Cuál de los dos
+        # casos aplica se valida en VentaCreateView.form_valid(), no aquí.
+        self.fields["forma_pago"].required = False
+        # x-model en vez de un listener aparte: sincroniza el checkbox con
+        # el x-data local del bloque "Forma de pago" en venta_form.html
+        # (para mostrar/ocultar el select), independiente del x-data del
+        # bloque "Pago dividido" -que escucha este mismo checkbox por su
+        # cuenta, ver venta-pago-dividido.js-.
+        self.fields["pago_dividido"].widget.attrs["x-model"] = "dividido"
+        self.fields["efectivo_recibido"].widget.attrs.update({"step": "0.01", "min": "0"})
         self.fields["cliente"].queryset = Cliente.objects.filter(is_active=True)
         # Venta nueva sin cliente explícito: precarga "Público en general"
         # (lo más común en mostrador); se puede cambiar buscando otro
@@ -97,6 +122,48 @@ VentaDetalleFormSet = inlineformset_factory(
     VentaDetalle,
     form=VentaDetalleForm,
     extra=1,
+    can_delete=True,
+)
+
+
+class VentaPagoForm(BaseModelForm):
+    class Meta:
+        model = VentaPago
+        fields = ["forma_pago", "monto", "referencia", "recibido"]
+        widgets = {
+            # Mismo widget que VentaForm.forma_pago: expone data-clave por
+            # <option> para que venta-pago-dividido.js muestre "recibido"
+            # solo en la fila que quedó en Efectivo.
+            "forma_pago": FormaPagoSelect,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # "Por definir" (crédito) no es una forma de pago real que se pueda
+        # combinar en un cobro dividido: un pago dividido siempre es dinero
+        # ya recibido de inmediato, nunca a crédito (ver
+        # ventas.services.validar_venta_a_credito).
+        self.fields["forma_pago"].queryset = FormaPago.objects.exclude(clave=Venta.CLAVE_CREDITO)
+        self.fields["forma_pago"].widget.attrs["class"] = (
+            self.fields["forma_pago"].widget.attrs.get("class", "") + " fs-forma-pago-dividido"
+        ).strip()
+        self.fields["monto"].widget.attrs.update({
+            "class": (self.fields["monto"].widget.attrs.get("class", "") + " fs-monto-pago").strip(),
+            "step": "0.01",
+            "min": "0.01",
+        })
+        self.fields["recibido"].widget.attrs.update({
+            "class": (self.fields["recibido"].widget.attrs.get("class", "") + " fs-recibido-pago").strip(),
+            "step": "0.01",
+            "min": "0",
+        })
+
+
+VentaPagoFormSet = inlineformset_factory(
+    Venta,
+    VentaPago,
+    form=VentaPagoForm,
+    extra=2,
     can_delete=True,
 )
 

@@ -14,9 +14,11 @@ def validar_venta_a_credito(cliente, forma_pago, monto):
     definir", ver Venta.CLAVE_CREDITO), valida que el cliente tenga
     crédito autorizado y que esta venta no lo deje por encima de su
     límite. No aplica a ninguna otra forma de pago -esas se asumen
-    cobradas de inmediato-. Devuelve un mensaje de error, o None si no
+    cobradas de inmediato-, ni cuando el cobro se dividió en varias formas
+    de pago (forma_pago None: un pago dividido siempre es dinero ya
+    recibido, nunca a crédito). Devuelve un mensaje de error, o None si no
     aplica o todo está en orden."""
-    if forma_pago.clave != "99":
+    if forma_pago is None or forma_pago.clave != "99":
         return None
     if not cliente.tiene_credito:
         return (
@@ -25,6 +27,32 @@ def validar_venta_a_credito(cliente, forma_pago, monto):
         )
     from apps.cobros.services import validar_limite_credito_cliente
     return validar_limite_credito_cliente(cliente, monto)
+
+
+def validar_pago_dividido(total, montos):
+    """Valida que el desglose de un cobro dividido en varias formas de
+    pago cuadre EXACTO contra el total de la venta -no se ajusta ni se
+    promedia nada: si no cuadra, se regresa el error para que el cajero
+    corrija las cantidades a mano-. Mismo criterio que
+    gastos.services.validar_distribucion para un reparto exacto."""
+    errores = []
+    montos = [m for m in montos if m is not None]
+    if not montos:
+        errores.append("Agrega al menos una forma de pago para dividir el cobro.")
+        return errores
+
+    suma = sum(montos, Decimal("0.00"))
+    if suma != total:
+        diferencia = total - suma
+        if diferencia > 0:
+            detalle = f"faltan ${diferencia} por cobrar"
+        else:
+            detalle = f"sobran ${-diferencia} asignados de más"
+        errores.append(
+            f"La suma de las formas de pago (${suma}) debe ser exactamente igual al total de la venta "
+            f"(${total}): {detalle}."
+        )
+    return errores
 
 
 def validar_turno_abierto(almacen, usuario):

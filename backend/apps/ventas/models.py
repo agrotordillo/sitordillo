@@ -11,6 +11,10 @@ class Venta(BaseAbstractModel):
     # se va a cobrar. Ver ventas.services.validar_venta_a_credito y
     # cobros.services.generar_cuenta_por_cobrar, que se disparan con ella.
     CLAVE_CREDITO = "99"
+    # Clave SAT c_FormaPago "01 - Efectivo": la única forma de pago para la
+    # que tiene sentido capturar cuánto entregó el cliente y calcular
+    # cambio (ver Venta.efectivo_recibido/cambio y VentaPago.recibido/cambio).
+    CLAVE_EFECTIVO = "01"
 
     cliente = models.ForeignKey(
         "clientes.Cliente",
@@ -27,8 +31,11 @@ class Venta(BaseAbstractModel):
     forma_pago = models.ForeignKey(
         "fiscal.FormaPago",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="ventas",
         verbose_name="Forma de pago",
+        help_text="Vacío cuando el cobro se dividió en varias formas de pago (ver Venta.pagos).",
     )
     turno = models.ForeignKey(
         "products.Turno",
@@ -41,6 +48,20 @@ class Venta(BaseAbstractModel):
         "(ver ventas.services.obtener_turno_abierto). No lo elige el usuario.",
     )
     fecha_venta = models.DateTimeField(default=timezone.now, verbose_name="Fecha de venta")
+    referencia_pago = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Referencia de pago",
+        help_text="Solo cuando el cobro no se dividió (ver VentaPago.referencia para el caso dividido).",
+    )
+    efectivo_recibido = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Efectivo recibido",
+        help_text="Solo cuando forma_pago es Efectivo; de aquí sale Venta.cambio.",
+    )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
     veces_impreso = models.PositiveIntegerField(
         default=0,
@@ -82,6 +103,31 @@ class Venta(BaseAbstractModel):
         return self.subtotal
 
     @property
+    def pago_dividido(self):
+        """El cobro se dividió en varias formas de pago (ver VentaPago) en
+        vez de una sola -forma_pago queda vacío en ese caso, ver
+        VentaCreateView.form_valid()-."""
+        return self.forma_pago_id is None
+
+    @property
+    def forma_pago_texto(self):
+        """Representación de una línea para ticket/CFDI: la descripción de
+        `forma_pago` si el cobro fue con una sola, o el desglose de
+        VentaPago separado por coma si se dividió."""
+        if not self.pago_dividido:
+            return self.forma_pago.descripcion
+        return ", ".join(f"{p.forma_pago.descripcion} ${p.monto}" for p in self.pagos.all())
+
+    @property
+    def cambio(self):
+        """None cuando no aplica (no es efectivo, o todavía no se captura
+        cuánto entregó el cliente); nunca negativo -eso ya lo bloquea
+        VentaCreateView.form_valid(), que exige efectivo_recibido >= total-."""
+        if self.efectivo_recibido is None:
+            return None
+        return (self.efectivo_recibido - self.total).quantize(Decimal("0.01"))
+
+    @property
     def importe_sin_impuesto(self):
         """Suma del desglose informativo de cada línea (ver
         VentaDetalle.importe_sin_impuesto) para el ticket de venta -no
@@ -115,6 +161,85 @@ class Venta(BaseAbstractModel):
         super().clean()
         if self.almacen_id and self.almacen.tipo != self.almacen.Tipo.SUCURSAL:
             raise ValidationError({"almacen": "Las ventas se registran desde una sucursal, no desde el CEDIS."})
+        if self.efectivo_recibido is not None and (
+            self.forma_pago_id is None or self.forma_pago.clave != self.CLAVE_EFECTIVO
+        ):
+            raise ValidationError(
+                {"efectivo_recibido": "Solo se captura cuando la forma de pago es Efectivo."}
+            )
+
+
+class VentaPago(BaseAbstractModel):
+    """Una línea del desglose cuando el cobro de una venta se dividió en
+    varias formas de pago (ej. parte en efectivo, parte con tarjeta, parte
+    por transferencia). Solo existen filas aquí cuando Venta.forma_pago
+    quedó vacío (ver Venta.pago_dividido); la suma de `monto` de todas las
+    líneas de una venta debe ser exactamente igual a Venta.total -se
+    valida al guardar en VentaCreateView, no aquí, porque el total real
+    solo se conoce hasta que los detalles ya están guardados con su precio
+    resuelto-."""
+
+    venta = models.ForeignKey(
+        Venta,
+        on_delete=models.CASCADE,
+        related_name="pagos",
+        verbose_name="Venta",
+    )
+    forma_pago = models.ForeignKey(
+        "fiscal.FormaPago",
+        on_delete=models.PROTECT,
+        related_name="pagos_venta",
+        verbose_name="Forma de pago",
+    )
+    monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto")
+    referencia = models.CharField(max_length=50, blank=True, verbose_name="Referencia de pago")
+    recibido = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Efectivo recibido",
+        help_text="Solo cuando forma_pago es Efectivo; de aquí sale VentaPago.cambio.",
+    )
+
+    class Meta:
+        verbose_name = "Pago de venta"
+        verbose_name_plural = "Pagos de venta"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(monto__gt=0), name="vtp_monto_positivo"),
+        ]
+        indexes = [
+            models.Index(fields=["venta"]),
+        ]
+
+    def __str__(self):
+        return f"{self.forma_pago.descripcion}: ${self.monto}"
+
+    def get_folio_prefix(self):
+        return "VTP"
+
+    def get_slug_source(self):
+        return f"{self.venta_id}-{self.forma_pago_id}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def cambio(self):
+        if self.recibido is None:
+            return None
+        return (self.recibido - self.monto).quantize(Decimal("0.01"))
+
+    def clean(self):
+        super().clean()
+        if self.recibido is not None:
+            if self.forma_pago_id is None or self.forma_pago.clave != Venta.CLAVE_EFECTIVO:
+                raise ValidationError(
+                    {"recibido": "Solo se captura cuando la forma de pago es Efectivo."}
+                )
+            if self.monto is not None and self.recibido < self.monto:
+                raise ValidationError({"recibido": "Lo recibido no puede ser menor que el monto asignado."})
 
 
 class VentaDetalle(BaseAbstractModel):

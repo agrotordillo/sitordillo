@@ -54,10 +54,24 @@
         {% else %}
         {{ form.almacen }}
         {% endif %}
-        <div>
+        <div x-data="{ dividido: {{ form.pago_dividido.value|yesno:'true,false' }} }">
           <label for="{{ form.forma_pago.id_for_label }}" class="label">Forma de pago</label>
-          {{ form.forma_pago }}
+          <div x-show="!dividido" x-cloak>{{ form.forma_pago }}</div>
           {% if form.forma_pago.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.forma_pago.errors.0 }}</p>{% endif %}
+          <label class="mt-1.5 inline-flex items-center gap-1.5 text-xs text-gray-500">
+            {{ form.pago_dividido }}
+            Dividir el cobro en varias formas de pago
+          </label>
+          <div x-show="!dividido" x-cloak class="mt-4">
+            <label for="{{ form.referencia_pago.id_for_label }}" class="label">Referencia de pago <span class="text-gray-400 font-normal">(opcional)</span></label>
+            {{ form.referencia_pago }}
+          </div>
+          <div id="venta-campo-efectivo" x-show="!dividido" x-cloak class="hidden mt-4">
+            <label for="{{ form.efectivo_recibido.id_for_label }}" class="label">Efectivo recibido</label>
+            {{ form.efectivo_recibido }}
+            {% if form.efectivo_recibido.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.efectivo_recibido.errors.0 }}</p>{% endif %}
+            <p class="mt-1.5 text-sm">Cambio: <span id="venta-cambio-simple" class="font-semibold text-red-600">$0.00</span></p>
+          </div>
         </div>
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
@@ -107,10 +121,68 @@
 
       <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
         <div class="text-sm text-gray-600">
-          Total: <span class="font-semibold text-gray-800" x-text="total"></span>
+          Total: <span id="venta-total-display" class="font-semibold text-gray-800" x-text="total"></span>
         </div>
       </div>
       <p class="mt-1 text-xs text-gray-400 text-right">Sin impuestos desglosados; se calculan en la fase de facturación.</p>
+    </div>
+
+    <div
+      x-data="pagoDivididoForm({
+        totalFormsSelector: '#id_pagos-TOTAL_FORMS',
+        totalVentaSelector: '#venta-total-display',
+        divididoSelector: '#{{ form.pago_dividido.id_for_label }}',
+      })"
+      x-show="dividido" x-cloak
+    >
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Pago dividido</h3>
+      <p class="text-xs text-gray-400 mb-3">Captura cuánto se cobró con cada forma de pago; la suma debe cuadrar exactamente con el total de la venta.</p>
+
+      {{ pagos_formset.management_form }}
+      {% if pagos_formset.non_form_errors %}
+      <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {% for error in pagos_formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Forma de pago</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Monto</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Referencia</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Efectivo recibido</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+            </tr>
+          </thead>
+          <tbody x-ref="rows" class="divide-y divide-gray-100">
+            {% for pago_form in pagos_formset %}
+            {% include "ventas/includes/_pago_row.html" with form=pago_form %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <template x-ref="emptyRow">{% include "ventas/includes/_pago_row.html" with form=pagos_formset.empty_form %}</template>
+
+      <button type="button" class="btn-secondary mt-3" @click="addRow()">
+        <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+        </svg>
+        Agregar forma de pago
+      </button>
+
+      <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
+        <div class="text-sm text-right">
+          <p class="text-gray-600">Asignado: <span class="font-semibold text-gray-800" x-text="formatMoney(totalAsignado)"></span></p>
+          <p class="mt-0.5" :class="restante === 0 ? 'text-green-600' : 'text-amber-600'">
+            <span x-show="restante > 0">Falta por cobrar: <span x-text="formatMoney(restante)"></span></span>
+            <span x-show="restante < 0">Asignado de más: <span x-text="formatMoney(restante * -1)"></span></span>
+            <span x-show="restante === 0">Cuadra exacto con el total</span>
+          </p>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -125,5 +197,7 @@
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/venta-cambio.js' %}"></script>
+<script src="{% static 'js/modules/forms/venta-pago-dividido.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

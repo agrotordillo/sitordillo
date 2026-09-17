@@ -11,11 +11,12 @@ from apps.core.scoping import almacenes_visibles
 from apps.products.models import Turno
 from apps.products.services import fijar_precios_autorizados
 from apps.ventas.models import Venta, VentaDetalle
-from apps.ventas.forms import VentaForm, VentaDetalleFormSet
+from apps.ventas.forms import VentaForm, VentaDetalleFormSet, VentaPagoFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
     obtener_turno_abierto,
     procesar_lineas_venta,
+    validar_pago_dividido,
     validar_stock_disponible,
     validar_turno_abierto,
     validar_venta_a_credito,
@@ -57,7 +58,7 @@ class VentaTicketView(PermissionRequiredMixin, DetailView):
                 "cotizacion_origen",
                 "cotizacion_origen__created_by",
             )
-            .prefetch_related("detalles__producto__unidad_medida")
+            .prefetch_related("detalles__producto__unidad_medida", "pagos__forma_pago")
         )
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
@@ -124,6 +125,11 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
                 data["formset"] = VentaDetalleFormSet(self.request.POST, instance=self.object, prefix="detalles")
             else:
                 data["formset"] = VentaDetalleFormSet(instance=self.object, prefix="detalles")
+        if "pagos_formset" not in data:
+            if self.request.method == "POST":
+                data["pagos_formset"] = VentaPagoFormSet(self.request.POST, instance=self.object, prefix="pagos")
+            else:
+                data["pagos_formset"] = VentaPagoFormSet(instance=self.object, prefix="pagos")
 
         # Aviso previo (no bloquea cargar el formulario, solo informa antes
         # de que el cajero llene todo y se tope con el error hasta enviar):
@@ -142,16 +148,31 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
 
     def form_valid(self, form):
         formset = VentaDetalleFormSet(self.request.POST, instance=form.instance, prefix="detalles")
+        pagos_formset = VentaPagoFormSet(self.request.POST, instance=form.instance, prefix="pagos")
         if not formset.is_valid():
-            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         almacen = form.cleaned_data["almacen"]
 
         error_turno = validar_turno_abierto(almacen, self.request.user)
         if error_turno:
             form.add_error(None, error_turno)
-            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
         form.instance.turno = obtener_turno_abierto(almacen, self.request.user)
+
+        # El cobro se captura con una sola forma de pago, o dividido en
+        # varias (ver Venta.pago_dividido) -nunca ambas-: si se dividió,
+        # forma_pago se limpia aquí sin importar qué haya llegado en ese
+        # campo del POST (el HTML lo oculta cuando el checkbox está
+        # activo, pero eso tampoco es la garantía real).
+        pago_dividido = form.cleaned_data.get("pago_dividido")
+        if pago_dividido:
+            form.instance.forma_pago = None
+            if not pagos_formset.is_valid():
+                return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
+        elif not form.cleaned_data.get("forma_pago"):
+            form.add_error("forma_pago", 'Indica la forma de pago, o marca "Dividir el cobro".')
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         # El precio de una venta no lo captura el cajero -ni tampoco quien
         # levanta una cotización, misma regla-: se resuelve aquí con la
@@ -170,33 +191,54 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
         ]
         if not lineas:
             form.add_error(None, "Agrega al menos un producto a la venta.")
-            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         errores_stock = validar_stock_disponible(almacen, lineas)
         if errores_stock:
             for error in errores_stock:
                 form.add_error(None, error)
-            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         try:
             with transaction.atomic():
                 self.object = form.save()
                 formset.instance = self.object
                 formset.save()
-                # La venta ya tiene su total real (self.object.total, suma
-                # de los detalles recién guardados): aquí, no antes, es
-                # donde se puede validar el crédito con el monto exacto.
+
+                if pago_dividido:
+                    # El total real (self.object.total) solo se conoce
+                    # hasta aquí, con los detalles ya guardados y su
+                    # precio resuelto -por eso el cobro dividido se valida
+                    # después de formset.save(), no antes-.
+                    montos = [
+                        cd["monto"]
+                        for f in pagos_formset
+                        if (cd := f.cleaned_data) and cd.get("forma_pago") and not cd.get("DELETE")
+                    ]
+                    errores_pago = validar_pago_dividido(self.object.total, montos)
+                    if errores_pago:
+                        raise ValueError(" ".join(errores_pago))
+                    pagos_formset.instance = self.object
+                    pagos_formset.save()
+                elif self.object.efectivo_recibido is not None and self.object.efectivo_recibido < self.object.total:
+                    # Igual que arriba: self.object.total (la suma de los
+                    # detalles ya guardados) solo se conoce hasta aquí, así
+                    # que esta comparación no puede vivir en Venta.clean().
+                    raise ValueError("El efectivo recibido no puede ser menor que el total de la venta.")
+
+                # La venta ya tiene su total real: aquí, no antes, es donde
+                # se puede validar el crédito con el monto exacto.
                 error_credito = validar_venta_a_credito(
                     self.object.cliente, self.object.forma_pago, self.object.total
                 )
                 if error_credito:
                     raise ValueError(error_credito)
                 procesar_lineas_venta(self.object)
-                if self.object.forma_pago.clave == Venta.CLAVE_CREDITO:
+                if self.object.forma_pago and self.object.forma_pago.clave == Venta.CLAVE_CREDITO:
                     generar_cuenta_por_cobrar(self.object)
         except ValueError as e:
             form.add_error(None, str(e))
-            return self.render_to_response(self.get_context_data(form=form, formset=formset))
+            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
