@@ -23,8 +23,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // posicionarPanel) para no quedar recortado por el overflow-x-auto de la
   // tabla que lo contiene; al no seguir el flujo normal, hay que ocultarlo
   // si la página se desplaza o cambia de tamaño, para que no quede
-  // flotando en un lugar que ya no corresponde al campo.
-  window.addEventListener("scroll", () => ocultarTodos(), true);
+  // flotando en un lugar que ya no corresponde al campo. Se usa la fase de
+  // captura porque el scroll no hace bubbling -es la única forma de
+  // enterarse desde window-, pero por eso también "escucha" cuando se
+  // hace scroll DENTRO del panel de resultados (que es scrolleable,
+  // overflow-y-auto, cuando hay varias coincidencias): sin este filtro,
+  // intentar bajar la lista con el mouse cerraba el autocomplete a medio
+  // scroll. Si el scroll viene del propio panel, se ignora.
+  window.addEventListener("scroll", (event) => {
+    if (event.target.closest?.(".producto-search-results")) return;
+    ocultarTodos();
+  }, true);
   window.addEventListener("resize", () => ocultarTodos());
 
   function ocultarTodos(exceptoSi) {
