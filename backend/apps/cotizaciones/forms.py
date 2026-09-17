@@ -4,7 +4,7 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BaseModelForm
 from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.clientes.models import Cliente
-from apps.products.models import Almacen, ListaPrecio, Producto
+from apps.products.models import Almacen, Producto
 from .models import Cotizacion, CotizacionDetalle
 
 
@@ -52,9 +52,19 @@ class CotizacionForm(BaseModelForm):
 
 
 class CotizacionDetalleForm(BaseModelForm):
+    """descuento, lista_precio y estrategia_salida NO son campos del
+    formulario a propósito: quien levanta una cotización tampoco manipula
+    el precio (misma regla que en Ventas, ver VentaDetalleForm). La lista
+    de precios (la del cliente si tiene una propia, si no "PUBLICO") y la
+    estrategia de salida (siempre FIFO) las resuelve
+    CotizacionCreateView/UpdateView.form_valid() al guardar, y
+    precio_unitario -aunque sigue en el formulario, porque su valor real
+    se pinta ahí- se sobreescribe ahí también, sin confiar en lo que haya
+    llegado en el POST."""
+
     class Meta:
         model = CotizacionDetalle
-        fields = ["producto", "cantidad", "precio_unitario", "descuento", "lista_precio", "estrategia_salida"]
+        fields = ["producto", "cantidad", "precio_unitario"]
         widgets = {
             # Mismo patrón de búsqueda por texto que en Ventas (ver
             # producto-search.js): el <select> no es viable con ~300 mil
@@ -74,24 +84,9 @@ class CotizacionDetalleForm(BaseModelForm):
             "class": (self.fields["precio_unitario"].widget.attrs.get("class", "") + " fs-precio").strip(),
             "step": "0.01",
             "min": "0",
+            "readonly": "readonly",
+            "tabindex": "-1",
         })
-        self.fields["descuento"].widget.attrs.update({
-            "class": (self.fields["descuento"].widget.attrs.get("class", "") + " fs-descuento").strip(),
-            "step": "0.01",
-            "min": "0",
-            "max": "100",
-        })
-        self.fields["lista_precio"].queryset = ListaPrecio.objects.filter(is_active=True)
-        self.fields["lista_precio"].widget.attrs.update({
-            "class": (self.fields["lista_precio"].widget.attrs.get("class", "") + " fs-lista-precio").strip(),
-        })
-        # Casi toda sucursal cotiza solo en PUBLICO -salvo Bodega Sur, la
-        # única que de verdad maneja mayoreo/medio mayoreo/sub distribuidor-,
-        # así que se precarga sola y el cajero normal ni la nota.
-        if not self.instance.pk and "lista_precio" not in self.initial:
-            publico = ListaPrecio.objects.filter(nombre="PUBLICO").first()
-            if publico is not None:
-                self.initial["lista_precio"] = publico.pk
 
 
 CotizacionDetalleFormSet = inlineformset_factory(

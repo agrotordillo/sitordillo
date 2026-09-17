@@ -30,12 +30,8 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="{{ form.cliente.id_for_label }}" class="label">Cliente</label>
-          <div class="flex items-center gap-2">
-            {% include "clientes/includes/_cliente_search_field.html" %}
-            <a href="{% url 'clientes:cliente-create' %}" target="_blank" rel="noopener" class="btn-icon-outline" aria-label="Crear nuevo cliente" title="Crear nuevo cliente (se abre en una pestaña nueva)">
-              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
-            </a>
-          </div>
+          {% include "clientes/includes/_cliente_search_field.html" %}
+          <p class="mt-1 text-xs text-gray-400">Solo se puede elegir un cliente ya registrado; el alta y los datos fiscales/precio preferencial se dan de alta en Administración.</p>
         </div>
         {% if not form.almacen.is_hidden %}
         <div>
@@ -51,7 +47,7 @@
 
     <div>
       <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
-      <p class="text-xs text-gray-400 mb-3">Esta cotización no descuenta inventario. Al guardar se genera un folio que el cliente puede llevar a caja para convertirla en venta.</p>
+      <p class="text-xs text-gray-400 mb-3">El precio se toma de la lista de precios del cliente (o "PUBLICO" si no tiene una propia) y no se puede modificar aquí. Esta cotización no descuenta inventario; al guardar se genera un folio que el cliente puede llevar a caja para convertirla en venta.</p>
 
       {{ formset.management_form }}
       {% if formset.non_form_errors %}
@@ -67,9 +63,6 @@
               <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
               <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad</th>
               <th scope="col" class="px-3 py-2.5 font-semibold">Precio</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Desc. %</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Lista</th>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Estrategia</th>
               <th scope="col" class="px-3 py-2.5 font-semibold text-right">Subtotal</th>
               <th scope="col" class="px-3 py-2.5 font-semibold"></th>
             </tr>

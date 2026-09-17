@@ -3,6 +3,8 @@
   class="producto-search relative"
   data-producto-search-url="{% url 'api:producto-buscar' %}"
   {% if almacen_field_id %}data-producto-search-almacen-field="{{ almacen_field_id }}"{% endif %}
+  {% if cliente_field_id %}data-producto-search-cliente-field="{{ cliente_field_id }}"{% endif %}
+  {% if precio_almacen_field_id %}data-producto-search-precio-almacen-field="{{ precio_almacen_field_id }}"{% endif %}
   data-producto-search-precio-campo="{{ precio_campo|default:'costo' }}"
 >
   {{ form.producto }}

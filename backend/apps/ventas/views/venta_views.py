@@ -9,7 +9,8 @@ from django.views.generic.edit import CreateView
 
 from apps.core.scoping import almacenes_visibles
 from apps.products.models import Turno
-from apps.ventas.models import Venta
+from apps.products.services import fijar_precios_autorizados
+from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.forms import VentaForm, VentaDetalleFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
@@ -152,8 +153,18 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
         form.instance.turno = obtener_turno_abierto(almacen, self.request.user)
 
+        # El precio de una venta no lo captura el cajero -ni tampoco quien
+        # levanta una cotización, misma regla-: se resuelve aquí con la
+        # lista de precios del cliente -su "precio preferencial", o
+        # "PUBLICO" si no tiene una propia- y la sucursal de la venta,
+        # ignorando cualquier precio_unitario que haya llegado en el POST
+        # -el campo es readonly en el HTML, pero eso no basta como
+        # garantía-. Igual se fija la estrategia de salida siempre en FIFO
+        # y el descuento en 0 (ver fijar_precios_autorizados).
+        fijar_precios_autorizados(formset, form.cleaned_data.get("cliente"), almacen, VentaDetalle.Estrategia.FIFO)
+
         lineas = [
-            (cd["producto"], cd["cantidad"], cd["estrategia_salida"])
+            (cd["producto"], cd["cantidad"], VentaDetalle.Estrategia.FIFO)
             for f in formset
             if (cd := f.cleaned_data) and cd.get("producto") and not cd.get("DELETE")
         ]

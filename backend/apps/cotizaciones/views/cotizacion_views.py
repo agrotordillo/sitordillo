@@ -7,8 +7,9 @@ from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
 from apps.core.scoping import almacenes_visibles
-from apps.cotizaciones.models import Cotizacion
+from apps.cotizaciones.models import Cotizacion, CotizacionDetalle
 from apps.cotizaciones.forms import CotizacionForm, CotizacionDetalleFormSet
+from apps.products.services import fijar_precios_autorizados
 
 
 class CotizacionListView(PermissionRequiredMixin, ListView):
@@ -53,6 +54,15 @@ class CotizacionCreateView(PermissionRequiredMixin, CreateView):
         formset = CotizacionDetalleFormSet(self.request.POST, instance=form.instance, prefix="detalles")
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
+
+        # El precio de una cotización tampoco lo captura mostrador (misma
+        # regla que en Ventas): se resuelve con la lista de precios del
+        # cliente y la sucursal de la cotización, ignorando lo que haya
+        # llegado en el POST.
+        fijar_precios_autorizados(
+            formset, form.cleaned_data.get("cliente"), form.cleaned_data.get("almacen"),
+            CotizacionDetalle.Estrategia.FIFO,
+        )
 
         lineas = [
             cd for f in formset
@@ -119,6 +129,15 @@ class CotizacionUpdateView(PermissionRequiredMixin, UpdateView):
         formset = CotizacionDetalleFormSet(self.request.POST, instance=form.instance, prefix="detalles")
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
+
+        # El precio de una cotización tampoco lo captura mostrador (misma
+        # regla que en Ventas): se resuelve con la lista de precios del
+        # cliente y la sucursal de la cotización, ignorando lo que haya
+        # llegado en el POST.
+        fijar_precios_autorizados(
+            formset, form.cleaned_data.get("cliente"), form.cleaned_data.get("almacen"),
+            CotizacionDetalle.Estrategia.FIFO,
+        )
 
         lineas = [
             cd for f in formset

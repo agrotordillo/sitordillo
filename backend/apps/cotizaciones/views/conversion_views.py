@@ -9,6 +9,7 @@ from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.forms import BuscarFolioForm
 from apps.cotizaciones.models import Cotizacion
 from apps.products.models import Turno
+from apps.products.services import fijar_precios_autorizados
 from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.services import (
@@ -70,8 +71,19 @@ def convertir_cotizacion_view(request, pk):
         if form.is_valid() and formset.is_valid():
             almacen = form.cleaned_data["almacen"]
             error_turno = validar_turno_abierto(almacen, request.user)
+
+            # El precio no lo decide quien está en caja, ni siquiera al
+            # convertir una cotización ya cotizada -se vuelve a resolver
+            # aquí con el cliente y la sucursal de la venta (que caja
+            # podría haber cambiado respecto a la cotización original),
+            # nunca se copia el precio_unitario que trae el formset
+            # precargado desde la cotización-.
+            fijar_precios_autorizados(
+                formset, form.cleaned_data.get("cliente"), almacen, VentaDetalle.Estrategia.FIFO,
+            )
+
             lineas = [
-                (cd["producto"], cd["cantidad"], cd["estrategia_salida"])
+                (cd["producto"], cd["cantidad"], VentaDetalle.Estrategia.FIFO)
                 for f in formset
                 if (cd := f.cleaned_data) and cd.get("producto") and not cd.get("DELETE")
             ]
@@ -124,13 +136,14 @@ def convertir_cotizacion_view(request, pk):
             user=request.user,
         )
         initial_detalles = [
+            # precio_unitario se precarga solo para que la pantalla muestre
+            # algo antes de guardar (lo que se cotizó); al confirmar la
+            # venta, fijar_precios_autorizados() lo vuelve a resolver de
+            # cero y este valor precargado se descarta.
             {
                 "producto": d.producto_id,
                 "cantidad": d.cantidad,
                 "precio_unitario": d.precio_unitario,
-                "descuento": d.descuento,
-                "lista_precio": d.lista_precio_id,
-                "estrategia_salida": d.estrategia_salida,
             }
             for d in detalles
         ]

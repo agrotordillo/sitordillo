@@ -57,9 +57,24 @@ document.addEventListener("DOMContentLoaded", () => {
     resultsEl.classList.remove("hidden");
   }
 
+  function limpiarPrecio(hiddenInput) {
+    // Al quitar el producto elegido, el precio que estaba puesto ya no
+    // corresponde a nada: se limpia en vez de dejarlo "pegado" (bug: se
+    // buscaba un producto, se borraba el campo de búsqueda, y el precio
+    // de ese producto se quedaba como si siguiera aplicando).
+    const row = hiddenInput?.closest(".formset-row");
+    const precioInput = row?.querySelector(".fs-precio");
+    if (precioInput) {
+      precioInput.value = "";
+      precioInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+
   async function buscar(wrapper, input) {
     const url = wrapper.dataset.productoSearchUrl;
     const almacenFieldId = wrapper.dataset.productoSearchAlmacenField;
+    const clienteFieldId = wrapper.dataset.productoSearchClienteField;
+    const precioAlmacenFieldId = wrapper.dataset.productoSearchPrecioAlmacenField;
     const precioCampo = wrapper.dataset.productoSearchPrecioCampo || "costo";
     const resultsEl = wrapper.querySelector(".producto-search-results");
     const hiddenInput = wrapper.querySelector('input[type="hidden"]');
@@ -68,7 +83,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!q) {
       resultsEl.classList.add("hidden");
       resultsEl.innerHTML = "";
-      if (hiddenInput) hiddenInput.value = "";
+      if (hiddenInput) {
+        hiddenInput.value = "";
+        limpiarPrecio(hiddenInput);
+      }
       return;
     }
 
@@ -96,6 +114,14 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const params = new URLSearchParams({ q });
       if (almacenValue) params.set("almacen", almacenValue);
+      if (clienteFieldId) {
+        const clienteValue = document.getElementById(clienteFieldId)?.value;
+        if (clienteValue) params.set("cliente", clienteValue);
+      }
+      if (precioAlmacenFieldId) {
+        const precioAlmacenValue = document.getElementById(precioAlmacenFieldId)?.value;
+        if (precioAlmacenValue) params.set("precio_almacen", precioAlmacenValue);
+      }
       const res = await fetch(`${url}?${params.toString()}`, { headers: { Accept: "application/json" } });
       if (!res.ok) return;
       const items = await res.json();
@@ -129,17 +155,20 @@ document.addEventListener("DOMContentLoaded", () => {
         hiddenInput.value = item.id;
         hiddenInput.dataset.precioCosto = item.precio_costo;
 
-        // Sugiere el precio unitario de la línea (solo si el campo está
-        // vacío, para no pisar un precio ya capturado a mano): costo del
-        // producto en compras (precio_costo, 4 decimales), o precio de
-        // venta en ventas/cotizaciones (precio_venta, 2 decimales) -según
-        // data-producto-search-precio-campo en el wrapper-. Usar el campo
-        // equivocado no es solo un tema de decimales: en una venta
-        // sugeriría el costo de compra, no el precio al público.
+        // Precio unitario de la línea: costo del producto en compras
+        // (precio_costo, 4 decimales), o precio de venta ya resuelto por
+        // el backend (precio_venta, según la lista del cliente y la
+        // sucursal -ver ProductoBuscarView-) en ventas -según
+        // data-producto-search-precio-campo en el wrapper-. En compras
+        // solo se sugiere si el campo está vacío, para no pisar un costo
+        // ya capturado a mano; en ventas el precio no es editable por el
+        // cajero (readonly) y SIEMPRE se actualiza al elegir producto,
+        // para que nunca quede el de una elección anterior.
         const precioSugerido = precioCampo === "venta" ? item.precio_venta : item.precio_costo;
         const row = hiddenInput.closest(".formset-row");
         const precioInput = row?.querySelector(".fs-precio");
-        if (precioInput && !precioInput.value && precioSugerido) {
+        const debeActualizar = precioCampo === "venta" || !precioInput?.value;
+        if (precioInput && debeActualizar && precioSugerido) {
           precioInput.value = precioSugerido;
           precioInput.dispatchEvent(new Event("input", { bubbles: true }));
         }

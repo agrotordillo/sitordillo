@@ -6,8 +6,10 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.clientes.models import Cliente
 from apps.products.forms import BrandForm, ClaseForm, LineaForm, UnitMeasureForm
 from apps.products.models import Producto, Subcategoria
+from apps.products.services import resolver_lista_precio_cliente, resolver_precio_producto
 from apps.api.serializers.products import OptionSerializer
 
 
@@ -68,7 +70,17 @@ class ProductoBuscarView(APIView):
     Con `?almacen=<id>` (usado por el buscador de traspasos) solo devuelve
     productos con existencia disponible (>0) en ese almacén — no tiene
     sentido ofrecer para traspaso algo que no está en stock ahí — e incluye
-    `disponible` con esa cantidad."""
+    `disponible` con esa cantidad.
+
+    Con `?cliente=<id>` y/o `?precio_almacen=<id>` (usados por ventas)
+    `precio_venta` deja de ser el precio_venta plano del producto y pasa a
+    ser el resuelto para la lista de precios de ese cliente (o "PUBLICO" si
+    no tiene una propia) y esa sucursal -ver
+    apps.products.services.resolver_precio_producto-, que sí respeta los
+    precios específicos por sucursal (ProductoPrecio.almacen) que el precio
+    plano no conoce. Es un parámetro aparte de "almacen" a propósito: no
+    debe activar el filtro de existencia de arriba, que es solo para
+    traspasos."""
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
@@ -94,19 +106,34 @@ class ProductoBuscarView(APIView):
                 )
             )
 
+        # Solo se resuelve el precio por lista/sucursal si el llamador manda
+        # alguno de estos dos parámetros (hoy, solo ventas): así compras,
+        # traspasos, comisiones, etc. no pagan consultas extra que no usan
+        # y su resultado no cambia.
+        cliente_id = request.query_params.get("cliente", "").strip()
+        precio_almacen_id = request.query_params.get("precio_almacen", "").strip() or None
+        lista_precio = None
+        if cliente_id or precio_almacen_id:
+            cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
+            lista_precio = resolver_lista_precio_cliente(cliente)
+
         productos = productos.order_by("nombre")[:20]
-        data = [
-            {
+        data = []
+        for p in productos:
+            precio_venta = p.precio_venta
+            if lista_precio is not None:
+                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
+                if resuelto is not None:
+                    precio_venta = resuelto
+            data.append({
                 "id": p.id,
                 "folio": p.folio,
                 "sku": p.sku,
                 "nombre": p.nombre,
-                "precio_venta": str(p.precio_venta),
+                "precio_venta": str(precio_venta),
                 "precio_costo": str(p.precio_costo),
                 **({"disponible": str(p.disponible)} if con_existencia else {}),
-            }
-            for p in productos
-        ]
+            })
         return Response(data)
 
 
