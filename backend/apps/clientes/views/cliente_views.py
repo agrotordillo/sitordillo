@@ -18,6 +18,11 @@ class ClienteCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView
     success_message = "Cliente creado correctamente."
     extra_context = {"active_module": "clients"}
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar el cliente. Revisa los campos.")
         return super().form_invalid(form)
@@ -31,6 +36,11 @@ class ClienteUpdateView(PermissionRequiredMixin, SuccessMessageMixin, UpdateView
     success_url = reverse_lazy("clientes:cliente-list")
     success_message = "Cliente actualizado correctamente."
     extra_context = {"active_module": "clients"}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar el cliente. Revisa los campos.")
