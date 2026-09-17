@@ -25,14 +25,20 @@ class ClienteForm(BaseModelForm):
             "observaciones",
         ]
 
+    # Ventas sí puede registrar/actualizar un cliente (lo necesita para
+    # capturar sus datos fiscales al momento de facturar), pero el crédito
+    # que se le otorga y su precio preferente son invariantes de negocio
+    # exclusivos del Administrador (mismo criterio que
+    # SuperuserRequiredMixin): quien no es superusuario ni siquiera ve
+    # estos campos, así no puede dárselos de alta ni cambiarlos desde este
+    # formulario -sea al crear o al editar, ClienteCreateView y
+    # ClienteUpdateView le pasan `user` a este form por igual-.
+    CAMPOS_SOLO_ADMINISTRADOR = ["tiene_credito", "limite_credito", "dias_credito", "descuento", "lista_precio"]
+
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # El precio preferente del cliente (su lista de precio por default en
-        # ventas/cotizaciones) es un invariante de negocio exclusivo del
-        # Administrador (mismo criterio que SuperuserRequiredMixin): quien
-        # no es superusuario ni siquiera ve el campo, así no puede dárselo
-        # de alta ni cambiarlo desde este formulario.
         if user is not None and not user.is_superuser:
-            self.fields.pop("lista_precio", None)
+            for campo in self.CAMPOS_SOLO_ADMINISTRADOR:
+                self.fields.pop(campo, None)
         elif "lista_precio" in self.fields:
             self.fields["lista_precio"].queryset = ListaPrecio.objects.filter(is_active=True)
