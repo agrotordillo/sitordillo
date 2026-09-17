@@ -13,14 +13,25 @@ document.addEventListener("alpine:init", () => {
     restante: 0,
 
     init() {
-      this._rows = this.$refs.rows;
-      this._emptyTemplate = this.$refs.emptyRow;
-      this._totalFormsInput = document.querySelector(config.totalFormsSelector);
-      this._totalVentaEl = document.querySelector(config.totalVentaSelector);
-      this._divididoInput = document.querySelector(config.divididoSelector);
+      // Prefijo "_pago" en todas las propiedades internas (no reactivas
+      // para la vista) a propósito: este x-data queda ANIDADO dentro del
+      // x-data="formsetRows(...)" del <form> (ver venta_form.html), y
+      // Alpine comparte/hereda propiedades entre x-data anidados -si un
+      // hijo asigna this.algo = x con un nombre que el padre YA tiene,
+      // Alpine lo escribe en el padre, no en el hijo-. formsetRows usa
+      // _rows/_emptyTemplate/_totalFormsInput para SU PROPIA tabla de
+      // productos; usar esos mismos nombres aquí los pisaba en cuanto
+      // este init() corría, dejando _rows de formsetRows apuntando a la
+      // tabla de pago dividido y el subtotal/total de la venta en 0.00
+      // sin importar el precio o cantidad capturados.
+      this._pagoRows = this.$refs.rows;
+      this._pagoEmptyTemplate = this.$refs.emptyRow;
+      this._pagoTotalFormsInput = document.querySelector(config.totalFormsSelector);
+      this._pagoTotalVentaEl = document.querySelector(config.totalVentaSelector);
+      this._pagoDivididoInput = document.querySelector(config.divididoSelector);
 
-      this.dividido = this._divididoInput ? this._divididoInput.checked : false;
-      this._divididoInput?.addEventListener("change", (event) => {
+      this.dividido = this._pagoDivididoInput ? this._pagoDivididoInput.checked : false;
+      this._pagoDivididoInput?.addEventListener("change", (event) => {
         this.dividido = event.target.checked;
         this._recalculate();
       });
@@ -32,20 +43,20 @@ document.addEventListener("alpine:init", () => {
         if (event.target.matches(".fs-cantidad, .fs-precio, .fs-monto-pago")) this._recalculate();
       });
 
-      this._rows.querySelectorAll(".formset-row").forEach((row) => this._bindRow(row));
+      this._pagoRows.querySelectorAll(".formset-row").forEach((row) => this._bindRow(row));
       this._recalculate();
     },
 
     addRow() {
-      const index = parseInt(this._totalFormsInput.value, 10);
-      const html = this._emptyTemplate.innerHTML.replaceAll("__prefix__", index);
+      const index = parseInt(this._pagoTotalFormsInput.value, 10);
+      const html = this._pagoEmptyTemplate.innerHTML.replaceAll("__prefix__", index);
       const wrapper = document.createElement("tbody");
       wrapper.innerHTML = html.trim();
       const row = wrapper.firstElementChild;
       if (!row) return;
 
-      this._rows.appendChild(row);
-      this._totalFormsInput.value = index + 1;
+      this._pagoRows.appendChild(row);
+      this._pagoTotalFormsInput.value = index + 1;
       this._bindRow(row);
       this._recalculate();
     },
@@ -99,13 +110,13 @@ document.addEventListener("alpine:init", () => {
     },
 
     _totalVenta() {
-      const texto = this._totalVentaEl?.textContent || "0";
+      const texto = this._pagoTotalVentaEl?.textContent || "0";
       return parseFloat(texto.replace(/[^0-9.-]/g, "")) || 0;
     },
 
     _recalculate() {
       let suma = 0;
-      this._rows.querySelectorAll(".formset-row").forEach((row) => {
+      this._pagoRows.querySelectorAll(".formset-row").forEach((row) => {
         if (row.dataset.removed === "true") return;
         suma += parseFloat(row.querySelector(".fs-monto-pago")?.value) || 0;
       });
