@@ -49,6 +49,18 @@ RFC_PATTERN = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$")
 RFC_GENERICOS = {"XAXX010101000", "XEXX010101000", "XAX101010000"}
 JUNK_TEXTO = {"", ".", ",", "-", ".-", "..", ",,", "NULL", "N/A"}
 
+# Normalización laxa (solo para detectar RFC repetido en el archivo, no para
+# validar formato): quita espacios/guiones de captura ("AAL 630101 HX5",
+# "AAL-630101-HX5") para que cuenten como el mismo RFC. 469 filas del
+# archivo (170 RFC) están así: el mismo cliente capturado más de una vez en
+# el sistema anterior. Solo la primera fila con ese RFC se importa; las
+# demás se omiten, para no crear un Cliente repetido por cada captura.
+RFC_LAXO_RE = re.compile(r"[^A-ZÑ&0-9]")
+
+
+def norm_rfc_laxo(valor):
+    return RFC_LAXO_RE.sub("", limpio(valor).upper())
+
 LIMITE_CREDITO_MAX = Decimal("9999999999.99")  # Cliente.limite_credito: max_digits=12, decimal_places=2
 
 LISTA_PRECIO_POR_INDICE = {
@@ -116,14 +128,25 @@ class Command(BaseCommand):
 
         stats = {
             "clientes": 0, "omitidos": 0, "sin_rfc": 0, "credito_bandera_gano": 0,
-            "limite_credito_saneado": 0, "errores": [],
+            "limite_credito_saneado": 0, "duplicado_por_rfc_omitido": 0, "errores": [],
         }
         rfcs_usados = set()
+        rfcs_vistos_laxo = set()
 
         try:
             with transaction.atomic():
                 for row in filas:
                     r = dict(zip(COLUMNAS, row))
+                    rfc_laxo = norm_rfc_laxo(r["rfc"])
+                    if rfc_laxo and rfc_laxo not in RFC_GENERICOS and len(rfc_laxo) >= 12:
+                        if rfc_laxo in rfcs_vistos_laxo:
+                            # Mismo cliente capturado más de una vez en el sistema
+                            # anterior (mismo RFC, con o sin espacios/guiones de
+                            # captura): se queda solo el primero, no se crea un
+                            # Cliente repetido por cada fila.
+                            stats["duplicado_por_rfc_omitido"] += 1
+                            continue
+                        rfcs_vistos_laxo.add(rfc_laxo)
                     try:
                         with transaction.atomic():
                             self._crear_cliente(r, lista_precio_obj, rfcs_usados, stats)
@@ -141,6 +164,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f"Listo. Clientes={stats['clientes']} (omitidos por error: {stats['omitidos']}) "
+            f"duplicados por RFC omitidos={stats['duplicado_por_rfc_omitido']} "
             f"sin RFC={stats['sin_rfc']} bandera NO gano sobre numero capturado={stats['credito_bandera_gano']} "
             f"limite_credito saneado (absurdo)={stats['limite_credito_saneado']}"
         ))
