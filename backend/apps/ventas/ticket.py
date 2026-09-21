@@ -31,6 +31,9 @@ _CORTE_PAPEL = _GS + "V" + "\x01"
 
 _CODIFICACION = "cp850"
 
+_PRECIO_ANCHO = 9
+_IMPORTE_ANCHO = 10
+
 
 def _nombre_usuario(usuario):
     return usuario.get_full_name() or usuario.get_username()
@@ -46,6 +49,12 @@ def _fila(izquierda, derecha, ancho):
     return izquierda + " " * espacio + derecha + "\n"
 
 
+def _columnas_precio_importe(precio_txt, importe_txt):
+    """Las columnas PRECIO e IMPORTE con el mismo ancho fijo en el
+    encabezado y en cada línea, para que queden alineadas entre sí."""
+    return f"{precio_txt:>{_PRECIO_ANCHO}}{importe_txt:>{_IMPORTE_ANCHO}}"
+
+
 def construir_ticket(venta, empresa=None):
     """Regresa el ticket de `venta` como bytes ESC/POS, replicando el mismo
     contenido que `ventas/venta_ticket.html` (encabezado, líneas,
@@ -53,12 +62,15 @@ def construir_ticket(venta, empresa=None):
     `venta.almacen`."""
     almacen = venta.almacen
     ancho = almacen.impresora_ancho_columnas
-    separador = "-" * ancho + "\n"
+    # Las TM-U220D/TM-U220UD son de impacto: el guion medio ("-") solo usa
+    # una fila de agujas y casi no se ve en el papel, sobre todo con la
+    # cinta ya gastada. El "=" usa dos filas y sí se nota.
+    separador = "=" * ancho + "\n"
 
     partes = [_INIT, _CODEPAGE_CP850, _ALINEAR_CENTRO]
 
+    partes.append(_NEGRITA_ON + "Agroveterinaria el Tordillo" + "\n" + _NEGRITA_OFF)
     if empresa:
-        partes.append(_NEGRITA_ON + empresa.display_name + "\n" + _NEGRITA_OFF)
         if empresa.rfc:
             partes.append(f"RFC: {empresa.rfc}\n")
         if empresa.telefono:
@@ -78,43 +90,33 @@ def construir_ticket(venta, empresa=None):
     if cotizacion_origen and cotizacion_origen.created_by_id:
         partes.append(f"Vendedor (mostrador): {_nombre_usuario(cotizacion_origen.created_by)}\n")
     partes.append(separador)
-    partes.append(f"Folio: {venta.folio}\n")
-    partes.append(f"Impresión: {venta.veces_impreso}\n")
+    partes.append(f"Folio: {venta.folio}-{venta.veces_impreso}\n")
     fecha_local = timezone.localtime(venta.fecha_venta)
     partes.append(f"Fecha: {fecha_local:%d/%m/%Y}  Hora: {fecha_local:%H:%M}\n")
     partes.append(f"Cliente: {venta.cliente.display_name}\n")
     if venta.cliente.direccion:
         for renglon in wrap(venta.cliente.direccion, ancho) or [venta.cliente.direccion]:
             partes.append(renglon + "\n")
-    if venta.pago_dividido:
-        partes.append("Forma de pago (dividido):\n")
-        for pago in venta.pagos.all():
-            partes.append(_fila(f"  {pago.forma_pago.descripcion}", f"${moneda(pago.monto)}", ancho))
-    else:
-        partes.append(f"Forma de pago: {venta.forma_pago.descripcion}\n")
+    if venta.observaciones:
+        for renglon in wrap(venta.observaciones, ancho) or [venta.observaciones]:
+            partes.append(renglon + "\n")
     partes.append(separador)
+
+    partes.append(_NEGRITA_ON)
+    partes.append(_fila("CANT  PRODUCTO", _columnas_precio_importe("PRECIO", "IMPORTE"), ancho))
+    partes.append(_NEGRITA_OFF)
 
     for detalle in venta.detalles.all():
         producto = detalle.producto
         descuento_txt = f" (-{detalle.descuento}%)" if detalle.descuento else ""
         primera = f"{moneda(detalle.cantidad)}  {producto.sku}{descuento_txt}"
-        partes.append(_fila(primera, f"${moneda(detalle.precio_unitario)}", ancho))
+        derecha = _columnas_precio_importe(f"${moneda(detalle.precio_unitario)}", f"${moneda(detalle.subtotal)}")
+        partes.append(_fila(primera, derecha, ancho))
 
         abreviatura = producto.unidad_medida.abreviatura if producto.unidad_medida_id else ""
-        importe_txt = f"${moneda(detalle.subtotal)}"
-        # El primer renglón del nombre debe caber junto con la abreviatura Y
-        # el importe -si se envolviera con el ancho completo, `_fila` lo
-        # truncaría en silencio para que quepa el importe, perdiendo texto
-        # en vez de pasarlo al siguiente renglón-.
-        ancho_primer_renglon = max(ancho - len(abreviatura) - 1 - len(importe_txt) - 1, 10)
-        primer_chunk = (wrap(producto.nombre, ancho_primer_renglon) or [producto.nombre])[0]
-        resto_nombre = producto.nombre[len(primer_chunk):].strip()
-
-        segunda = f"{abreviatura} {primer_chunk}".strip()
-        partes.append(_fila(segunda, importe_txt, ancho))
-        if resto_nombre:
-            for renglon in wrap(resto_nombre, ancho):
-                partes.append(renglon + "\n")
+        nombre_con_abreviatura = f"{abreviatura} {producto.nombre}".strip()
+        for renglon in wrap(nombre_con_abreviatura, ancho) or [nombre_con_abreviatura]:
+            partes.append(renglon + "\n")
 
     partes.append(separador)
     partes.append(_fila("Subtotal:", f"${moneda(venta.importe_sin_impuesto)}", ancho))
@@ -123,10 +125,14 @@ def construir_ticket(venta, empresa=None):
     partes.append(_NEGRITA_ON)
     partes.append(_fila("TOTAL:", f"${moneda(venta.total)}", ancho))
     partes.append(_NEGRITA_OFF)
+    partes.append(separador)
 
-    if venta.observaciones:
-        partes.append(separador)
-        partes.append(venta.observaciones + "\n")
+    if venta.pago_dividido:
+        partes.append("Forma de pago (dividido):\n")
+        for pago in venta.pagos.all():
+            partes.append(_fila(f"  {pago.forma_pago.descripcion}", f"${moneda(pago.monto)}", ancho))
+    else:
+        partes.append(f"Forma de pago: {venta.forma_pago.descripcion}\n")
 
     partes.append(separador)
     partes.append(_fila("Peso en kilos:", moneda(venta.peso_total), ancho))
@@ -135,7 +141,7 @@ def construir_ticket(venta, empresa=None):
     partes.append(separador)
     partes.append(_ALINEAR_CENTRO)
     partes.append("Gracias por su compra\n")
-    partes.append("\n\n\n")
+    partes.append("\n\n\n\n\n")
     partes.append(_CORTE_PAPEL)
 
     return "".join(partes).encode(_CODIFICACION, errors="replace")

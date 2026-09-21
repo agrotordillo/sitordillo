@@ -24,13 +24,13 @@
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: 700; }
-  .logo { max-width: 55mm; max-height: 22mm; margin: 0 auto 4px; display: block; }
   .nombre-negocio { font-size: 14px; font-weight: 700; }
   .muted { color: #4b5563; }
   .sep { border: none; border-top: 1px dashed #6b7280; margin: 6px 0; }
   table.lineas { width: 100%; border-collapse: collapse; }
-  table.lineas th { text-align: left; font-weight: 700; border-bottom: 1px solid #111827; padding-bottom: 2px; }
-  table.lineas td { vertical-align: top; padding: 2px 0; }
+  table.lineas th { text-align: left; font-weight: 700; border-bottom: 1px solid #111827; padding: 0 6px 2px 0; }
+  table.lineas td { vertical-align: top; padding: 2px 6px 2px 0; }
+  table.lineas th:last-child, table.lineas td:last-child { padding-right: 0; }
   table.lineas td.num, table.lineas th.num { text-align: right; }
   .producto-nombre { display: block; }
   .producto-detalle { display: block; font-size: 10.5px; color: #4b5563; }
@@ -68,9 +68,8 @@
 
 <div class="ticket">
   <div class="center">
-    <img src="{% static 'src/logo.png' %}" alt="Logo" class="logo">
+    <div class="nombre-negocio">Agroveterinaria el Tordillo</div>
     {% if empresa %}
-    <div class="nombre-negocio">{{ empresa.display_name }}</div>
     {% if empresa.rfc %}<div class="muted">RFC: {{ empresa.rfc }}</div>{% endif %}
     {% if empresa.telefono %}<div class="muted">Tel: {{ empresa.telefono }}</div>{% endif %}
     {% endif %}
@@ -91,38 +90,34 @@
 
   <hr class="sep">
 
-  <div>Folio: <span class="bold">{{ venta.folio }}</span></div>
-  <div class="muted">Impresión: {{ venta.veces_impreso }}</div>
+  <div>Folio: <span class="bold">{{ venta.folio }}-{{ venta.veces_impreso }}</span></div>
   <div>Fecha: {{ venta.fecha_venta|date:"d/m/Y" }} &nbsp; Hora: {{ venta.fecha_venta|date:"H:i" }}</div>
   <div>Cliente: {{ venta.cliente.display_name }}</div>
   {% if venta.cliente.direccion %}<div class="muted">{{ venta.cliente.direccion }}</div>{% endif %}
-  {% if venta.pago_dividido %}
-  <div>Forma de pago (dividido):</div>
-  {% for pago in venta.pagos.all %}
-  <div class="muted">&nbsp;&nbsp;{{ pago.forma_pago.descripcion }}: ${{ pago.monto|moneda }}</div>
-  {% endfor %}
-  {% else %}
-  <div>Forma de pago: {{ venta.forma_pago.descripcion }}</div>
-  {% endif %}
+  {% if venta.observaciones %}<div class="muted">{{ venta.observaciones }}</div>{% endif %}
 
   <hr class="sep">
 
   <table class="lineas">
     <thead>
       <tr>
+        <th class="num">Cant</th>
         <th>Producto</th>
+        <th class="num">Precio</th>
         <th class="num">Importe</th>
       </tr>
     </thead>
     <tbody>
       {% for detalle in venta.detalles.all %}
       <tr>
+        <td class="num">{{ detalle.cantidad|moneda }}</td>
         <td>
-          <span class="producto-nombre">{{ detalle.producto.sku }} · {{ detalle.producto.nombre }}</span>
+          <span class="producto-nombre">{{ detalle.producto.sku }}</span>
           <span class="producto-detalle">
-            {{ detalle.producto.unidad_medida.abreviatura }} {{ detalle.cantidad }} x ${{ detalle.precio_unitario|moneda }}{% if detalle.descuento %} (-{{ detalle.descuento }}%){% endif %}
+            {{ detalle.producto.unidad_medida.abreviatura }} {{ detalle.producto.nombre }}{% if detalle.descuento %} (-{{ detalle.descuento }}%){% endif %}
           </span>
         </td>
+        <td class="num">${{ detalle.precio_unitario|moneda }}</td>
         <td class="num">${{ detalle.subtotal|moneda }}</td>
       </tr>
       {% endfor %}
@@ -151,17 +146,23 @@
   </table>
 
   <hr class="sep">
+  {% if venta.pago_dividido %}
+  <div>Forma de pago (dividido):</div>
+  {% for pago in venta.pagos.all %}
+  <div class="muted">&nbsp;&nbsp;{{ pago.forma_pago.descripcion }}: ${{ pago.monto|moneda }}</div>
+  {% endfor %}
+  {% else %}
+  <div>Forma de pago: {{ venta.forma_pago.descripcion }}</div>
+  {% endif %}
+
+  <hr class="sep">
   <div class="muted">Peso en kilos: {{ venta.peso_total|moneda }}</div>
   <div class="muted">Volumen (m³): {{ venta.volumen_total|moneda }}</div>
-
-  {% if venta.observaciones %}
-  <hr class="sep">
-  <div class="muted">{{ venta.observaciones }}</div>
-  {% endif %}
 
   <div class="footer center">
     <hr class="sep">
     Gracias por su compra
+    <br><br>
   </div>
 </div>
 
