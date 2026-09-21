@@ -33,6 +33,10 @@ class VentaForm(BaseModelForm):
             # usa venta-cambio.js para saber, sin ir al servidor, cuándo
             # forma_pago es Efectivo y mostrar el campo de "recibido".
             "forma_pago": FormaPagoSelect,
+            # Campo libre corto (motivo de la venta, referencia interna),
+            # no un texto largo: un <input> de una sola línea es más rápido
+            # de llenar en mostrador que un <textarea>.
+            "observaciones": forms.TextInput,
         }
 
     def __init__(self, *args, user=None, **kwargs):
