@@ -8,6 +8,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
@@ -17,7 +19,13 @@ from apps.pagos.models import CuentaPorPagar
 from apps.pagos.services import generar_cuenta_por_pagar
 
 
+@method_decorator(never_cache, name="dispatch")
 class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
+    """El saldo pendiente de cada cuenta cambia en cuanto se registra o edita
+    un pago -si el navegador sirviera esta pantalla desde su caché (p. ej. al
+    volver con el botón Atrás después de editar un pago), se vería el saldo
+    viejo aunque en la base de datos ya esté correcto-."""
+
     permission_required = "pagos.view_cuentaporpagar"
     model = CuentaPorPagar
     template_name = "pagos/cuenta_list.html"

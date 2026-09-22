@@ -3,12 +3,15 @@ from decimal import Decimal
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Count, Q
 from django.utils.dateparse import parse_date
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import ListView
 
 from apps.fiscal.models import FormaPago
 from apps.pagos.models import Banco, ReciboPago
 
 
+@method_decorator(never_cache, name="dispatch")
 class ReciboPagoListView(PermissionRequiredMixin, ListView):
     """Listado de eventos de pago (un recibo puede agrupar varias cuentas
     del mismo proveedor pagadas juntas), con su folio consecutivo y,

@@ -8,6 +8,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 
 from apps.pagos.forms import EnviarComprobanteForm, PagoEditForm, PagoForm, PagoMultipleForm
 from apps.pagos.models import CuentaPorPagar, Pago
@@ -23,6 +24,7 @@ from apps.pagos.services import (
 CUENTAS_PAGABLES = (CuentaPorPagar.Estatus.PENDIENTE, CuentaPorPagar.Estatus.PARCIAL)
 
 
+@never_cache
 @permission_required("pagos.add_pago", raise_exception=True)
 def registrar_pago_view(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
@@ -252,6 +254,7 @@ def pago_multiple_confirmacion_view(request):
     )
 
 
+@never_cache
 @permission_required("pagos.change_pago", raise_exception=True)
 def editar_pago_view(request, pk):
     """Corrige un pago ya registrado -monto, forma de pago, si cuenta como
