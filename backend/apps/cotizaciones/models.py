@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from apps.core.models import BaseAbstractModel
 
@@ -21,6 +21,19 @@ class Cotizacion(BaseAbstractModel):
         on_delete=models.PROTECT,
         related_name="cotizaciones",
         verbose_name="Sucursal",
+    )
+    punto_venta = models.ForeignKey(
+        "products.PuntoVenta",
+        on_delete=models.PROTECT,
+        related_name="cotizaciones",
+        verbose_name="Punto de venta",
+    )
+    numero_documento = models.CharField(
+        max_length=20,
+        unique=True,
+        editable=False,
+        verbose_name="Número de cotización",
+        help_text="Folio para el cliente: número de almacén + número de punto de venta + consecutivo. Se genera solo al guardar y no se puede editar.",
     )
     fecha_cotizacion = models.DateTimeField(default=timezone.now, verbose_name="Fecha de cotización")
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
@@ -47,6 +60,7 @@ class Cotizacion(BaseAbstractModel):
             models.Index(fields=["cliente"]),
             models.Index(fields=["almacen"]),
             models.Index(fields=["estatus"]),
+            models.Index(fields=["punto_venta"], name="cotizaciones_punto_venta_idx"),
         ]
 
     def __str__(self):
@@ -74,6 +88,19 @@ class Cotizacion(BaseAbstractModel):
         super().clean()
         if self.almacen_id and self.almacen.tipo != self.almacen.Tipo.SUCURSAL:
             raise ValidationError({"almacen": "Las cotizaciones se registran desde una sucursal, no desde el CEDIS."})
+        if self.almacen_id and self.punto_venta_id and self.punto_venta.almacen_id != self.almacen_id:
+            raise ValidationError({"punto_venta": "El punto de venta debe pertenecer a la sucursal seleccionada."})
+
+    def save(self, *args, **kwargs):
+        if not self.numero_documento and self.punto_venta_id:
+            from apps.products.models import PuntoVenta
+
+            with transaction.atomic():
+                punto_venta = (
+                    PuntoVenta.objects.select_for_update().select_related("almacen").get(pk=self.punto_venta_id)
+                )
+                self.numero_documento = punto_venta.tomar_siguiente_folio_cotizacion()
+        super().save(*args, **kwargs)
 
 
 class CotizacionDetalle(BaseAbstractModel):

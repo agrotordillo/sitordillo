@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
+from django.db.models import Q
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -33,7 +34,9 @@ def buscar_cotizacion_view(request):
         visibles = almacenes_visibles(request.user)
         if visibles is not None:
             cotizaciones_qs = cotizaciones_qs.filter(almacen__in=visibles)
-        cotizacion = cotizaciones_qs.filter(folio__iexact=folio).first()
+        cotizacion = cotizaciones_qs.filter(
+            Q(numero_documento__iexact=folio) | Q(folio__iexact=folio)
+        ).first()
         if cotizacion is None:
             form.add_error("folio", f"No se encontró ninguna cotización con el folio '{folio}'.")
         else:
@@ -127,7 +130,7 @@ def convertir_cotizacion_view(request, pk):
                     else:
                         messages.success(
                             request,
-                            f"Cotización {cotizacion.folio} convertida a la venta {venta.folio}.",
+                            f"Cotización {cotizacion.numero_documento} convertida a la venta {venta.folio}.",
                         )
                         return redirect("ventas:venta-list")
     else:
@@ -136,7 +139,7 @@ def convertir_cotizacion_view(request, pk):
                 "cliente": cotizacion.cliente_id,
                 "almacen": cotizacion.almacen_id,
                 "observaciones": (
-                    f"Generada desde cotización {cotizacion.folio}."
+                    f"Generada desde cotización {cotizacion.numero_documento}."
                     + (f" {cotizacion.observaciones}" if cotizacion.observaciones else "")
                 ),
             },

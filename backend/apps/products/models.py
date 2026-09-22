@@ -160,6 +160,11 @@ class Almacen(BaseAbstractModel):
         default=Tipo.SUCURSAL,
         verbose_name="Tipo de almacén",
     )
+    numero = models.PositiveSmallIntegerField(
+        unique=True,
+        verbose_name="Número de almacén",
+        help_text="Los 2 dígitos que identifican a este almacén en los folios de mostrador (cotizaciones, ventas).",
+    )
     direccion = models.CharField(
         max_length=255,
         blank=True,
@@ -237,12 +242,21 @@ class PuntoVenta(BaseAbstractModel):
         verbose_name="Almacén",
     )
     codigo = models.CharField(max_length=20, verbose_name="Código")
+    numero = models.PositiveSmallIntegerField(
+        verbose_name="Número de punto de venta",
+        help_text="Los 2 dígitos que, junto con el número de almacén, identifican a este punto de venta en los folios de mostrador.",
+    )
     nombre = models.CharField(max_length=200, verbose_name="Nombre")
     tipo = models.CharField(
         max_length=10,
         choices=Tipo.choices,
         default=Tipo.COBRO,
         verbose_name="Tipo de punto de venta",
+    )
+    consecutivo_cotizacion = models.PositiveIntegerField(
+        default=0,
+        editable=False,
+        verbose_name="Último consecutivo de cotización usado",
     )
 
     class Meta:
@@ -251,6 +265,7 @@ class PuntoVenta(BaseAbstractModel):
         ordering = ["almacen", "codigo"]
         constraints = [
             models.UniqueConstraint(fields=["almacen", "codigo"], name="unico_codigo_por_almacen"),
+            models.UniqueConstraint(fields=["almacen", "numero"], name="unico_numero_por_almacen"),
         ]
         indexes = [
             models.Index(fields=["almacen"]),
@@ -273,6 +288,17 @@ class PuntoVenta(BaseAbstractModel):
         super().clean()
         if self.almacen_id and self.almacen.tipo != Almacen.Tipo.SUCURSAL:
             raise ValidationError({"almacen": "Los puntos de venta solo se configuran para sucursales, no para el CEDIS."})
+
+    def tomar_siguiente_folio_cotizacion(self):
+        """Incrementa el consecutivo de cotizaciones de este punto de venta y
+        regresa el folio armado (número de almacén + número de punto de venta
+        + "C" + consecutivo). Debe llamarse con la fila ya bloqueada
+        (select_for_update) dentro de la misma transacción que crea la
+        cotización, para que dos cotizaciones grabadas al mismo tiempo en
+        este punto de venta nunca reciban el mismo consecutivo."""
+        self.consecutivo_cotizacion += 1
+        self.save(update_fields=["consecutivo_cotizacion", "updated_at", "updated_by"])
+        return f"{self.almacen.numero:02d}{self.numero:02d}C{self.consecutivo_cotizacion:07d}"
 
 
 class Turno(BaseAbstractModel):

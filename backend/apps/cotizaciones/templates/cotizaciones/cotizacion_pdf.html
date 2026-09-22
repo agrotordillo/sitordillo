@@ -1,0 +1,183 @@
+{% load core_extras %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cotización {{ cotizacion.numero_documento }}</title>
+<style>
+  @page {
+    size: letter;
+    margin: 2cm 1.5cm;
+  }
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    color: #1f2933;
+  }
+  h1 {
+    font-size: 16pt;
+    margin: 0 0 2px 0;
+  }
+  .logo {
+    width: 50px;
+    height: 50px;
+  }
+  .empresa {
+    font-size: 9pt;
+    color: #52606d;
+  }
+  .encabezado {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .encabezado td {
+    vertical-align: top;
+  }
+  .folio-box {
+    text-align: right;
+  }
+  .folio-box .numero {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #0f5132;
+  }
+  .datos-cliente {
+    width: 100%;
+    margin-bottom: 16px;
+    border-top: 1px solid #d9dde3;
+    border-bottom: 1px solid #d9dde3;
+    padding: 8px 0;
+  }
+  .datos-cliente td {
+    padding: 2px 0;
+  }
+  table.productos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  table.productos th {
+    background-color: #f0f2f5;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 9pt;
+    text-transform: uppercase;
+    border-bottom: 1px solid #d9dde3;
+  }
+  table.productos th.num {
+    text-align: right;
+  }
+  table.productos td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #eceff2;
+    font-size: 9.5pt;
+  }
+  .num {
+    text-align: right;
+  }
+  .totales {
+    width: 100%;
+  }
+  .totales td {
+    padding: 4px 8px;
+  }
+  .totales .total {
+    font-size: 12pt;
+    font-weight: bold;
+    border-top: 1px solid #1f2933;
+  }
+  .observaciones {
+    margin-top: 12px;
+    font-size: 9.5pt;
+  }
+  .pie {
+    margin-top: 24px;
+    font-size: 8.5pt;
+    color: #7b8794;
+    border-top: 1px solid #d9dde3;
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+  <table class="encabezado">
+    <tr>
+      {% if logo_path %}
+      <td style="width: 60px;">
+        <img src="{{ logo_path }}" class="logo">
+      </td>
+      {% endif %}
+      <td>
+        <h1>AGROPECUARIA EL TORDILLO</h1>
+        <div class="empresa">
+          {% if empresa.rfc %}RFC: {{ empresa.rfc }}<br>{% endif %}
+          {% if empresa.telefono %}Tel: {{ empresa.telefono }}<br>{% endif %}
+          {% if cotizacion.almacen.direccion %}{{ cotizacion.almacen.direccion }}<br>{% endif %}
+          {{ cotizacion.almacen.nombre }}
+        </div>
+      </td>
+      <td class="folio-box">
+        <div>COTIZACIÓN</div>
+        <div class="numero">{{ cotizacion.numero_documento }}</div>
+        <div>{{ cotizacion.fecha_cotizacion|date:"d/m/Y H:i" }}</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="datos-cliente">
+    <tr>
+      <td style="width: 60%;">
+        <strong>Cliente:</strong> {{ cotizacion.cliente.display_name }}<br>
+        {% if cotizacion.cliente.direccion %}{{ cotizacion.cliente.direccion }}<br>{% endif %}
+        {% if cotizacion.cliente.contacto_telefono %}Tel: {{ cotizacion.cliente.contacto_telefono }}{% endif %}
+      </td>
+      <td style="width: 40%;">
+        <strong>Sucursal:</strong> {{ cotizacion.almacen.nombre }}<br>
+        <strong>Atendió:</strong> {% firstof cotizacion.created_by.get_full_name cotizacion.created_by.get_username "—" %}
+      </td>
+    </tr>
+  </table>
+
+  <table class="productos">
+    <thead>
+      <tr>
+        <th class="num" style="width: 15%;">Cantidad</th>
+        <th style="width: 45%;">Producto</th>
+        <th class="num" style="width: 20%;">Precio unitario</th>
+        <th class="num" style="width: 20%;">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for detalle in cotizacion.detalles.all %}
+      <tr>
+        <td class="num">{{ detalle.cantidad|moneda }}</td>
+        <td>{{ detalle.producto.sku }} · {{ detalle.producto.nombre }}</td>
+        <td class="num">${{ detalle.precio_unitario|moneda }}</td>
+        <td class="num">${{ detalle.subtotal|moneda }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totales">
+    <tr>
+      <td style="width: 70%;"></td>
+      <td class="num">Total:</td>
+      <td class="num total">${{ cotizacion.total|moneda }}</td>
+    </tr>
+  </table>
+
+  {% if cotizacion.observaciones %}
+  <div class="observaciones">
+    <strong>Observaciones:</strong> {{ cotizacion.observaciones }}
+  </div>
+  {% endif %}
+
+  <div class="pie">
+    Esta cotización no genera ningún compromiso de existencia ni de precio; los precios y la disponibilidad
+    se confirman al momento de convertirla en venta en caja, presentando el folio {{ cotizacion.numero_documento }}.
+  </div>
+
+</body>
+</html>

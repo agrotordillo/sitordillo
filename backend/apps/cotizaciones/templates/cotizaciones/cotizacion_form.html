@@ -42,6 +42,15 @@
         {% else %}
         {{ form.almacen }}
         {% endif %}
+        {% if not form.punto_venta.is_hidden %}
+        <div>
+          <label for="{{ form.punto_venta.id_for_label }}" class="label">Punto de venta</label>
+          {{ form.punto_venta }}
+          {% if form.punto_venta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.punto_venta.errors.0 }}</p>{% endif %}
+        </div>
+        {% else %}
+        {{ form.punto_venta }}
+        {% endif %}
       </div>
     </div>
 

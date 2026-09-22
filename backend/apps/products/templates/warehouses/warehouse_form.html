@@ -26,6 +26,12 @@
       {{ form.tipo }}
       {% if form.tipo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tipo.errors.0 }}</p>{% endif %}
     </div>
+    <div>
+      <label for="{{ form.numero.id_for_label }}" class="label">Número de almacén</label>
+      {{ form.numero }}
+      <p class="mt-1.5 text-xs text-gray-400">Los 2 dígitos que identifican a este almacén en los folios de mostrador (cotizaciones, ventas).</p>
+      {% if form.numero.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.numero.errors.0 }}</p>{% endif %}
+    </div>
     <div class="md:col-span-2">
       <label for="{{ form.direccion.id_for_label }}" class="label">Dirección <span class="text-gray-400 font-normal">(opcional)</span></label>
       {{ form.direccion }}

@@ -8,14 +8,14 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">{{ cotizacion.folio }}</li>
+    <li class="text-gray-500 font-medium">{{ cotizacion.numero_documento }}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
 {% block primary_container_class %}container-primary max-w-lg{% endblock primary_container_class %}
 {% block main_content %}
 <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-4">
-  La cotización {{ cotizacion.folio }} ya fue convertida a la venta
+  La cotización {{ cotizacion.numero_documento }} ya fue convertida a la venta
   {% if cotizacion.venta %}<strong>{{ cotizacion.venta.folio }}</strong>{% else %}correspondiente{% endif %}.
 </div>
 <div class="flex gap-2">

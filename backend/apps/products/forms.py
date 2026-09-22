@@ -97,6 +97,7 @@ class WarehouseForm(BaseModelForm):
         model = Almacen
         fields = [
             "nombre",
+            "numero",
             "tipo",
             "direccion",
             "impresora_nombre",
@@ -108,7 +109,7 @@ class WarehouseForm(BaseModelForm):
 class PuntoVentaForm(BaseModelForm):
     class Meta:
         model = PuntoVenta
-        fields = ["codigo", "nombre", "tipo"]
+        fields = ["codigo", "numero", "nombre", "tipo"]
 
     def clean_codigo(self):
         # "almacen" no es un campo del form (lo fija la vista según la URL),
@@ -121,6 +122,17 @@ class PuntoVentaForm(BaseModelForm):
             if duplicado.exists():
                 raise forms.ValidationError("Ya existe un punto de venta con este código en este almacén.")
         return codigo
+
+    def clean_numero(self):
+        # Mismo caso que "codigo": la unicidad de (almacen, numero) no la
+        # valida Django solo porque "almacen" no es un campo del form.
+        numero = self.cleaned_data["numero"]
+        almacen_id = self.instance.almacen_id
+        if almacen_id:
+            duplicado = PuntoVenta.objects.filter(almacen_id=almacen_id, numero=numero).exclude(pk=self.instance.pk)
+            if duplicado.exists():
+                raise forms.ValidationError("Ya existe un punto de venta con este número en este almacén.")
+        return numero
 
 
 class UnitMeasureForm(BaseModelForm):

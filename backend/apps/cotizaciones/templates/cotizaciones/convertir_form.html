@@ -9,13 +9,13 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'cotizaciones:cotizacion-list' %}" class="text-gray-400 hover:text-primary-600">Cotizaciones</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Convertir {{ cotizacion.folio }}</li>
+    <li class="text-gray-500 font-medium">Convertir {{ cotizacion.numero_documento }}</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
 <div class="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-700 mb-6">
-  Datos traídos de la cotización <strong>{{ cotizacion.folio }}</strong> ({{ cotizacion.cliente.display_name }}). Puedes editarlos antes de confirmar la venta.
+  Datos traídos de la cotización <strong>{{ cotizacion.numero_documento }}</strong> ({{ cotizacion.cliente.display_name }}). Puedes editarlos antes de confirmar la venta.
 </div>
 
 <form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">

@@ -1,6 +1,11 @@
 from django.urls import path
 
-from .views.cotizacion_views import CotizacionCreateView, CotizacionListView, CotizacionUpdateView
+from .views.cotizacion_views import (
+    CotizacionCreateView,
+    CotizacionListView,
+    CotizacionPDFView,
+    CotizacionUpdateView,
+)
 from .views.conversion_views import buscar_cotizacion_view, convertir_cotizacion_view
 
 app_name = "cotizaciones"
@@ -9,6 +14,7 @@ urlpatterns = [
     path("", CotizacionListView.as_view(), name="cotizacion-list"),
     path("crear/", CotizacionCreateView.as_view(), name="cotizacion-create"),
     path("<int:pk>/editar/", CotizacionUpdateView.as_view(), name="cotizacion-update"),
+    path("<int:pk>/pdf/", CotizacionPDFView.as_view(), name="cotizacion-pdf"),
     path("convertir/", buscar_cotizacion_view, name="cotizacion-buscar"),
     path("<int:pk>/convertir/", convertir_cotizacion_view, name="cotizacion-convertir"),
 ]

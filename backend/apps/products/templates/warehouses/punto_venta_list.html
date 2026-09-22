@@ -26,6 +26,7 @@
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Código</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Número</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Tipo</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estado</th>
@@ -36,6 +37,7 @@
       {% for punto in puntos_venta %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-500">{{ punto.codigo }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-500">{{ punto.numero|stringformat:"02d" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ punto.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4">
           {% if punto.tipo == 'cobro' %}
@@ -66,7 +68,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
             <p class="text-sm text-gray-400">Esta sucursal aún no tiene puntos de venta registrados</p>
             <a href="{% url 'products:punto-venta-create' almacen.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>

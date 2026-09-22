@@ -1,14 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView
+from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView, UpdateView
 
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.models import Cotizacion, CotizacionDetalle
 from apps.cotizaciones.forms import CotizacionForm, CotizacionDetalleFormSet
+from apps.cotizaciones.pdf import generar_pdf_cotizacion
 from apps.products.services import fijar_precios_autorizados
 
 
@@ -158,3 +159,39 @@ class CotizacionUpdateView(PermissionRequiredMixin, UpdateView):
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar la cotización. Revisa los campos.")
         return super().form_invalid(form)
+
+
+class CotizacionPDFView(PermissionRequiredMixin, DetailView):
+    """PDF formal para el cliente que pidió la cotización. Deja de ofrecerse
+    en cuanto la cotización se convierte a venta (ver la plantilla de lista,
+    donde el enlace ya no aparece para las convertidas)."""
+
+    permission_required = "cotizaciones.view_cotizacion"
+    model = Cotizacion
+
+    def get_queryset(self):
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related("cliente", "almacen", "punto_venta")
+            .prefetch_related("detalles__producto__unidad_medida")
+        )
+        visibles = almacenes_visibles(self.request.user)
+        if visibles is not None:
+            queryset = queryset.filter(almacen__in=visibles)
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        from apps.facturacion.models import Empresa
+
+        self.object = self.get_object()
+        if self.object.estatus != Cotizacion.Estatus.ABIERTA:
+            messages.error(
+                request, "Esta cotización ya fue convertida a venta; ya no se puede generar su PDF.",
+            )
+            return HttpResponseRedirect(reverse_lazy("cotizaciones:cotizacion-list"))
+
+        pdf_bytes = generar_pdf_cotizacion(self.object, empresa=Empresa.objects.first())
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{self.object.numero_documento}.pdf"'
+        return response

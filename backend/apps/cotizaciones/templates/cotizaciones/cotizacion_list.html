@@ -37,7 +37,7 @@
     <tbody class="divide-y divide-gray-100">
       {% for cotizacion in cotizaciones %}
       <tr class="hover:bg-gray-50/50 transition-colors">
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ cotizacion.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ cotizacion.numero_documento }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ cotizacion.cliente.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ cotizacion.almacen.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ cotizacion.fecha_cotizacion|date:"d/m/Y H:i" }}</td>
@@ -53,6 +53,7 @@
           {% if cotizacion.estatus == "convertida" %}
           <a href="{% url 'ventas:venta-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver venta {{ cotizacion.venta.folio }}</a>
           {% else %}
+          <a href="{% url 'cotizaciones:cotizacion-pdf' cotizacion.pk %}" target="_blank" class="text-sm text-primary-600 hover:text-primary-700 font-medium">PDF</a>
           <a href="{% url 'cotizaciones:cotizacion-update' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
           <a href="{% url 'cotizaciones:cotizacion-convertir' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Convertir a venta</a>
           {% endif %}
