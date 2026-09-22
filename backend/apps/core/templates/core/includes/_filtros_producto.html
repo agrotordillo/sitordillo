@@ -1,0 +1,90 @@
+{% comment %}
+Filtros compartidos por línea, marca, clase, categoría, subcategoría y
+sucursal. Se incluye DENTRO de un <form method="get"> ya existente
+(no trae su propio <form> ni botón "Filtrar"): la vista que lo incluye
+controla el grid, el buscador de texto y el resto de sus campos.
+
+Requiere en el contexto: marcas, lineas, categorias, subcategorias,
+clases, marca_id, linea_id, categoria_id, subcategoria_id, clase_id
+(los arma contexto_filtros_producto() de apps.core.filtros_producto).
+Para el filtro de sucursal, además: mostrar_filtro_almacen, almacenes,
+almacen_id.
+
+El select de Subcategoría depende del de Categoría (vía el componente
+Alpine "dependentSelect", el mismo que usa el formulario de producto):
+la plantilla que incluye este parcial debe cargar, en ese orden,
+static/js/modules/forms/dependent-select.js y
+static/js/vendor/alpine.min.js en su bloque extra_js.
+{% endcomment %}
+<div>
+  <label class="label">Marca</label>
+  <select name="marca" class="input w-full">
+    <option value="">Todas</option>
+    {% for marca in marcas %}
+    <option value="{{ marca.pk }}" {% if marca_id == marca.pk|stringformat:"s" %}selected{% endif %}>{{ marca.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div>
+  <label class="label">Línea</label>
+  <select name="linea" class="input w-full">
+    <option value="">Todas</option>
+    {% for linea in lineas %}
+    <option value="{{ linea.pk }}" {% if linea_id == linea.pk|stringformat:"s" %}selected{% endif %}>{{ linea.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div
+  class="contents"
+  x-data="dependentSelect({
+    parent: '#id_categoria_filtro',
+    child: '#id_subcategoria_filtro',
+    url: '{% url 'api:subcategories-by-category' %}',
+    param: 'category',
+    initial: '{{ subcategoria_id }}',
+    placeholder: 'Elige categoría primero'
+  })"
+>
+  <div>
+    <label class="label">Categoría</label>
+    <select name="categoria" id="id_categoria_filtro" class="input w-full">
+      <option value="">Todas</option>
+      {% for categoria in categorias %}
+      <option value="{{ categoria.pk }}" {% if categoria_id == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Subcategoría</label>
+    <select name="subcategoria" id="id_subcategoria_filtro" class="input w-full" {% if not categoria_id %}disabled{% endif %}>
+      {% if categoria_id %}
+      <option value="">Todas</option>
+      {% for sub in subcategorias %}
+      <option value="{{ sub.pk }}" {% if subcategoria_id == sub.pk|stringformat:"s" %}selected{% endif %}>{{ sub.nombre }}</option>
+      {% endfor %}
+      {% else %}
+      <option value="">Elige categoría primero</option>
+      {% endif %}
+    </select>
+  </div>
+</div>
+<div>
+  <label class="label">Clase</label>
+  <select name="clase" class="input w-full">
+    <option value="">Todas</option>
+    {% for clase in clases %}
+    <option value="{{ clase.pk }}" {% if clase_id == clase.pk|stringformat:"s" %}selected{% endif %}>{{ clase.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% if mostrar_filtro_almacen %}
+<div>
+  <label class="label">Sucursal</label>
+  <select name="almacen" class="input w-full">
+    <option value="">Todas</option>
+    {% for almacen in almacenes %}
+    <option value="{{ almacen.pk }}" {% if almacen_id == almacen.pk|stringformat:"s" %}selected{% endif %}>{{ almacen.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endif %}

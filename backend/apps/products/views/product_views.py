@@ -7,7 +7,8 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
-from apps.products.models import Categoria, Clase, Linea, Marca, Producto, ProductoPrecio
+from apps.core.filtros_producto import FiltrosProductoMixin
+from apps.products.models import Producto, ProductoPrecio
 from apps.products.forms import ProductForm
 
 # (nombre de la ListaPrecio, nombre del campo anotado) para las 5 listas
@@ -90,7 +91,7 @@ class ProductToggleActivoView(PermissionRequiredMixin, View):
         return redirect(next_url)
 
 
-class ProductListView(PermissionRequiredMixin, ListView):
+class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
     permission_required = "products.view_producto"
     model = Producto
     template_name = "products/product_list.html"
@@ -106,22 +107,6 @@ class ProductListView(PermissionRequiredMixin, ListView):
                 Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q)
             )
 
-        marca_id = self.request.GET.get("marca", "").strip()
-        if marca_id:
-            queryset = queryset.filter(marca_id=marca_id)
-
-        linea_id = self.request.GET.get("linea", "").strip()
-        if linea_id:
-            queryset = queryset.filter(linea_id=linea_id)
-
-        categoria_id = self.request.GET.get("categoria", "").strip()
-        if categoria_id:
-            queryset = queryset.filter(categoria_id=categoria_id)
-
-        clase_id = self.request.GET.get("clase", "").strip()
-        if clase_id:
-            queryset = queryset.filter(clase_id=clase_id)
-
         annotations = {
             campo: Subquery(
                 ProductoPrecio.objects.filter(
@@ -136,12 +121,4 @@ class ProductListView(PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["q"] = self.request.GET.get("q", "").strip()
-        context["marca_id"] = self.request.GET.get("marca", "").strip()
-        context["linea_id"] = self.request.GET.get("linea", "").strip()
-        context["categoria_id"] = self.request.GET.get("categoria", "").strip()
-        context["clase_id"] = self.request.GET.get("clase", "").strip()
-        context["marcas"] = Marca.objects.filter(is_active=True).order_by("nombre")
-        context["lineas"] = Linea.objects.filter(is_active=True).order_by("nombre")
-        context["categorias"] = Categoria.objects.filter(is_active=True).order_by("nombre")
-        context["clases"] = Clase.objects.filter(is_active=True).order_by("nombre")
         return context

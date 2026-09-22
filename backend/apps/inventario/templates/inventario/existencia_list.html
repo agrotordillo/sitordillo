@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_table_layout.html" %}
+{% load static %}
 {% block title %}Existencias{% endblock title %}
 {% block title_layout %}Existencias por almacén{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -11,16 +12,8 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<form method="get" class="grid gap-2 sm:grid-cols-3 items-end w-full">
-  <div>
-    <label class="label">Almacén</label>
-    <select name="almacen" class="input w-full">
-      <option value="">Todos</option>
-      {% for a in almacenes %}
-      <option value="{{ a.pk }}" {% if almacen_id == a.pk|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
-      {% endfor %}
-    </select>
-  </div>
+<form method="get" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 items-end w-full">
+  {% include "core/includes/_filtros_producto.html" %}
   <div class="flex items-center gap-1.5">
     <div class="flex-1">
       <label class="label">Ingresó desde</label>
@@ -31,7 +24,16 @@
       <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input w-full">
     </div>
   </div>
-  <button type="submit" class="btn-primary">Filtrar</button>
+  <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4 lg:justify-end">
+    <button type="submit" class="btn-primary">Filtrar</button>
+    {% if hay_filtros_producto or fecha_desde or fecha_hasta %}
+    <a href="{% url 'inventario:existencia-list' %}" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+    {% endif %}
+  </div>
 </form>
 {% endblock table_actions %}
 {% block main_content %}
@@ -64,3 +66,7 @@
   </table>
 </div>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

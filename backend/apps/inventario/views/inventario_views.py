@@ -4,17 +4,19 @@ from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
+from apps.core.filtros_producto import FiltrosProductoMixin
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
-from apps.products.models import Almacen
 
 
-class LoteListView(PermissionRequiredMixin, ListView):
+class LoteListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
     permission_required = "inventario.view_lote"
     model = Lote
     template_name = "inventario/lote_list.html"
     context_object_name = "lotes"
     extra_context = {"active_module": "warehouses"}
+    filtro_producto_prefix = "producto__"
+    filtro_incluir_almacen = True
 
     def get_queryset(self):
         queryset = (
@@ -40,11 +42,13 @@ class LoteListView(PermissionRequiredMixin, ListView):
         return context
 
 
-class ExistenciaListView(PermissionRequiredMixin, ListView):
+class ExistenciaListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
     permission_required = "inventario.view_lote"
     template_name = "inventario/existencia_list.html"
     context_object_name = "existencias"
     extra_context = {"active_module": "warehouses"}
+    filtro_producto_prefix = "producto__"
+    filtro_incluir_almacen = True
 
     def get_queryset(self):
         queryset = Lote.objects.filter(is_active=True, cantidad_disponible__gt=0)
@@ -52,9 +56,11 @@ class ExistenciaListView(PermissionRequiredMixin, ListView):
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
 
-        almacen_id = self.request.GET.get("almacen", "").strip()
-        if almacen_id:
-            queryset = queryset.filter(almacen_id=almacen_id)
+        # Filtros de marca/línea/categoría/subcategoría/clase/sucursal deben
+        # aplicarse ANTES del values()+annotate() de abajo: después de
+        # agrupar, un .filter() ya actuaría como HAVING sobre lo agregado,
+        # no como filtro de qué lotes entran al agrupamiento.
+        queryset = self.aplicar_filtros_producto(queryset)
 
         # Fecha de ingreso del lote: cuándo entró esa mercancía, no cuándo
         # se registró en el sistema (created_at es solo auditoría).
@@ -73,13 +79,6 @@ class ExistenciaListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["almacen_id"] = self.request.GET.get("almacen", "")
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
-
-        almacenes = Almacen.objects.filter(is_active=True)
-        visibles = almacenes_visibles(self.request.user)
-        if visibles is not None:
-            almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
-        context["almacenes"] = almacenes
         return context

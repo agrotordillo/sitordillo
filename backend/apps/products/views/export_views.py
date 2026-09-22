@@ -4,6 +4,7 @@ from django.db.models import DecimalField, OuterRef, Q, Subquery
 from django.http import HttpResponse
 from django.utils import timezone
 
+from apps.core.filtros_producto import aplicar_filtros_producto, leer_filtros_producto
 from apps.products.models import Producto, ProductoPrecio
 from apps.products.views.product_views import LISTAS_PRECIO_TABLA
 
@@ -20,10 +21,10 @@ ENCABEZADOS = [
 @permission_required("products.view_producto", raise_exception=True)
 def producto_exportar_excel_view(request):
     """Descarga en Excel el mismo listado de Productos que se ve en
-    pantalla -respeta los filtros de búsqueda, marca, línea, categoría y
-    clase si se llega desde ahí-, con toda su información incluidos los 5
-    precios generales de lista (los mismos que se muestran como columnas
-    en el listado)."""
+    pantalla -respeta los filtros de búsqueda, marca, línea, categoría,
+    subcategoría y clase si se llega desde ahí-, con toda su información
+    incluidos los 5 precios generales de lista (los mismos que se
+    muestran como columnas en el listado)."""
     queryset = Producto.objects.select_related(
         "categoria", "subcategoria", "linea", "clase", "marca", "proveedor", "unidad_medida",
     ).order_by("nombre")
@@ -32,21 +33,7 @@ def producto_exportar_excel_view(request):
     if q:
         queryset = queryset.filter(Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q))
 
-    marca_id = request.GET.get("marca", "").strip()
-    if marca_id:
-        queryset = queryset.filter(marca_id=marca_id)
-
-    linea_id = request.GET.get("linea", "").strip()
-    if linea_id:
-        queryset = queryset.filter(linea_id=linea_id)
-
-    categoria_id = request.GET.get("categoria", "").strip()
-    if categoria_id:
-        queryset = queryset.filter(categoria_id=categoria_id)
-
-    clase_id = request.GET.get("clase", "").strip()
-    if clase_id:
-        queryset = queryset.filter(clase_id=clase_id)
+    queryset = aplicar_filtros_producto(queryset, leer_filtros_producto(request))
 
     annotations = {
         campo: Subquery(
