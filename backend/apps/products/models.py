@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -472,6 +472,20 @@ PRECIO_POSICIONES = [
 ]
 
 
+def redondear_precio_venta(valor):
+    """Redondea un precio de venta CALCULADO (nunca uno capturado a mano)
+    hacia arriba al múltiplo de $0.50 más cercano -nunca hacia abajo, para
+    no perder margen-: 7.32 y 7.51 suben a 7.50 y 8.00 respectivamente;
+    7.00 y 7.50 se quedan igual porque ya son múltiplos de $0.50. Se usa
+    únicamente al recalcular el precio desde el % de utilidad o desde el
+    costo del producto (ver Producto._recalcular_precios_por_utilidad y
+    static/js/modules/forms/precio-lista-calc.js, misma regla en ambos
+    lados); un precio con impuesto capturado directamente en la pantalla
+    de Precios se respeta tal cual, sin forzar este redondeo."""
+    subido = (valor / Decimal("0.50")).to_integral_value(rounding=ROUND_CEILING) * Decimal("0.50")
+    return subido.quantize(Decimal("0.01"))
+
+
 class Producto(BaseAbstractModel):
     class TipoProducto(models.TextChoices):
         PRODUCTO = "producto", "Producto"
@@ -727,15 +741,14 @@ class Producto(BaseAbstractModel):
     def _recalcular_precios_por_utilidad(self):
         """Cuando cambia el costo del producto, recalcula el precio de cada
         lista que tenga un % de utilidad guardado (precio_sin_impuesto =
-        costo * (1 + utilidad% / 100)). Las filas sin % de utilidad son
-        precio manual y no se tocan."""
+        costo * (1 + utilidad% / 100)), redondeado hacia arriba al múltiplo
+        de $0.50 más cercano (ver redondear_precio_venta). Las filas sin %
+        de utilidad son precio manual y no se tocan."""
         for precio in self.precios.filter(utilidad_pct__isnull=False):
             precio.producto = self
             factor = (Decimal("1") + precio._tasa_ieps) * (Decimal("1") + precio._tasa_iva)
             precio_sin_impuesto = self.precio_costo * (Decimal("1") + precio.utilidad_pct / Decimal("100"))
-            precio.precio_con_impuesto = (precio_sin_impuesto * factor).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+            precio.precio_con_impuesto = redondear_precio_venta(precio_sin_impuesto * factor)
             precio.save(update_fields=["precio_con_impuesto"])
 
 
