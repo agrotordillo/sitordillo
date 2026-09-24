@@ -254,6 +254,15 @@
                 {{ form.retencion_isr }}
                 {% if form.retencion_isr.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.retencion_isr.errors.0 }}</p>{% endif %}
               </div>
+              <div>
+                <label for="{{ form.flete.id_for_label }}" class="label">Flete</label>
+                {{ form.flete }}
+                <p class="mt-1.5 text-xs text-gray-400">
+                  Pagado a un tercero, no al proveedor: no se suma al total ni a la cuenta por pagar.
+                  Se prorratea entre los productos para que su costo real al recibir incluya el flete.
+                </p>
+                {% if form.flete.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.flete.errors.0 }}</p>{% endif %}
+              </div>
             </div>
               </div>
             </div>

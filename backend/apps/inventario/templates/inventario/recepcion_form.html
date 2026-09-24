@@ -54,6 +54,9 @@
         <div class="sm:col-span-2">
           <label for="{{ form.costo_unitario.id_for_label }}" class="label">Costo unitario</label>
           {{ form.costo_unitario }}
+          {% if detalle.orden_compra.flete %}
+          <p class="mt-1.5 text-xs text-gray-400">Ya incluye ${{ detalle.flete_unitario|floatformat:2 }} de flete prorrateado.</p>
+          {% endif %}
           {% if form.costo_unitario.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.costo_unitario.errors.0 }}</p>{% endif %}
         </div>
       </div>

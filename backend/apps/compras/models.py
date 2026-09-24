@@ -192,6 +192,18 @@ class OrdenCompra(BaseAbstractModel):
     )
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IVA")
     ieps = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IEPS")
+    flete = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        verbose_name="Flete",
+        help_text=(
+            "Costo de transporte pagado a un tercero (no al proveedor) para traer "
+            "esta mercancía. No se suma a total/cuenta por pagar del proveedor; solo "
+            "se prorratea entre los productos de la orden para reflejar su costo "
+            "real de entrada al almacén."
+        ),
+    )
     retencion_iva = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Retención IVA"
     )
@@ -211,6 +223,7 @@ class OrdenCompra(BaseAbstractModel):
             ),
             models.CheckConstraint(condition=models.Q(iva__gte=0), name="oc_iva_no_negativo"),
             models.CheckConstraint(condition=models.Q(ieps__gte=0), name="oc_ieps_no_negativo"),
+            models.CheckConstraint(condition=models.Q(flete__gte=0), name="oc_flete_no_negativo"),
             models.CheckConstraint(condition=models.Q(retencion_iva__gte=0), name="oc_retencion_iva_no_negativa"),
             models.CheckConstraint(condition=models.Q(retencion_isr__gte=0), name="oc_retencion_isr_no_negativa"),
         ]
@@ -374,8 +387,9 @@ class OrdenCompraDetalle(BaseAbstractModel):
         alcanza ese adicional, el costo registrado no debe quedar inflado
         ni desinflado por una negociación puntual. Este es el valor que se
         compara contra el costo registrado del producto (alerta de "el
-        precio subió") y el que se usa como costo por default al recibir
-        la mercancía — nunca el precio bruto ni el % combinado."""
+        precio subió") — nunca el precio bruto ni el % combinado. Para el
+        costo que se precarga al recibir la mercancía usa costo_con_flete,
+        no este valor directamente."""
         precio = self.precio_unitario or Decimal("0.00")
         if not self.orden_compra_id:
             return precio
@@ -392,6 +406,37 @@ class OrdenCompraDetalle(BaseAbstractModel):
             return precio
         neto = precio * (Decimal("1") - pct / Decimal("100"))
         return neto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def flete_unitario(self):
+        """Flete de la orden (OrdenCompra.flete, pagado a un tercero, no al
+        proveedor) prorrateado a este renglón según su peso en el valor
+        total ORDENADO de la orden (cantidad × precio_unitario de todos
+        los renglones, no cantidad_facturable) y repartido entre sus
+        piezas ordenadas. Usar lo ordenado -en vez de lo ya recibido- es
+        deliberado: así la tasa de flete por pieza no cambia entre una
+        recepción parcial y la siguiente, solo depende de lo que se pidió.
+        Formaliza lo que hoy se hace a mano: inflar el costo unitario al
+        recibir para que absorba el flete de traer la mercancía."""
+        if not self.orden_compra_id or not self.orden_compra.flete:
+            return Decimal("0.00")
+        valor_ordenado_total = sum(
+            (d.cantidad * (d.precio_unitario or Decimal("0.00")) for d in self.orden_compra.detalles.all()),
+            Decimal("0.00"),
+        )
+        cantidad = self.cantidad or Decimal("0.00")
+        if not valor_ordenado_total or not cantidad:
+            return Decimal("0.00")
+        valor_linea = cantidad * (self.precio_unitario or Decimal("0.00"))
+        flete_linea = self.orden_compra.flete * (valor_linea / valor_ordenado_total)
+        return (flete_linea / cantidad).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def costo_con_flete(self):
+        """precio_neto más el flete prorrateado de esta orden: el costo por
+        default que se precarga en costo_unitario al recibir la mercancía
+        (ver apps.inventario.views.recepcion_views)."""
+        return self.precio_neto + self.flete_unitario
 
     def clean(self):
         super().clean()

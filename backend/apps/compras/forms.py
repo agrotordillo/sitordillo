@@ -67,6 +67,7 @@ class OrdenCompraForm(BaseModelForm):
             "ieps",
             "retencion_iva",
             "retencion_isr",
+            "flete",
             "observaciones",
         ]
         widgets = {
@@ -111,6 +112,9 @@ class OrdenCompraForm(BaseModelForm):
                 "step": "0.01",
                 "min": "0",
             })
+        # Sin fs-impuesto-suma: el flete no se paga al proveedor, así que no
+        # debe sumarse al total/cuenta por pagar que calcula formset-rows.js.
+        self.fields["flete"].widget.attrs.update({"step": "0.01", "min": "0"})
 
 
 class OrdenCompraDetalleForm(BaseModelForm):

@@ -102,10 +102,11 @@ def recepcion_compra_view(request, pk):
             {
                 "detalle_id": d.id,
                 "cantidad_recibir": d.cantidad - d.cantidad_recibida,
-                # precio_neto (no precio_unitario bruto): descuenta solo el %
-                # base del proveedor (Proveedor.descuento), nunca el %
-                # combinado/adicional de la orden — ver OrdenCompraDetalle.precio_neto.
-                "costo_unitario": d.precio_neto,
+                # costo_con_flete = precio_neto (descuenta solo el % base del
+                # proveedor, nunca el % combinado/adicional de la orden) más
+                # el flete de la orden prorrateado a este renglón — ver
+                # OrdenCompraDetalle.precio_neto y .flete_unitario.
+                "costo_unitario": d.costo_con_flete,
                 "almacen": orden.almacen_destino_id,
             }
             for d in pendientes
