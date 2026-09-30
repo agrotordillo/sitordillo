@@ -1,0 +1,31 @@
+{% comment %}
+Carga por lista (pegar código/SKU y cantidad), compartida entre venta y
+cotización -mismo patrón que compras (ver lista-masiva.js), pero acá el
+precio se resuelve contra la lista del cliente y solo se ofrece lo que
+tiene existencia en la sucursal elegida (ver ProductoResolverSkusView).
+{% endcomment %}
+<div class="mb-4 rounded-xl border border-gray-100" x-data="{ open: false }">
+  <button type="button" class="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700" @click="open = !open">
+    Carga por lista (pegar código y cantidad)
+    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ '-rotate-180': open }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+    </svg>
+  </button>
+  <div x-show="open" x-cloak class="px-3 pb-3 border-t border-gray-100 pt-3">
+    <p class="text-xs text-gray-400 mb-2">Pega una lista con código/SKU y cantidad por línea (como se copia de Excel), una línea por producto. El precio se toma de la lista de precios del cliente; solo se agrega lo que tenga existencia en la sucursal elegida.</p>
+    <textarea id="lista-masiva-texto" class="input" rows="5" placeholder="C120	2&#10;3S100	5"></textarea>
+    <div class="flex items-center justify-between mt-2">
+      <p id="lista-masiva-resumen" class="text-xs text-gray-500"></p>
+      <button
+        type="button"
+        id="lista-masiva-btn"
+        class="btn-secondary"
+        data-url="{% url 'api:producto-resolver-skus' %}"
+        data-almacen-field="id_almacen"
+        data-almacen-label="la sucursal"
+        data-cliente-field="id_cliente"
+        data-precio-campo="venta"
+      >{{ boton_texto|default:"Agregar" }}</button>
+    </div>
+  </div>
+</div>

@@ -3,22 +3,20 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView
 
 from apps.core.scoping import almacenes_visibles
-from apps.products.models import Turno
-from apps.products.services import fijar_precios_autorizados
+from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.forms import VentaForm, VentaDetalleFormSet, VentaPagoFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
-    obtener_turno_abierto,
     procesar_lineas_venta,
     validar_pago_dividido,
     validar_stock_disponible,
-    validar_turno_abierto,
     validar_venta_a_credito,
 )
 
@@ -107,16 +105,33 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
     success_message = "Venta registrada correctamente."
     extra_context = {"active_module": "sales"}
 
+    def dispatch(self, request, *args, **kwargs):
+        # La sucursal de la venta ya no la elige el cajero: se toma del
+        # punto de venta de su turno propio y abierto (ver
+        # products.services.turno_abierto_de) -si no tiene ninguno, no
+        # tiene caso ni mostrarle el formulario, porque no hay de dónde
+        # sacar la sucursal ni se podría cobrar al final.
+        self.turno = turno_abierto_de(request.user)
+        if self.turno is None:
+            messages.error(request, "No tienes un turno abierto. Ábrelo antes de registrar una venta.")
+            return redirect("products:turno-list")
+        self.almacen = self.turno.punto_venta.almacen
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         # Al terminar de registrar la venta, directo al ticket listo para
         # imprimir -no al listado-, para no obligar a un clic extra en el
         # mostrador.
         return reverse("ventas:venta-ticket", args=[self.object.pk])
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # almacen/turno ya no son campos del formulario (ver VentaForm):
+        # se fijan aquí, directo en la instancia, antes de validar -así
+        # form.save() los guarda igual que cualquier otro campo-.
+        form.instance.almacen = self.almacen
+        form.instance.turno = self.turno
+        return form
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -130,20 +145,8 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
                 data["pagos_formset"] = VentaPagoFormSet(self.request.POST, instance=self.object, prefix="pagos")
             else:
                 data["pagos_formset"] = VentaPagoFormSet(instance=self.object, prefix="pagos")
-
-        # Aviso previo (no bloquea cargar el formulario, solo informa antes
-        # de que el cajero llene todo y se tope con el error hasta enviar):
-        # de las sucursales que puede elegir, en cuáles el usuario actual
-        # NO tiene su propio turno abierto -ver validar_turno_abierto, que
-        # exige que sea el mismo usuario, no que la sucursal tenga
-        # cualquier turno abierto por alguien más.
-        almacenes = list(data["form"].fields["almacen"].queryset)
-        con_turno_propio_abierto = set(
-            Turno.objects.filter(
-                punto_venta__almacen__in=almacenes, usuario=self.request.user, estatus=Turno.Estatus.ABIERTO
-            ).values_list("punto_venta__almacen_id", flat=True)
-        )
-        data["sucursales_sin_turno"] = [a for a in almacenes if a.pk not in con_turno_propio_abierto]
+        data["turno"] = self.turno
+        data["almacen"] = self.almacen
         return data
 
     def form_valid(self, form):
@@ -152,13 +155,7 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
-        almacen = form.cleaned_data["almacen"]
-
-        error_turno = validar_turno_abierto(almacen, self.request.user)
-        if error_turno:
-            form.add_error(None, error_turno)
-            return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
-        form.instance.turno = obtener_turno_abierto(almacen, self.request.user)
+        almacen = self.almacen
 
         # El cobro se captura con una sola forma de pago, o dividido en
         # varias (ver Venta.pago_dividido) -nunca ambas-: si se dividió,

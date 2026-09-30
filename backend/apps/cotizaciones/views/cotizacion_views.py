@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView, UpdateView
@@ -10,7 +11,7 @@ from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.models import Cotizacion, CotizacionDetalle
 from apps.cotizaciones.forms import CotizacionForm, CotizacionDetalleFormSet
 from apps.cotizaciones.pdf import generar_pdf_cotizacion
-from apps.products.services import fijar_precios_autorizados
+from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 
 
 class CotizacionListView(PermissionRequiredMixin, ListView):
@@ -37,10 +38,25 @@ class CotizacionCreateView(PermissionRequiredMixin, CreateView):
     success_message = "Cotización registrada correctamente."
     extra_context = {"active_module": "quotes"}
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
+    def dispatch(self, request, *args, **kwargs):
+        # Igual que en Ventas: la sucursal (y el punto de venta, que ya
+        # determina el folio) ya no los elige mostrador, se toman del
+        # turno propio y abierto de quien levanta la cotización -sin uno
+        # abierto no hay de dónde sacarlos, así que tampoco tiene caso
+        # dejarlo entrar a la pantalla-.
+        self.turno = turno_abierto_de(request.user)
+        if self.turno is None:
+            messages.error(request, "No tienes un turno abierto. Ábrelo antes de levantar una cotización.")
+            return redirect("products:turno-list")
+        self.almacen = self.turno.punto_venta.almacen
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.instance.almacen = self.almacen
+        form.instance.punto_venta = self.turno.punto_venta
+        form.instance.turno = self.turno
+        return form
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -49,6 +65,8 @@ class CotizacionCreateView(PermissionRequiredMixin, CreateView):
                 data["formset"] = CotizacionDetalleFormSet(self.request.POST, instance=self.object, prefix="detalles")
             else:
                 data["formset"] = CotizacionDetalleFormSet(instance=self.object, prefix="detalles")
+        data["turno"] = self.turno
+        data["almacen"] = self.almacen
         return data
 
     def form_valid(self, form):
@@ -61,7 +79,7 @@ class CotizacionCreateView(PermissionRequiredMixin, CreateView):
         # cliente y la sucursal de la cotización, ignorando lo que haya
         # llegado en el POST.
         fijar_precios_autorizados(
-            formset, form.cleaned_data.get("cliente"), form.cleaned_data.get("almacen"),
+            formset, form.cleaned_data.get("cliente"), self.almacen,
             CotizacionDetalle.Estrategia.FIFO,
         )
 
@@ -102,11 +120,6 @@ class CotizacionUpdateView(PermissionRequiredMixin, UpdateView):
             queryset = queryset.filter(almacen__in=visibles)
         return queryset
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
-
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.estatus != Cotizacion.Estatus.ABIERTA:
@@ -136,7 +149,7 @@ class CotizacionUpdateView(PermissionRequiredMixin, UpdateView):
         # cliente y la sucursal de la cotización, ignorando lo que haya
         # llegado en el POST.
         fijar_precios_autorizados(
-            formset, form.cleaned_data.get("cliente"), form.cleaned_data.get("almacen"),
+            formset, form.cleaned_data.get("cliente"), form.instance.almacen,
             CotizacionDetalle.Estrategia.FIFO,
         )
 

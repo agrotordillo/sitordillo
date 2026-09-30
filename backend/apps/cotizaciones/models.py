@@ -28,6 +28,16 @@ class Cotizacion(BaseAbstractModel):
         related_name="cotizaciones",
         verbose_name="Punto de venta",
     )
+    turno = models.ForeignKey(
+        "products.Turno",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cotizaciones",
+        verbose_name="Turno",
+        help_text="El turno propio y abierto de quien la levantó, tomado automáticamente "
+        "(ver products.services.turno_abierto_de). No lo elige el usuario.",
+    )
     numero_documento = models.CharField(
         max_length=20,
         unique=True,

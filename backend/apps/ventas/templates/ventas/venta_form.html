@@ -23,14 +23,6 @@
   </div>
   {% endif %}
 
-  {% if sucursales_sin_turno %}
-  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-    No tienes un turno propio abierto en: {{ sucursales_sin_turno|join:", " }}. Ábrelo en
-    <a href="{% url 'products:turno-list' %}" target="_blank" rel="noopener" class="underline font-medium">Turnos</a>
-    antes de vender ahí.
-  </div>
-  {% endif %}
-
   <div class="grid gap-8">
 
     <div>
@@ -45,15 +37,11 @@
             </a>
           </div>
         </div>
-        {% if not form.almacen.is_hidden %}
         <div>
-          <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal</label>
-          {{ form.almacen }}
-          {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+          <span class="label">Sucursal</span>
+          <p class="text-sm text-gray-700 py-2">{{ almacen.nombre }} <span class="text-gray-400">· Caja: {{ turno.punto_venta.nombre }} ({{ turno.folio }})</span></p>
+          <input type="hidden" id="id_almacen" value="{{ almacen.pk }}">
         </div>
-        {% else %}
-        {{ form.almacen }}
-        {% endif %}
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
           {{ form.observaciones }}
@@ -71,6 +59,8 @@
         {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
       </div>
       {% endif %}
+
+      {% include "ventas/includes/_lista_masiva.html" with boton_texto="Agregar a la venta" %}
 
       <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
         <table class="w-full text-sm text-left text-gray-600">
@@ -203,6 +193,7 @@
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/lista-masiva.js' %}"></script>
 <script src="{% static 'js/modules/forms/venta-cambio.js' %}"></script>
 <script src="{% static 'js/modules/forms/venta-pago-dividido.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>

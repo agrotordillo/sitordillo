@@ -173,9 +173,16 @@ class ProductoPreciosPorClienteView(APIView):
 
 class ProductoResolverSkusView(APIView):
     """Resuelve una lista de SKUs a productos (coincidencia exacta,
-    insensible a mayúsculas/minúsculas). Pensado para la carga por lista de
-    Compras: pegas SKU + cantidad por línea y esto encuentra el producto de
-    cada SKU en un solo viaje al servidor."""
+    insensible a mayúsculas/minúsculas). Pensado para la carga por lista
+    (pegas SKU + cantidad por línea) de Compras, Ventas y Cotizaciones.
+
+    Con `almacen` en el body (ventas/cotizaciones) solo se ofrecen los
+    productos con existencia ahí -mismo criterio que ProductoBuscarView-;
+    los que sí existen como producto pero sin stock en esa sucursal se
+    reportan aparte en `sin_existencia`, distinto de `no_encontrados`
+    (SKU que no corresponde a ningún producto). Con `cliente` y/o
+    `precio_almacen` se resuelve `precio_venta` contra la lista de
+    precios de ese cliente, igual que ProductoBuscarView."""
 
     def post(self, request):
         skus = request.data.get("skus", [])
@@ -184,28 +191,56 @@ class ProductoResolverSkusView(APIView):
 
         skus_norm = [str(s).strip().upper() for s in skus if str(s).strip()]
         if not skus_norm:
-            return Response({"productos": [], "no_encontrados": []})
+            return Response({"productos": [], "no_encontrados": [], "sin_existencia": []})
 
-        productos = list(
+        almacen_id = str(request.data.get("almacen") or "").strip() or None
+
+        productos_qs = (
             Producto.objects.filter(is_active=True)
             .exclude(tipo=Producto.TipoProducto.PAQUETE)
             .annotate(sku_upper=Upper("sku"))
             .filter(sku_upper__in=set(skus_norm))
         )
+        if almacen_id:
+            productos_qs = productos_qs.annotate(
+                disponible=Sum("lotes__cantidad_disponible", filter=Q(lotes__almacen_id=almacen_id))
+            )
+
+        productos = list(productos_qs)
         por_sku = {p.sku.upper(): p for p in productos}
         no_encontrados = [s for s in dict.fromkeys(skus_norm) if s not in por_sku]
 
-        data = [
-            {
+        sin_existencia = []
+        if almacen_id:
+            con_existencia = [p for p in productos if (p.disponible or 0) > 0]
+            sin_existencia = [p.sku for p in productos if not ((p.disponible or 0) > 0)]
+            productos = con_existencia
+
+        cliente_raw = request.data.get("cliente")
+        cliente_id = str(cliente_raw).strip() if cliente_raw else None
+        precio_almacen_raw = request.data.get("precio_almacen")
+        precio_almacen_id = str(precio_almacen_raw).strip() if precio_almacen_raw else None
+        lista_precio = None
+        if cliente_id or precio_almacen_id:
+            cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
+            lista_precio = resolver_lista_precio_cliente(cliente)
+
+        data = []
+        for p in productos:
+            precio_venta = p.precio_venta
+            if lista_precio is not None:
+                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
+                if resuelto is not None:
+                    precio_venta = resuelto
+            data.append({
                 "id": p.id,
                 "folio": p.folio,
                 "sku": p.sku,
                 "nombre": p.nombre,
                 "precio_costo": str(p.precio_costo),
-            }
-            for p in productos
-        ]
-        return Response({"productos": data, "no_encontrados": no_encontrados})
+                "precio_venta": str(precio_venta),
+            })
+        return Response({"productos": data, "no_encontrados": no_encontrados, "sin_existencia": sin_existencia})
 
 
 class ProductoActualizarCostoView(APIView):

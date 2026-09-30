@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from apps.inventario.models import Lote, MovimientoInventario
 from apps.inventario.services import registrar_movimiento, seleccionar_lotes_para_salida
-from apps.products.models import Producto, Turno
+from apps.products.models import Producto
 
 from .models import VentaDetalleLote
 
@@ -55,42 +55,23 @@ def validar_pago_dividido(total, montos):
     return errores
 
 
-def validar_turno_abierto(almacen, usuario):
-    """Una venta solo se puede registrar si el usuario que la captura tiene
-    ÉL MISMO un turno abierto en alguna caja (PuntoVenta tipo Cobro) de
-    esa sucursal (ver products.Turno) -no basta con que la sucursal tenga
-    alguno abierto por otra persona-, para que quede claro quién estuvo a
-    cargo de esa operación. Una sucursal puede tener varias cajas, cada
-    una con su propio turno abierto simultáneo (aunque hoy en la práctica
-    solo se use una), así que esto no bloquea a un segundo cajero con su
-    propia caja abierta. Devuelve un mensaje de error, o None si el
-    usuario tiene un turno propio abierto en alguna caja de esa sucursal."""
-    if not Turno.objects.filter(
-        punto_venta__almacen=almacen, usuario=usuario, estatus=Turno.Estatus.ABIERTO
-    ).exists():
-        return f'No tienes un turno abierto en "{almacen.nombre}". Ábrelo antes de registrar la venta.'
-    return None
-
-
-def obtener_turno_abierto(almacen, usuario):
-    """El turno propio y abierto de `usuario` en alguna caja de `almacen`
-    -mismo criterio que validar_turno_abierto-, para dejarlo guardado en
-    la Venta (ver Venta.turno) y así poder imprimir en el ticket con qué
-    caja y bajo qué turno se cobró. Se llama siempre después de que
-    validar_turno_abierto ya confirmó que existe uno; si por una
-    condición de carrera ya no lo hay, regresa None."""
-    return Turno.objects.filter(
-        punto_venta__almacen=almacen, usuario=usuario, estatus=Turno.Estatus.ABIERTO
-    ).select_related("punto_venta").first()
-
-
 def expandir_linea(producto, cantidad, estrategia):
     """Convierte una línea de venta en las líneas de producto real que
     afectan inventario. Para un producto normal, es la misma línea sin
-    cambios. Para un paquete/combo, se expande en cada componente con su
-    cantidad multiplicada (cantidad_componente_por_paquete * cantidad
-    de paquetes vendidos)."""
+    cambios. Para un paquete/combo con existencia propia (se armó con
+    anticipación, ver apps.inventario.services.registrar_ensamble_paquete),
+    se vende directo de ahí, sin tocar los componentes de nuevo. Si no
+    tiene existencia propia, se expande en cada componente con su cantidad
+    multiplicada (cantidad_componente_por_paquete * cantidad de paquetes
+    vendidos) -el paquete "virtual" de siempre, armado al momento de
+    vender."""
     if producto.tipo == Producto.TipoProducto.PAQUETE:
+        tiene_existencia_propia = Lote.objects.filter(
+            producto=producto, almacen_id=producto.almacen_id, is_active=True, cantidad_disponible__gt=0
+        ).exists()
+        if tiene_existencia_propia:
+            yield (producto, cantidad, estrategia)
+            return
         for componente in producto.componentes.select_related("producto_componente"):
             cantidad_componente = (componente.cantidad * cantidad).quantize(Decimal("0.01"))
             yield from expandir_linea(componente.producto_componente, cantidad_componente, estrategia)

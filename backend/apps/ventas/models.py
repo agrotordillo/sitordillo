@@ -45,7 +45,7 @@ class Venta(BaseAbstractModel):
         related_name="ventas",
         verbose_name="Turno",
         help_text="El turno propio y abierto del usuario que cobró, tomado automáticamente "
-        "(ver ventas.services.obtener_turno_abierto). No lo elige el usuario.",
+        "(ver products.services.turno_abierto_de); de ahí también sale la sucursal de la venta.",
     )
     fecha_venta = models.DateTimeField(default=timezone.now, verbose_name="Fecha de venta")
     referencia_pago = models.CharField(

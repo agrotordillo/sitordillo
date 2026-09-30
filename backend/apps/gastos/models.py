@@ -14,10 +14,13 @@ class CentroCosto(BaseAbstractModel):
     propio control de gasto -por ejemplo, para la declaración fiscal del
     PFAE que agrupa todas las actividades del negocio- como proyectos
     agropecuarios, administración corporativa o gasto personal de los
-    dueños."""
+    dueños. Las unidades de negocio (renta de mobiliario, transportes,
+    arrendamiento de inmuebles) sí tienen ingreso propio, pero no venden
+    en mostrador ni tienen almacén."""
 
     class Tipo(models.TextChoices):
         SUCURSAL = "sucursal", "Sucursal (venta al público)"
+        UNIDAD_NEGOCIO = "unidad_negocio", "Unidad de negocio (ingreso propio, sin mostrador)"
         PROYECTO = "proyecto", "Proyecto / actividad no comercial"
         ADMINISTRATIVO = "administrativo", "Administración / corporativo"
         PERSONAL = "personal", "Gasto personal de los dueños"
@@ -77,20 +80,86 @@ class CentroCosto(BaseAbstractModel):
             raise ValidationError({"almacen": "Solo los centros de tipo Sucursal se ligan a un almacén."})
 
 
+class GrupoGasto(BaseAbstractModel):
+    """Agrupador de conceptos de gasto (Nómina, Servicios, Mantenimiento,
+    Activo fijo...). Su `clasificacion` decide si lo registrado con sus
+    conceptos es gasto de operación o no: la compra de un activo fijo o un
+    retiro de la propietaria se capturan en el mismo módulo para no perder
+    su rastro, pero no deben inflar el gasto del punto de equilibrio."""
+
+    class Clasificacion(models.TextChoices):
+        GASTO = "gasto", "Gasto de operación"
+        INVERSION = "inversion", "Inversión / activo fijo"
+        NO_OPERATIVO = "no_operativo", "Movimiento no operativo"
+
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre del grupo",
+        error_messages={"unique": "Ya existe un %(model_name)s con este nombre."},
+    )
+    clasificacion = models.CharField(
+        max_length=15,
+        choices=Clasificacion.choices,
+        default=Clasificacion.GASTO,
+        verbose_name="Clasificación",
+        help_text="Solo lo clasificado como Gasto de operación cuenta en el reporte de punto de equilibrio.",
+    )
+    orden = models.PositiveSmallIntegerField(default=0, verbose_name="Orden")
+
+    class Meta:
+        verbose_name = "Grupo de gasto"
+        verbose_name_plural = "Grupos de gasto"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "GRG"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+    @property
+    def cuenta_en_resultados(self):
+        return self.clasificacion == self.Clasificacion.GASTO
+
+
 class CategoriaGasto(BaseAbstractModel):
-    """Catálogo de clasificación operativa del gasto (servicios, personal,
-    mobiliario, transporte, arrendamiento, etc.). Es un catálogo libre para
-    poder agregar categorías nuevas sin tocar código."""
+    """Concepto de gasto: el nivel en el que se clasifica cada gasto
+    capturado (Agua, Mantenimiento eléctrico, Peajes de caseta...). Viene
+    del catálogo con guía contabilizadora que definió el negocio; cada
+    concepto guarda la cuenta del plan de cuentas contable a la que se
+    envía (varios conceptos pueden compartir cuenta) y la guía de qué sí y
+    qué no se registra en él, para mostrarla al capturar. En la interfaz se
+    llama "Concepto de gasto"; el modelo conserva su nombre original."""
 
     class Naturaleza(models.TextChoices):
         FIJO = "fijo", "Fijo"
         VARIABLE = "variable", "Variable"
 
+    grupo = models.ForeignKey(
+        GrupoGasto,
+        on_delete=models.PROTECT,
+        related_name="conceptos",
+        verbose_name="Grupo",
+    )
     nombre = models.CharField(
         max_length=100,
         unique=True,
-        verbose_name="Nombre de la categoría",
-        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
+        verbose_name="Nombre del concepto",
+        error_messages={"unique": "Ya existe un concepto de gasto con este nombre."},
+    )
+    cuenta_contable = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="Cuenta contable",
+        help_text="Cuenta del plan de cuentas contable (p. ej. 4101-015-000) a la que se envía este concepto.",
     )
     naturaleza = models.CharField(
         max_length=10,
@@ -99,12 +168,14 @@ class CategoriaGasto(BaseAbstractModel):
         verbose_name="Naturaleza",
         help_text="Fijo: no depende de cuánto se venda (renta, internet). Variable: depende del nivel de operación.",
     )
-    descripcion = models.TextField(blank=True, verbose_name="Descripción")
+    descripcion = models.TextField(blank=True, verbose_name="Qué debe registrarse")
+    ejemplos = models.TextField(blank=True, verbose_name="Ejemplos de captura")
+    criterio = models.TextField(blank=True, verbose_name="Criterio / no incluir")
 
     class Meta:
-        verbose_name = "Categoría de gasto"
-        verbose_name_plural = "Categorías de gasto"
-        ordering = ["nombre"]
+        verbose_name = "Concepto de gasto"
+        verbose_name_plural = "Conceptos de gasto"
+        ordering = ["grupo__orden", "nombre"]
 
     def __str__(self):
         return self.nombre
@@ -120,14 +191,65 @@ class CategoriaGasto(BaseAbstractModel):
         return self.nombre.strip()
 
 
+class Vehiculo(BaseAbstractModel):
+    """Unidad (vehículo o maquinaria) a la que se le liga un gasto de
+    combustible, casetas, rastreo, refacciones o mantenimiento, para poder
+    saber cuánto cuesta operar cada una. Es opcional en el gasto: una carga
+    de gasolina de un auto particular, por ejemplo, no tiene unidad."""
+
+    class Tipo(models.TextChoices):
+        VEHICULO = "vehiculo", "Vehículo"
+        MAQUINARIA = "maquinaria", "Maquinaria / equipo"
+
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre",
+        help_text="Cómo se le conoce en la operación (p. ej. \"Nissan 2014\", \"KW 2017\", \"Montacargas\").",
+        error_messages={"unique": "Ya existe una unidad con este nombre."},
+    )
+    tipo = models.CharField(max_length=10, choices=Tipo.choices, verbose_name="Tipo")
+    placas = models.CharField(max_length=15, blank=True, verbose_name="Placas")
+    centro_costo = models.ForeignKey(
+        CentroCosto,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="vehiculos",
+        verbose_name="Centro de costo habitual",
+        help_text="A dónde se carga normalmente su gasto. Es solo una referencia: cada gasto elige su centro.",
+    )
+    responsable = models.CharField(max_length=150, blank=True, verbose_name="Responsable / chofer")
+    descripcion = models.TextField(blank=True, verbose_name="Descripción")
+
+    class Meta:
+        verbose_name = "Vehículo o maquinaria"
+        verbose_name_plural = "Vehículos y maquinaria"
+        ordering = ["tipo", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_folio_prefix(self):
+        return "VEH"
+
+    def get_slug_source(self):
+        return self.nombre
+
+    @property
+    def display_name(self):
+        return self.nombre.strip()
+
+
 class Gasto(BaseAbstractModel):
     """Un gasto registrado contra un centro de costo. Cuando `es_compartido`
     es verdadero, el importe no se contabiliza directamente al centro de
-    costo de origen: se reparte entre las sucursales beneficiadas mediante
-    `GastoDistribucion`, con montos exactos capturados a mano (nunca un
-    promedio automático), porque el consumo real de cada sucursal no es
-    proporcional -por ejemplo, el reparto de agua depende de cuánto
-    personal tiene cada una, no de una división en partes iguales."""
+    costo de origen: se reparte entre los centros beneficiados (sucursales,
+    unidades de negocio, proyectos...) mediante `GastoDistribucion`, con
+    montos exactos capturados a mano (nunca un promedio automático), porque
+    el consumo real de cada uno no es proporcional -por ejemplo, el reparto
+    de agua depende de cuánto personal tiene cada sucursal, y el de una
+    factura de gasolina, de qué unidad cargó cuánto."""
 
     class Condicion(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
@@ -146,7 +268,16 @@ class Gasto(BaseAbstractModel):
         CategoriaGasto,
         on_delete=models.PROTECT,
         related_name="gastos",
-        verbose_name="Categoría",
+        verbose_name="Concepto de gasto",
+    )
+    vehiculo = models.ForeignKey(
+        Vehiculo,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="gastos",
+        verbose_name="Vehículo o maquinaria",
+        help_text="Opcional: la unidad a la que corresponde el gasto (combustible, casetas, refacciones, mantenimiento).",
     )
     proveedor = models.ForeignKey(
         "proveedores.Proveedor",
@@ -205,8 +336,9 @@ class Gasto(BaseAbstractModel):
     )
     es_compartido = models.BooleanField(
         default=False,
-        verbose_name="Se distribuye entre varias sucursales",
-        help_text="Actívalo cuando el gasto beneficia a más de una sucursal (p. ej. un servicio corporativo) y necesites repartirlo con montos exactos.",
+        verbose_name="Se distribuye entre varios centros de costo",
+        help_text="Actívalo cuando el gasto beneficia a más de un centro de costo (p. ej. una factura de gasolina "
+        "que se reparte entre Transporte, Administración y Personal) y necesites repartirlo con montos exactos.",
     )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
@@ -284,8 +416,8 @@ class Gasto(BaseAbstractModel):
 
 
 class GastoDistribucion(BaseAbstractModel):
-    """Monto exacto de un gasto compartido que le corresponde a una
-    sucursal. La suma de todas las distribuciones de un mismo `Gasto` debe
+    """Monto exacto de un gasto compartido que le corresponde a un centro
+    de costo (de cualquier tipo, no solo sucursal). La suma de todas las distribuciones de un mismo `Gasto` debe
     ser exactamente igual a `Gasto.importe` (se valida al guardar, no es un
     promedio calculado)."""
 
@@ -299,7 +431,7 @@ class GastoDistribucion(BaseAbstractModel):
         CentroCosto,
         on_delete=models.PROTECT,
         related_name="distribuciones_gasto",
-        verbose_name="Sucursal beneficiada",
+        verbose_name="Centro de costo beneficiado",
     )
     monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto asignado")
 

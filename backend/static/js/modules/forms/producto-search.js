@@ -155,7 +155,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const almacenField = document.getElementById(almacenFieldId);
       almacenValue = almacenField ? almacenField.value : "";
       if (!almacenValue) {
-        mostrarMensaje(resultsEl, input, '<p class="px-3 py-2.5 text-xs text-amber-600">Selecciona primero el almacén origen.</p>');
+        const almacenLabel = wrapper.dataset.productoSearchAlmacenLabel || "el almacén origen";
+        mostrarMensaje(resultsEl, input, `<p class="px-3 py-2.5 text-xs text-amber-600">Selecciona primero ${almacenLabel}.</p>`);
         return;
       }
     }
@@ -182,16 +183,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${url}?${params.toString()}`, { headers: { Accept: "application/json" } });
       if (!res.ok) return;
       const items = await res.json();
-      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue), precioCampo);
+      const almacenLabel = wrapper.dataset.productoSearchAlmacenLabel || "el almacén origen";
+      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue), precioCampo, almacenLabel);
     } catch (err) {
       if (window.App?.isDev) console.error("[producto-search]", err);
     }
   }
 
-  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen, precioCampo) {
+  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen, precioCampo, almacenLabel) {
     if (!items.length) {
       const mensaje = filtradoPorAlmacen
-        ? "Sin existencia de este producto en el almacén origen"
+        ? `Sin existencia de este producto en ${almacenLabel}`
         : "Sin resultados";
       mostrarMensaje(resultsEl, input, `<p class="px-3 py-2.5 text-xs text-gray-400">${mensaje}</p>`);
       return;

@@ -1,0 +1,53 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% block title %}{% if object %}Editar unidad{% else %}Registrar unidad{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar unidad{% else %}Registrar unidad{% endif %}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:vehiculo-list' %}" class="text-gray-400 hover:text-primary-600">Vehículos y maquinaria</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="{{ form.nombre.id_for_label }}" class="label">Nombre</label>
+      {{ form.nombre }}
+      <p class="mt-1 text-xs text-gray-400">{{ form.nombre.help_text }}</p>
+      {% if form.nombre.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.nombre.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.tipo.id_for_label }}" class="label">Tipo</label>
+      {{ form.tipo }}
+      {% if form.tipo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.tipo.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.placas.id_for_label }}" class="label">Placas <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.placas }}
+    </div>
+    <div>
+      <label for="{{ form.responsable.id_for_label }}" class="label">Responsable / chofer <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.responsable }}
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.centro_costo.id_for_label }}" class="label">Centro de costo habitual <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.centro_costo }}
+      <p class="mt-1 text-xs text-gray-400">{{ form.centro_costo.help_text }}</p>
+    </div>
+    <div class="sm:col-span-2">
+      <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.descripcion }}
+    </div>
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'gastos:vehiculo-list' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar</button>
+  </div>
+</form>
+{% endblock main_content %}

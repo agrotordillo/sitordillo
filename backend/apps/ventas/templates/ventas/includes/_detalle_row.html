@@ -1,7 +1,7 @@
 <tr class="formset-row">
   <td class="px-3 py-2 w-64">
     {{ form.id }}
-    {% include "products/includes/_producto_search_field.html" with precio_campo="venta" cliente_field_id="id_cliente" precio_almacen_field_id="id_almacen" %}
+    {% include "products/includes/_producto_search_field.html" with precio_campo="venta" cliente_field_id="id_cliente" precio_almacen_field_id="id_almacen" almacen_field_id="id_almacen" almacen_label="la sucursal" %}
   </td>
   <td class="px-3 py-2 w-24">
     {{ form.cantidad }}

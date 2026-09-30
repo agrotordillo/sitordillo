@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum
 
-from apps.gastos.models import CentroCosto, Gasto, GastoDistribucion
+from apps.gastos.models import CentroCosto, Gasto, GastoDistribucion, GrupoGasto
 from apps.ventas.models import VentaDetalle
 
 
@@ -15,7 +15,7 @@ def validar_distribucion(importe_total, montos):
     errores = []
     montos = [m for m in montos if m is not None]
     if not montos:
-        errores.append("Agrega al menos una sucursal para distribuir el gasto.")
+        errores.append("Agrega al menos un centro de costo para distribuir el gasto.")
         return errores
 
     suma = sum(montos, Decimal("0.00"))
@@ -26,7 +26,7 @@ def validar_distribucion(importe_total, montos):
         else:
             detalle = f"sobran ${-diferencia} asignados de más"
         errores.append(
-            f"La suma de las cantidades por sucursal (${suma}) debe ser exactamente igual al importe del "
+            f"La suma de las cantidades por centro de costo (${suma}) debe ser exactamente igual al importe del "
             f"gasto (${importe_total}): {detalle}."
         )
     return errores
@@ -36,25 +36,31 @@ def gasto_directo_por_centro(centro_costo, fecha_inicio, fecha_fin):
     """Suma de gastos no compartidos registrados directamente contra este
     centro de costo en el periodo. Excluye los gastos Cancelados -su
     condición de seguimiento, no is_active-, ya que un gasto cancelado no
-    representa una salida real de dinero."""
+    representa una salida real de dinero, y los de conceptos que no son
+    gasto de operación (compra de activo fijo, retiros de la propietaria,
+    transferencias a proyectos): se registran para no perder su rastro,
+    pero no son gasto del periodo."""
     total = Gasto.objects.filter(
         centro_costo=centro_costo,
         es_compartido=False,
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
+        categoria__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
     ).exclude(condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("importe"))["total"]
     return total or Decimal("0.00")
 
 
 def gasto_distribuido_por_centro(centro_costo, fecha_inicio, fecha_fin):
     """Suma de lo que le corresponde a este centro de costo de gastos
-    compartidos con otras sucursales, según el reparto manual capturado.
-    Excluye los gastos Cancelados, igual que gasto_directo_por_centro()."""
+    compartidos con otros centros de costo, según el reparto manual capturado.
+    Excluye los gastos Cancelados y los que no son gasto de operación,
+    igual que gasto_directo_por_centro()."""
     total = GastoDistribucion.objects.filter(
         centro_costo=centro_costo,
         gasto__es_compartido=True,
         gasto__fecha__gte=fecha_inicio,
         gasto__fecha__lte=fecha_fin,
+        gasto__categoria__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
     ).exclude(gasto__condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("monto"))["total"]
     return total or Decimal("0.00")
 

@@ -18,7 +18,7 @@
     </div>
 
     <nav class="flex-1 py-2">
-      {% if perms.products.view_producto or perms.products.view_categoria or perms.products.view_subcategoria or perms.products.view_marca or perms.products.view_linea or perms.products.view_clase or perms.proveedores.view_proveedor or perms.products.view_unidadmedida or perms.products.view_almacen or perms.products.view_turno or perms.inventario.view_lote or perms.products.view_productostocksucursal or perms.inventario.view_movimientoinventario or perms.inventario.view_conversion or perms.inventario.view_recetaconversion or perms.traspasos.view_traspaso %}
+      {% if perms.products.view_producto or perms.products.view_categoria or perms.products.view_subcategoria or perms.products.view_marca or perms.products.view_linea or perms.products.view_clase or perms.proveedores.view_proveedor or perms.products.view_unidadmedida or perms.products.view_almacen or perms.products.view_turno or perms.inventario.view_lote or perms.products.view_productostocksucursal or perms.inventario.view_movimientoinventario or perms.inventario.view_conversion or perms.inventario.view_recetaconversion or perms.inventario.view_ensamblepaquete or perms.traspasos.view_traspaso %}
       <div class="sidebar-section">Inventario</div>
       {% if perms.products.view_producto %}
       <a href="{% url 'products:product-list' %}" class="sidebar-link">
@@ -165,6 +165,9 @@
       {% if perms.inventario.view_recetaconversion %}
       <a href="{% url 'inventario:receta-conversion-list' %}" class="sidebar-sublink">Recetas de conversión</a>
       {% endif %}
+      {% if perms.inventario.view_ensamblepaquete %}
+      <a href="{% url 'inventario:ensamble-list' %}" class="sidebar-sublink">Ensambles de paquete</a>
+      {% endif %}
       {% if perms.traspasos.view_traspaso %}
       <a href="{% url 'traspasos:traspaso-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#818CF8]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -178,7 +181,7 @@
       {% endif %}
       {% endif %}
 
-      {% if perms.clientes.view_cliente or perms.compras.view_ordencompra or perms.compras.view_promocionproveedor or perms.compras.view_ordencompradetalle or perms.pagos.view_cuentaporpagar or perms.pagos.view_recibopago or perms.pagos.view_banco or perms.gastos.view_gasto or perms.gastos.view_categoriagasto or perms.gastos.view_centrocosto or perms.ventas.view_venta or perms.ventas.view_devolucioncliente or perms.cobros.view_cuentaporcobrar or perms.comisiones.view_comisionlinea or perms.comisiones.view_comisionproducto or perms.facturacion.view_factura or perms.facturacion.change_empresa %}
+      {% if perms.clientes.view_cliente or perms.compras.view_ordencompra or perms.compras.view_promocionproveedor or perms.compras.view_ordencompradetalle or perms.pagos.view_cuentaporpagar or perms.pagos.view_recibopago or perms.pagos.view_banco or perms.gastos.view_gasto or perms.gastos.view_categoriagasto or perms.gastos.view_centrocosto or perms.gastos.view_vehiculo or perms.ventas.view_venta or perms.ventas.view_devolucioncliente or perms.cobros.view_cuentaporcobrar or perms.comisiones.view_comisionlinea or perms.comisiones.view_comisionproducto or perms.facturacion.view_factura or perms.facturacion.change_empresa %}
       <div class="sidebar-section">Operaciones</div>
       {% if perms.clientes.view_cliente %}
       <a href="{% url 'clientes:cliente-list' %}" class="sidebar-link">
@@ -248,10 +251,13 @@
       <a href="{% url 'gastos:gasto-create' %}" class="sidebar-sublink">Registrar gasto</a>
       {% endif %}
       {% if perms.gastos.view_categoriagasto %}
-      <a href="{% url 'gastos:categoria-list' %}" class="sidebar-sublink">Categorías de gasto</a>
+      <a href="{% url 'gastos:categoria-list' %}" class="sidebar-sublink">Conceptos de gasto</a>
       {% endif %}
       {% if perms.gastos.view_centrocosto %}
       <a href="{% url 'gastos:centro-costo-list' %}" class="sidebar-sublink">Centros de costo</a>
+      {% endif %}
+      {% if perms.gastos.view_vehiculo %}
+      <a href="{% url 'gastos:vehiculo-list' %}" class="sidebar-sublink">Vehículos y maquinaria</a>
       {% endif %}
       {% if perms.ventas.view_venta %}
       <a href="{% url 'ventas:venta-list' %}" class="sidebar-link">

@@ -1,6 +1,6 @@
 {% extends "core/layouts/_main_table_layout.html" %}
-{% block title %}Categorías de gasto{% endblock title %}
-{% block title_layout %}Categorías de gasto{% endblock title_layout %}
+{% block title %}Conceptos de gasto{% endblock title %}
+{% block title_layout %}Conceptos de gasto{% endblock title_layout %}
 {% block breadcrumbs %}
 <nav class="inline-flex mt-1" aria-label="Breadcrumb">
   <ol class="inline-flex items-center gap-1.5 text-sm">
@@ -8,7 +8,7 @@
     <li class="text-gray-300">/</li>
     <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
     <li class="text-gray-300">/</li>
-    <li class="text-gray-500 font-medium">Categorías</li>
+    <li class="text-gray-500 font-medium">Conceptos</li>
   </ol>
 </nav>
 {% endblock breadcrumbs %}
@@ -17,7 +17,7 @@
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
   </svg>
-  Nueva categoría
+  Nuevo concepto
 </a>
 {% endblock table_actions %}
 {% block main_content %}
@@ -25,18 +25,35 @@
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Nombre</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Naturaleza</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Concepto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Cuenta contable</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Naturaleza</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"><span class="sr-only">Acciones</span></th>
       </tr>
     </thead>
+    {% regroup categorias by grupo as grupos %}
+    {% for grupo in grupos %}
     <tbody class="divide-y divide-gray-100">
-      {% for categoria in categorias %}
-      <tr class="hover:bg-gray-50/50 transition-colors">
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ categoria.nombre }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500">{{ categoria.get_naturaleza_display }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
-          <a href="{% url 'gastos:categoria-update' categoria.pk %}" class="btn-icon-outline" aria-label="Editar categoría" title="Editar categoría">
+      <tr class="bg-gray-50/70">
+        <th colspan="4" scope="colgroup" class="px-4 sm:px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-600">
+          {{ grupo.grouper.nombre }}
+          {% if not grupo.grouper.cuenta_en_resultados %}
+          <span class="ms-1.5 inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-sky-700"
+                title="No cuenta en el reporte de punto de equilibrio">{{ grupo.grouper.get_clasificacion_display }}</span>
+          {% endif %}
+        </th>
+      </tr>
+      {% for categoria in grupo.list %}
+      <tr class="hover:bg-gray-50/50 transition-colors{% if not categoria.is_active %} opacity-60{% endif %}">
+        <td class="px-4 sm:px-6 py-3 font-medium text-gray-800">
+          {{ categoria.nombre }}
+          {% if not categoria.is_active %}<span class="ms-1.5 text-xs font-normal text-gray-400">(inactivo)</span>{% endif %}
+          {% if categoria.descripcion %}<p class="mt-0.5 text-xs font-normal text-gray-400 line-clamp-1" title="{{ categoria.descripcion }}">{{ categoria.descripcion }}</p>{% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3 font-mono text-xs text-gray-500 hidden sm:table-cell">{{ categoria.cuenta_contable|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3 text-gray-500 hidden md:table-cell">{{ categoria.get_naturaleza_display }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right">
+          <a href="{% url 'gastos:categoria-update' categoria.pk %}" class="btn-icon-outline" aria-label="Editar concepto" title="Editar concepto">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
               <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
@@ -44,17 +61,20 @@
           </a>
         </td>
       </tr>
-      {% empty %}
+      {% endfor %}
+    </tbody>
+    {% empty %}
+    <tbody>
       <tr>
-        <td colspan="3" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
-            <p class="text-sm text-gray-400">No hay categorías registradas</p>
-            <a href="{% url 'gastos:categoria-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear la primera</a>
+            <p class="text-sm text-gray-400">No hay conceptos de gasto registrados</p>
+            <a href="{% url 'gastos:categoria-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
           </div>
         </td>
       </tr>
-      {% endfor %}
     </tbody>
+    {% endfor %}
   </table>
 </div>
 {% endblock main_content %}

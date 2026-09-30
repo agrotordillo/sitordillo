@@ -1,12 +1,9 @@
 from django import forms
 from django.forms import inlineformset_factory
 
-from django.core.exceptions import ValidationError
-
 from apps.core.forms import BaseModelForm
-from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.clientes.models import Cliente
-from apps.products.models import Almacen, Producto, PuntoVenta
+from apps.products.models import Producto
 from .models import Cotizacion, CotizacionDetalle
 
 
@@ -16,7 +13,12 @@ class CotizacionForm(BaseModelForm):
         # fecha_cotizacion no se captura: toma el default del modelo
         # (timezone.now al momento de guardar). observaciones se oculta por
         # ahora (puede volver a exponerse más adelante si hace falta).
-        fields = ["cliente", "almacen", "punto_venta"]
+        # almacen/punto_venta/turno tampoco son campos del formulario: al
+        # crear una cotización nueva se toman del turno propio y abierto de
+        # quien la levanta (ver CotizacionCreateView), igual que en Ventas;
+        # al editar una ya guardada simplemente no se tocan -quedan ligados
+        # al folio que ya se generó con esos datos-.
+        fields = ["cliente"]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
             # cliente-search.js): con el catálogo completo de clientes un
@@ -24,7 +26,7 @@ class CotizacionForm(BaseModelForm):
             "cliente": forms.HiddenInput,
         }
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["cliente"].queryset = Cliente.objects.filter(is_active=True)
         # Cotización nueva sin cliente explícito: precarga "Público en
@@ -34,51 +36,6 @@ class CotizacionForm(BaseModelForm):
             publico = Cliente.publico_general()
             if publico is not None:
                 self.initial["cliente"] = publico.pk
-
-        almacenes = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
-        if user is not None:
-            visibles = almacenes_visibles(user)
-            if visibles is not None:
-                almacenes = almacenes.filter(pk__in=visibles.values("pk"))
-        self.fields["almacen"].queryset = almacenes
-
-        puntos_venta = PuntoVenta.objects.filter(is_active=True, almacen__in=almacenes).select_related("almacen")
-        self.fields["punto_venta"].queryset = puntos_venta
-
-        # Usuario con una sucursal fija (ver AsignacionSucursal.es_principal):
-        # no tiene sentido que la elija cada vez, se fija sola y el campo se
-        # oculta. Sin una sucursal principal clara (Administrador, o sin
-        # asignación) sigue viendo el select normal.
-        fijo = almacen_principal(user) if user is not None else None
-        if fijo is not None:
-            self.fields["almacen"].widget = forms.HiddenInput()
-            if not self.instance.pk and "almacen" not in self.initial:
-                self.initial["almacen"] = fijo.pk
-
-            puntos_venta_fijo = puntos_venta.filter(almacen=fijo)
-            self.fields["punto_venta"].queryset = puntos_venta_fijo
-            # Con un único punto de venta en esa sucursal tampoco tiene
-            # sentido elegirlo: se precarga y se oculta igual que almacén.
-            if puntos_venta_fijo.count() == 1:
-                self.fields["punto_venta"].widget = forms.HiddenInput()
-                if not self.instance.pk and "punto_venta" not in self.initial:
-                    self.initial["punto_venta"] = puntos_venta_fijo.first().pk
-
-        # El número de cotización ya generado queda ligado al punto de venta
-        # que lo produjo: una vez asignado, ni almacén ni punto de venta se
-        # pueden volver a cambiar (dejarían el folio impreso sin relación
-        # con la sucursal/caja real del registro).
-        if self.instance.pk and self.instance.numero_documento:
-            self.fields["almacen"].disabled = True
-            self.fields["punto_venta"].disabled = True
-
-    def clean(self):
-        cleaned_data = super().clean()
-        almacen = cleaned_data.get("almacen")
-        punto_venta = cleaned_data.get("punto_venta")
-        if almacen and punto_venta and punto_venta.almacen_id != almacen.pk:
-            raise ValidationError({"punto_venta": "El punto de venta debe pertenecer a la sucursal seleccionada."})
-        return cleaned_data
 
 
 class CotizacionDetalleForm(BaseModelForm):

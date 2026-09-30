@@ -14,6 +14,7 @@ from .views.conversion_views import (
     RecetaConversionUpdateView,
     crear_conversion_view,
 )
+from .views.ensamble_views import EnsamblePaqueteListView, crear_ensamble_view
 
 app_name = "inventario"
 
@@ -36,4 +37,6 @@ urlpatterns = [
         RecetaConversionUpdateView.as_view(),
         name="receta-conversion-update",
     ),
+    path("ensambles/", EnsamblePaqueteListView.as_view(), name="ensamble-list"),
+    path("ensambles/crear/", crear_ensamble_view, name="ensamble-create"),
 ]

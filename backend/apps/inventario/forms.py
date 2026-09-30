@@ -127,3 +127,47 @@ class ConversionForm(forms.Form):
         for field in self.fields.values():
             existing = field.widget.attrs.get("class", "").strip()
             field.widget.attrs["class"] = f"{existing} input".strip()
+
+
+class EnsamblePaqueteForm(forms.Form):
+    """No es un ModelForm: `EnsamblePaquete.valor_consumido` y
+    `valor_generado` los calcula
+    apps.inventario.services.registrar_ensamble_paquete() -aquí solo se
+    captura lo que de verdad decide la persona (qué paquete, cuánto, en
+    qué almacén)."""
+
+    almacen = forms.ModelChoiceField(queryset=Almacen.objects.filter(is_active=True))
+    paquete = forms.ModelChoiceField(
+        queryset=Producto.objects.filter(is_active=True, tipo=Producto.TipoProducto.PAQUETE),
+        label="Paquete a armar",
+    )
+    cantidad = forms.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01"), label="Cantidad a armar"
+    )
+    fecha = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    observaciones = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        almacenes = Almacen.objects.filter(is_active=True)
+        if user is not None:
+            visibles = almacenes_visibles(user)
+            if visibles is not None:
+                almacenes = almacenes.filter(pk__in=visibles.values("pk"))
+        self.fields["almacen"].queryset = almacenes
+        self.fields["fecha"].input_formats = ["%Y-%m-%d"]
+        for field in self.fields.values():
+            existing = field.widget.attrs.get("class", "").strip()
+            field.widget.attrs["class"] = f"{existing} input".strip()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        paquete = cleaned_data.get("paquete")
+        almacen = cleaned_data.get("almacen")
+        if paquete and almacen and paquete.almacen_id != almacen.id:
+            self.add_error(
+                "almacen",
+                f"El paquete '{paquete.nombre}' pertenece a la sucursal {paquete.almacen.nombre}; "
+                "no se puede armar en otra.",
+            )
+        return cleaned_data

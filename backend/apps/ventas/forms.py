@@ -2,11 +2,10 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from apps.core.forms import BaseModelForm
-from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.clientes.models import Cliente
 from apps.fiscal.models import FormaPago
 from apps.pagos.forms import FormaPagoSelect
-from apps.products.models import Almacen, Producto
+from apps.products.models import Producto
 from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle, VentaPago
 
 
@@ -20,9 +19,12 @@ class VentaForm(BaseModelForm):
     class Meta:
         model = Venta
         # fecha_venta no se captura: toma el default del modelo
-        # (timezone.now al momento de guardar).
+        # (timezone.now al momento de guardar). almacen tampoco es un campo
+        # del formulario: ya no lo elige el cajero, se toma del punto de
+        # venta de su turno propio y abierto (ver VentaCreateView, que lo
+        # asigna directo en form.instance antes de validar).
         fields = [
-            "cliente", "almacen", "forma_pago", "referencia_pago", "efectivo_recibido", "observaciones",
+            "cliente", "forma_pago", "referencia_pago", "efectivo_recibido", "observaciones",
         ]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
@@ -39,7 +41,7 @@ class VentaForm(BaseModelForm):
             "observaciones": forms.TextInput,
         }
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # No siempre es obligatorio: si se dividió el cobro, forma_pago se
         # deja vacío a propósito (ver Venta.pago_dividido). Cuál de los dos
@@ -60,27 +62,6 @@ class VentaForm(BaseModelForm):
             publico = Cliente.publico_general()
             if publico is not None:
                 self.initial["cliente"] = publico.pk
-
-        almacenes = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
-        # Un usuario restringido a una o varias sucursales (ver
-        # AsignacionSucursal) solo puede registrar la venta en una de las
-        # suyas; sin restricción (Administrador/Auxiliar administrador) ve
-        # todas, igual que antes.
-        if user is not None:
-            visibles = almacenes_visibles(user)
-            if visibles is not None:
-                almacenes = almacenes.filter(pk__in=visibles.values("pk"))
-        self.fields["almacen"].queryset = almacenes
-
-        # Usuario con una sucursal fija (ver AsignacionSucursal.es_principal):
-        # no tiene sentido que la elija cada vez, se fija sola y el campo se
-        # oculta. Sin una sucursal principal clara (Administrador, o sin
-        # asignación) sigue viendo el select normal.
-        fijo = almacen_principal(user) if user is not None else None
-        if fijo is not None:
-            self.fields["almacen"].widget = forms.HiddenInput()
-            if not self.instance.pk and "almacen" not in self.initial:
-                self.initial["almacen"] = fijo.pk
 
 
 class VentaDetalleForm(BaseModelForm):

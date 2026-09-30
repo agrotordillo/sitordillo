@@ -18,6 +18,8 @@
     totalFormsSelector: '#id_distribuciones-TOTAL_FORMS',
     importeSelector: '#id_importe',
     compartidoSelector: '#id_es_compartido',
+    conceptoSelector: '#id_categoria',
+    guiaSelector: '#guia-conceptos',
   })">
   {% csrf_token %}
 
@@ -35,13 +37,33 @@
         <div>
           <label for="{{ form.centro_costo.id_for_label }}" class="label">Centro de costo de origen</label>
           {{ form.centro_costo }}
-          <p class="mt-1 text-xs text-gray-400">Si es compartido, aquí va quién lo pagó (p. ej. Administración); el reparto real por sucursal se captura abajo.</p>
+          <p class="mt-1 text-xs text-gray-400">Si es compartido, aquí va quién lo pagó (p. ej. Administración); el reparto real por centro de costo se captura abajo.</p>
           {% if form.centro_costo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.centro_costo.errors.0 }}</p>{% endif %}
         </div>
         <div>
-          <label for="{{ form.categoria.id_for_label }}" class="label">Categoría</label>
+          <label for="{{ form.categoria.id_for_label }}" class="label">Concepto de gasto</label>
           {{ form.categoria }}
           {% if form.categoria.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.categoria.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2" x-show="guia" x-cloak>
+          <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-600 space-y-1">
+            <p class="font-semibold text-gray-700">
+              <span x-text="guia?.grupo"></span>
+              <template x-if="guia?.cuenta"><span class="font-mono font-normal text-gray-400"> · Cuenta <span x-text="guia.cuenta"></span></span></template>
+            </p>
+            <p x-show="guia?.descripcion"><span class="font-medium text-gray-700">Qué registrar:</span> <span x-text="guia?.descripcion"></span></p>
+            <p x-show="guia?.ejemplos"><span class="font-medium text-gray-700">Ejemplos:</span> <span x-text="guia?.ejemplos"></span></p>
+            <p x-show="guia?.criterio"><span class="font-medium text-gray-700">No incluir:</span> <span x-text="guia?.criterio"></span></p>
+            <p x-show="guia && !guia.cuentaEnResultados" class="font-medium text-amber-700">
+              Este concepto no es gasto de operación: se registra, pero no cuenta en el reporte de punto de equilibrio.
+            </p>
+          </div>
+        </div>
+        <div>
+          <label for="{{ form.vehiculo.id_for_label }}" class="label">Vehículo o maquinaria <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.vehiculo }}
+          <p class="mt-1 text-xs text-gray-400">Para combustible, casetas, refacciones o mantenimiento de una unidad.</p>
+          {% if form.vehiculo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.vehiculo.errors.0 }}</p>{% endif %}
         </div>
         <div>
           <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor <span class="text-gray-400 font-normal">(opcional)</span></label>
@@ -67,8 +89,9 @@
           <p class="mt-1 text-xs text-gray-400">Un gasto Cancelado no cuenta en el reporte de punto de equilibrio.</p>
         </div>
         <div class="sm:col-span-2">
-          <label for="{{ form.concepto.id_for_label }}" class="label">Concepto</label>
+          <label for="{{ form.concepto.id_for_label }}" class="label">Descripción del gasto</label>
           {{ form.concepto }}
+          <p class="mt-1 text-xs text-gray-400">Lo que dice el vale (p. ej. "Pago de recibo de luz de Lerdo, bimestre 4").</p>
           {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
         </div>
         <div>
@@ -89,7 +112,7 @@
         <div class="flex items-end pb-1.5">
           <label class="inline-flex items-center gap-2">
             {{ form.es_compartido }}
-            <span class="text-sm text-gray-600">Se distribuye entre varias sucursales</span>
+            <span class="text-sm text-gray-600">Se distribuye entre varios centros de costo</span>
           </label>
         </div>
         <div class="flex items-center gap-2">
@@ -113,11 +136,11 @@
     </div>
 
     <div x-show="compartido" x-cloak>
-      <h3 class="text-sm font-semibold text-gray-700 mb-1">Distribución por sucursal</h3>
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Distribución por centro de costo</h3>
       <p class="text-xs text-gray-400 mb-3">
-        Captura la cantidad exacta que le corresponde a cada sucursal (no se calcula un promedio): por ejemplo, la
-        sucursal con más personal puede consumir más agua que las demás. La suma debe cuadrar exactamente con el
-        importe total del gasto.
+        Captura la cantidad exacta que le corresponde a cada centro de costo (no se calcula un promedio): por ejemplo,
+        la sucursal con más personal puede consumir más agua que las demás, o una factura de gasolina se reparte según
+        lo que cargó cada unidad. La suma debe cuadrar exactamente con el importe total del gasto.
       </p>
 
       {{ formset.management_form }}
@@ -131,7 +154,7 @@
         <table class="w-full text-sm text-left text-gray-600">
           <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
             <tr>
-              <th scope="col" class="px-3 py-2.5 font-semibold">Sucursal</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Centro de costo</th>
               <th scope="col" class="px-3 py-2.5 font-semibold">Monto asignado</th>
               <th scope="col" class="px-3 py-2.5 font-semibold"></th>
             </tr>
@@ -150,7 +173,7 @@
         <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
         </svg>
-        Agregar sucursal
+        Agregar centro de costo
       </button>
 
       <div class="flex justify-end mt-4 pt-3 border-t border-gray-100">
@@ -174,6 +197,7 @@
 </form>
 {% endblock main_content %}
 {% block extra_js %}
+{{ guia_conceptos|json_script:"guia-conceptos" }}
 <script src="{% static 'js/modules/forms/gasto-form.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

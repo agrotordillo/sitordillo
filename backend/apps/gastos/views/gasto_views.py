@@ -21,11 +21,11 @@ class GastoListView(PermissionRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("centro_costo", "categoria", "proveedor")
+        queryset = super().get_queryset().select_related("centro_costo", "categoria", "proveedor", "vehiculo")
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             # Excluye de paso los centros de costo sin almacén (proyectos,
-            # administración, personal): un usuario restringido a
+            # unidades de negocio, administración, personal): un usuario restringido a
             # sucursal no debe ver ese gasto corporativo/personal.
             queryset = queryset.filter(centro_costo__almacen__in=visibles)
         return queryset
@@ -40,6 +40,19 @@ class _GastoDistribucionFormValidMixin:
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
+        # Guía contabilizadora de cada concepto, para mostrar al elegirlo
+        # qué sí y qué no se registra en él (ver gasto-form.js).
+        data["guia_conceptos"] = {
+            str(c.pk): {
+                "grupo": c.grupo.nombre,
+                "cuenta": c.cuenta_contable,
+                "descripcion": c.descripcion,
+                "ejemplos": c.ejemplos,
+                "criterio": c.criterio,
+                "cuentaEnResultados": c.grupo.cuenta_en_resultados,
+            }
+            for c in data["form"].fields["categoria"].queryset.select_related("grupo")
+        }
         if "formset" not in data:
             if self.request.method == "POST":
                 data["formset"] = GastoDistribucionFormSet(self.request.POST, instance=self.object, prefix="distribuciones")

@@ -13,7 +13,7 @@
 {% endblock breadcrumbs %}
 {% block table_actions %}
 <a href="{% url 'gastos:reporte' %}" class="btn-secondary w-full sm:w-auto">Punto de equilibrio</a>
-<a href="{% url 'gastos:categoria-list' %}" class="btn-secondary w-full sm:w-auto">Categorías</a>
+<a href="{% url 'gastos:categoria-list' %}" class="btn-secondary w-full sm:w-auto">Conceptos</a>
 <a href="{% url 'gastos:centro-costo-list' %}" class="btn-secondary w-full sm:w-auto">Centros de costo</a>
 <a href="{% url 'gastos:gasto-create' %}" class="btn-primary w-full sm:w-auto">
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -29,9 +29,9 @@
       <tr>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Número</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Concepto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Descripción</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Centro de costo</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Categoría</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Concepto de gasto</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden lg:table-cell">Responsable</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Importe</th>
@@ -47,13 +47,16 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">
           {{ gasto.concepto }}
           {% if gasto.es_compartido %}
-          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ms-1.5" title="Se distribuye entre varias sucursales">
+          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ms-1.5" title="Se distribuye entre varios centros de costo">
             Compartido
           </span>
           {% endif %}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.centro_costo.nombre }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.categoria.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">
+          {{ gasto.categoria.nombre }}
+          {% if gasto.vehiculo %}<p class="text-xs text-gray-400">{{ gasto.vehiculo.nombre }}</p>{% endif %}
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ gasto.responsable|default:"—" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ gasto.fecha|date:"d/m/Y" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ gasto.importe|moneda }}</td>

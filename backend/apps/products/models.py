@@ -306,7 +306,9 @@ class Turno(BaseAbstractModel):
     Cobro): quién estuvo a cargo y en qué rango de horas, para poder
     ligarle los gastos que se registran mientras esa caja está operando
     (ver `gastos.Gasto.turno`) y para exigir turno abierto al cobrar una
-    venta (ver `ventas.services.validar_turno_abierto`).
+    venta o levantar una cotización -de aquí sale también la sucursal de
+    ambas, ya no la elige quien las captura (ver
+    `products.services.turno_abierto_de`).
 
     Se ata a la caja, no a la sucursal completa: así una misma sucursal
     puede operar con más de una caja abierta a la vez (cada una con su

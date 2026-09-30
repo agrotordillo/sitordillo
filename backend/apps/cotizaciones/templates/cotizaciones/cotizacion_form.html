@@ -33,24 +33,16 @@
           {% include "clientes/includes/_cliente_search_field.html" %}
           <p class="mt-1 text-xs text-gray-400">Solo se puede elegir un cliente ya registrado; el alta y los datos fiscales/precio preferencial se dan de alta en Administración.</p>
         </div>
-        {% if not form.almacen.is_hidden %}
         <div>
-          <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal</label>
-          {{ form.almacen }}
-          {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+          <span class="label">Sucursal</span>
+          {% if object %}
+          <p class="text-sm text-gray-700 py-2">{{ object.almacen.nombre }} <span class="text-gray-400">· {{ object.punto_venta.nombre }}</span></p>
+          <input type="hidden" id="id_almacen" value="{{ object.almacen.pk }}">
+          {% else %}
+          <p class="text-sm text-gray-700 py-2">{{ almacen.nombre }} <span class="text-gray-400">· Caja: {{ turno.punto_venta.nombre }} ({{ turno.folio }})</span></p>
+          <input type="hidden" id="id_almacen" value="{{ almacen.pk }}">
+          {% endif %}
         </div>
-        {% else %}
-        {{ form.almacen }}
-        {% endif %}
-        {% if not form.punto_venta.is_hidden %}
-        <div>
-          <label for="{{ form.punto_venta.id_for_label }}" class="label">Punto de venta</label>
-          {{ form.punto_venta }}
-          {% if form.punto_venta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.punto_venta.errors.0 }}</p>{% endif %}
-        </div>
-        {% else %}
-        {{ form.punto_venta }}
-        {% endif %}
       </div>
     </div>
 
@@ -64,6 +56,8 @@
         {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
       </div>
       {% endif %}
+
+      {% include "ventas/includes/_lista_masiva.html" with boton_texto="Agregar a la cotización" %}
 
       <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
         <table class="w-full text-sm text-left text-gray-600">
@@ -112,5 +106,6 @@
 <script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
 <script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/lista-masiva.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

@@ -1,14 +1,25 @@
 document.addEventListener("alpine:init", () => {
   // Combina en un solo componente el toggle de "gasto compartido" y el
-  // formset de distribución por sucursal, porque ambas cosas dependen una
-  // de la otra: el formset solo se muestra y valida cuando el checkbox
-  // está activo, y su suma se compara en vivo contra el importe capturado.
+  // formset de distribución por centro de costo, porque ambas cosas
+  // dependen una de la otra: el formset solo se muestra y valida cuando el
+  // checkbox está activo, y su suma se compara en vivo contra el importe
+  // capturado. También muestra la guía contabilizadora del concepto elegido.
   Alpine.data("gastoForm", (config) => ({
     compartido: false,
     totalAsignado: 0,
     restante: 0,
+    guia: null,
 
     init() {
+      const guiaScript = document.querySelector(config.guiaSelector);
+      const guias = guiaScript ? JSON.parse(guiaScript.textContent) : {};
+      const conceptoInput = document.querySelector(config.conceptoSelector);
+      const mostrarGuia = () => {
+        this.guia = guias[conceptoInput?.value] || null;
+      };
+      conceptoInput?.addEventListener("change", mostrarGuia);
+      mostrarGuia();
+
       this._rows = this.$refs.rows;
       this._emptyTemplate = this.$refs.emptyRow;
       this._totalFormsInput = document.querySelector(config.totalFormsSelector);

@@ -59,6 +59,25 @@ def fijar_precios_autorizados(formset, cliente, almacen, valor_estrategia_fifo):
     return lista_precio
 
 
+def turno_abierto_de(usuario):
+    """El turno propio y abierto de `usuario`, sin partir de una sucursal
+    ya elegida -al revés de como funcionaba antes (ver
+    ventas.services.obtener_turno_abierto/validar_turno_abierto, que
+    reciben el almacén ya elegido por el cajero): ahora la sucursal de
+    una venta o cotización se determina A PARTIR de este turno, así que
+    ni venta ni cotización ofrecen un selector de sucursal -se toma la
+    del punto de venta del turno abierto del usuario, y si no tiene
+    ninguno abierto, no puede continuar-. Si por asignación a varias
+    cajas llegara a tener más de un turno abierto a la vez, se toma el
+    más reciente -hoy en la práctica solo se opera una caja por
+    sucursal-."""
+    return (
+        Turno.objects.filter(usuario=usuario, estatus=Turno.Estatus.ABIERTO)
+        .select_related("punto_venta", "punto_venta__almacen")
+        .first()
+    )
+
+
 def abrir_turno(punto_venta, usuario, observaciones=""):
     """Abre un nuevo turno para esa caja (punto de venta de tipo Cobro).
     La restricción de "un solo turno abierto por punto de venta" vive en

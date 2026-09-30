@@ -4,6 +4,7 @@ from .views.categoria_views import CategoriaGastoCreateView, CategoriaGastoListV
 from .views.centro_costo_views import CentroCostoCreateView, CentroCostoListView, CentroCostoUpdateView
 from .views.gasto_views import GastoCreateView, GastoListView, GastoUpdateView
 from .views.reporte_views import ReportePuntoEquilibrioView
+from .views.vehiculo_views import VehiculoCreateView, VehiculoListView, VehiculoUpdateView
 
 app_name = "gastos"
 
@@ -18,4 +19,7 @@ urlpatterns = [
     path("categorias/", CategoriaGastoListView.as_view(), name="categoria-list"),
     path("categorias/crear/", CategoriaGastoCreateView.as_view(), name="categoria-create"),
     path("categorias/<int:pk>/editar/", CategoriaGastoUpdateView.as_view(), name="categoria-update"),
+    path("vehiculos/", VehiculoListView.as_view(), name="vehiculo-list"),
+    path("vehiculos/crear/", VehiculoCreateView.as_view(), name="vehiculo-create"),
+    path("vehiculos/<int:pk>/editar/", VehiculoUpdateView.as_view(), name="vehiculo-update"),
 ]

@@ -15,6 +15,11 @@ class CategoriaGastoListView(PermissionRequiredMixin, ListView):
     context_object_name = "categorias"
     extra_context = {"active_module": "expenses"}
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("grupo").order_by(
+            "grupo__orden", "grupo__nombre", "-is_active", "nombre"
+        )
+
 
 class CategoriaGastoCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):
     permission_required = "gastos.add_categoriagasto"
@@ -22,11 +27,11 @@ class CategoriaGastoCreateView(PermissionRequiredMixin, SuccessMessageMixin, Cre
     form_class = CategoriaGastoForm
     template_name = "gastos/categoria_form.html"
     success_url = reverse_lazy("gastos:categoria-list")
-    success_message = "Categoría creada correctamente."
+    success_message = "Concepto de gasto creado correctamente."
     extra_context = {"active_module": "expenses"}
 
     def form_invalid(self, form):
-        messages.error(self.request, "No fue posible guardar la categoría. Revisa los campos.")
+        messages.error(self.request, "No fue posible guardar el concepto de gasto. Revisa los campos.")
         return super().form_invalid(form)
 
 
@@ -36,9 +41,9 @@ class CategoriaGastoUpdateView(PermissionRequiredMixin, SuccessMessageMixin, Upd
     form_class = CategoriaGastoForm
     template_name = "gastos/categoria_form.html"
     success_url = reverse_lazy("gastos:categoria-list")
-    success_message = "Categoría actualizada correctamente."
+    success_message = "Concepto de gasto actualizado correctamente."
     extra_context = {"active_module": "expenses"}
 
     def form_invalid(self, form):
-        messages.error(self.request, "No fue posible guardar la categoría. Revisa los campos.")
+        messages.error(self.request, "No fue posible guardar el concepto de gasto. Revisa los campos.")
         return super().form_invalid(form)

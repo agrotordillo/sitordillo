@@ -324,3 +324,103 @@ class Conversion(BaseAbstractModel):
                     "granel. Revisa el costo de catálogo del producto destino."
                 ),
             })
+
+
+class EnsamblePaquete(BaseAbstractModel):
+    """Arma físicamente `cantidad` unidades de un producto tipo Paquete:
+    descuenta cada componente de su receta (products.PaqueteComponente) por
+    FIFO -mismo mecanismo que una venta, ver
+    apps.inventario.services.registrar_ensamble_paquete- y da de alta un
+    lote nuevo del paquete armado con esa cantidad, a su costo de catálogo.
+
+    A diferencia del paquete "virtual" (que se arma solo al momento de
+    vender, sin existencia propia -ver
+    apps.ventas.services.expandir_linea-), un paquete armado aquí queda
+    con existencia real: se vende directo de su propio inventario sin
+    volver a tocar los componentes, que ya se descontaron aquí. Ambos
+    caminos conviven para el mismo producto: si tiene existencia propia
+    armada se vende de ahí, si no, se sigue armando virtualmente como
+    siempre.
+
+    Es una actividad de Almacén, igual que Conversión, sobre la que se
+    modela: incluye la misma validación de que el valor generado supere
+    al valor consumido (armar no debería costar menos que los componentes
+    sueltos)."""
+
+    almacen = models.ForeignKey(
+        "products.Almacen",
+        on_delete=models.PROTECT,
+        related_name="ensambles_paquete",
+        verbose_name="Almacén",
+    )
+    paquete = models.ForeignKey(
+        "products.Producto",
+        on_delete=models.PROTECT,
+        related_name="ensambles",
+        verbose_name="Paquete",
+    )
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad armada")
+    fecha = models.DateField(verbose_name="Fecha")
+    valor_consumido = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Valor consumido",
+        help_text="Costo real (FIFO) de los componentes que salieron.",
+    )
+    valor_generado = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Valor generado",
+        help_text="Cantidad armada × costo de catálogo del paquete.",
+    )
+    observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Ensamble de paquete"
+        verbose_name_plural = "Ensambles de paquete"
+        ordering = ["-fecha", "-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(cantidad__gt=0), name="ensamble_cantidad_positiva"),
+            models.CheckConstraint(condition=models.Q(valor_consumido__gte=0), name="ensamble_valor_consumido_no_negativo"),
+            models.CheckConstraint(condition=models.Q(valor_generado__gte=0), name="ensamble_valor_generado_no_negativo"),
+        ]
+        indexes = [
+            models.Index(fields=["almacen"]),
+            models.Index(fields=["paquete"]),
+            models.Index(fields=["fecha"]),
+        ]
+
+    def __str__(self):
+        return f"{self.folio} · {self.cantidad} {self.paquete.nombre}"
+
+    def get_folio_prefix(self):
+        return "ENS"
+
+    def get_slug_source(self):
+        return f"{self.folio}-{self.almacen_id}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def diferencia(self):
+        return self.valor_generado - self.valor_consumido
+
+    def clean(self):
+        super().clean()
+        if self.cantidad is not None and self.cantidad <= 0:
+            raise ValidationError({"cantidad": "La cantidad armada debe ser mayor a cero."})
+        if self.paquete_id and self.paquete.tipo != self.paquete.TipoProducto.PAQUETE:
+            raise ValidationError({"paquete": "Solo se pueden armar productos de tipo Paquete/Combo."})
+        if (
+            self.valor_generado is not None
+            and self.valor_consumido is not None
+            and self.valor_generado <= self.valor_consumido
+        ):
+            raise ValidationError({
+                "valor_generado": (
+                    "El valor generado debe superar al valor consumido: armar el paquete no debería costar menos "
+                    "que sus componentes sueltos. Revisa el costo de catálogo del paquete."
+                ),
+            })

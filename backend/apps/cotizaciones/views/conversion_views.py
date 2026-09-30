@@ -9,15 +9,12 @@ from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.forms import BuscarFolioForm
 from apps.cotizaciones.models import Cotizacion
-from apps.products.models import Turno
-from apps.products.services import fijar_precios_autorizados
+from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.services import (
-    obtener_turno_abierto,
     procesar_lineas_venta,
     validar_stock_disponible,
-    validar_turno_abierto,
     validar_venta_a_credito,
 )
 
@@ -68,19 +65,36 @@ def convertir_cotizacion_view(request, pk):
         messages.error(request, "Esta cotización no tiene productos; no se puede convertir.")
         return redirect("cotizaciones:cotizacion-list")
 
+    # Igual que en Crear venta: la sucursal ya no la elige caja, se toma
+    # de su turno propio y abierto -pero aquí, a diferencia de una venta
+    # directa, esa sucursal debe ser la MISMA de la cotización (el precio
+    # y el stock ya se cotizaron contra ese almacén; convertirla desde
+    # otra sucursal decontaría el inventario equivocado).
+    turno = turno_abierto_de(request.user)
+    if turno is None:
+        messages.error(request, "No tienes un turno abierto. Ábrelo antes de convertir la cotización en venta.")
+        return redirect("products:turno-list")
+    if turno.punto_venta.almacen_id != cotizacion.almacen_id:
+        messages.error(
+            request,
+            f'Tu turno está en "{turno.punto_venta.almacen.nombre}"; esta cotización es de '
+            f'"{cotizacion.almacen.nombre}". Conviértela desde un turno abierto en esa sucursal.',
+        )
+        return redirect("cotizaciones:cotizacion-list")
+    almacen = cotizacion.almacen
+
     if request.method == "POST":
-        form = VentaForm(request.POST, user=request.user)
+        form = VentaForm(request.POST)
         formset = VentaDetalleFormSet(request.POST, instance=Venta(), prefix="detalles")
         if form.is_valid() and formset.is_valid():
-            almacen = form.cleaned_data["almacen"]
-            error_turno = validar_turno_abierto(almacen, request.user)
+            form.instance.almacen = almacen
+            form.instance.turno = turno
 
             # El precio no lo decide quien está en caja, ni siquiera al
             # convertir una cotización ya cotizada -se vuelve a resolver
-            # aquí con el cliente y la sucursal de la venta (que caja
-            # podría haber cambiado respecto a la cotización original),
-            # nunca se copia el precio_unitario que trae el formset
-            # precargado desde la cotización-.
+            # aquí con el cliente y la sucursal de la venta, nunca se
+            # copia el precio_unitario que trae el formset precargado
+            # desde la cotización-.
             fijar_precios_autorizados(
                 formset, form.cleaned_data.get("cliente"), almacen, VentaDetalle.Estrategia.FIFO,
             )
@@ -91,9 +105,7 @@ def convertir_cotizacion_view(request, pk):
                 if (cd := f.cleaned_data) and cd.get("producto") and not cd.get("DELETE")
             ]
 
-            if error_turno:
-                form.add_error(None, error_turno)
-            elif not form.cleaned_data.get("forma_pago"):
+            if not form.cleaned_data.get("forma_pago"):
                 # VentaForm.forma_pago ya no es obligatorio a nivel de
                 # formulario -se puede dejar vacío cuando se divide el
                 # cobro (ver VentaCreateView)-, pero esta pantalla no
@@ -108,7 +120,6 @@ def convertir_cotizacion_view(request, pk):
                     form.add_error(None, error)
 
                 if not errores_stock:
-                    form.instance.turno = obtener_turno_abierto(almacen, request.user)
                     try:
                         with transaction.atomic():
                             venta = form.save()
@@ -137,13 +148,11 @@ def convertir_cotizacion_view(request, pk):
         form = VentaForm(
             initial={
                 "cliente": cotizacion.cliente_id,
-                "almacen": cotizacion.almacen_id,
                 "observaciones": (
                     f"Generada desde cotización {cotizacion.numero_documento}."
                     + (f" {cotizacion.observaciones}" if cotizacion.observaciones else "")
                 ),
             },
-            user=request.user,
         )
         initial_detalles = [
             # precio_unitario se precarga solo para que la pantalla muestre
@@ -166,18 +175,6 @@ def convertir_cotizacion_view(request, pk):
         )
         formset = PrefillFormSet(instance=Venta(), initial=initial_detalles, prefix="detalles")
 
-    # Mismo aviso previo que en Crear venta (ver VentaCreateView): en cuáles
-    # de las sucursales que puede elegir el usuario actual NO tiene su
-    # propio turno abierto -no bloquea ver la pantalla, solo informa antes
-    # de llenar todo; el candado real está arriba, en validar_turno_abierto.
-    almacenes = list(form.fields["almacen"].queryset)
-    con_turno_propio_abierto = set(
-        Turno.objects.filter(
-            punto_venta__almacen__in=almacenes, usuario=request.user, estatus=Turno.Estatus.ABIERTO
-        ).values_list("punto_venta__almacen_id", flat=True)
-    )
-    sucursales_sin_turno = [a for a in almacenes if a.pk not in con_turno_propio_abierto]
-
     return render(
         request,
         "cotizaciones/convertir_form.html",
@@ -185,7 +182,8 @@ def convertir_cotizacion_view(request, pk):
             "cotizacion": cotizacion,
             "form": form,
             "formset": formset,
-            "sucursales_sin_turno": sucursales_sin_turno,
+            "turno": turno,
+            "almacen": almacen,
             "active_module": "quotes",
         },
     )

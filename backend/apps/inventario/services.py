@@ -3,7 +3,8 @@ from decimal import Decimal
 from django.db import models, transaction
 from django.utils import timezone
 
-from .models import Conversion, Lote, MovimientoInventario
+from apps.products.models import Producto
+from .models import Conversion, EnsamblePaquete, Lote, MovimientoInventario
 
 TWO_PLACES = Decimal("0.01")
 
@@ -321,4 +322,83 @@ def registrar_conversion(receta, almacen, cantidad_origen, fecha=None, observaci
 
     return conversion
 
-    return detalle
+
+@transaction.atomic
+def registrar_ensamble_paquete(paquete, almacen, cantidad, fecha=None, observaciones=""):
+    """Arma `cantidad` unidades de un producto tipo Paquete: descuenta cada
+    componente de su receta (products.PaqueteComponente) por FIFO
+    (registrar_salida, el mismo mecanismo que una venta), así que el valor
+    consumido es el costo real de los componentes -no uno estimado-. El
+    paquete armado entra en un lote nuevo a su costo de catálogo
+    (Producto.precio_costo). Se rechaza si el valor generado no supera al
+    valor consumido, igual que registrar_conversion: el costo de catálogo
+    del paquete debe reflejar al menos lo que de verdad costaron sus
+    componentes -si no, hay un costo de catálogo mal capturado en el
+    paquete-, y como esto se valida después de descontar los componentes,
+    @transaction.atomic revierte esas salidas si el ensamble se rechaza."""
+    if cantidad is None or cantidad <= 0:
+        raise ValueError("La cantidad a armar debe ser mayor a cero.")
+    if paquete.tipo != Producto.TipoProducto.PAQUETE:
+        raise ValueError(f"{paquete.nombre} no es un producto de tipo Paquete/Combo.")
+
+    componentes = list(paquete.componentes.select_related("producto_componente"))
+    if not componentes:
+        raise ValueError(f"{paquete.nombre} no tiene componentes capturados; agrégalos antes de armarlo.")
+
+    fecha = fecha or timezone.localdate()
+
+    valor_consumido = Decimal("0.00")
+    for componente in componentes:
+        cantidad_componente = (componente.cantidad * cantidad).quantize(TWO_PLACES)
+        movimientos_salida = registrar_salida(
+            componente.producto_componente,
+            almacen,
+            cantidad_componente,
+            estrategia="fifo",
+            motivo=f"Ensamble de paquete: {paquete.nombre}",
+        )
+        valor_consumido += sum(
+            ((-movimiento.cantidad) * movimiento.lote.costo_unitario for movimiento in movimientos_salida),
+            Decimal("0.00"),
+        )
+    valor_consumido = valor_consumido.quantize(TWO_PLACES)
+
+    valor_generado = (cantidad * paquete.precio_costo).quantize(TWO_PLACES)
+
+    if valor_generado <= valor_consumido:
+        raise ValueError(
+            f"El valor generado (${valor_generado}) no supera al valor consumido (${valor_consumido}): revisa el "
+            f"costo de catálogo de {paquete.nombre}, armar el paquete no debería costar menos que sus componentes."
+        )
+
+    ensamble = EnsamblePaquete(
+        almacen=almacen,
+        paquete=paquete,
+        cantidad=cantidad,
+        fecha=fecha,
+        valor_consumido=valor_consumido,
+        valor_generado=valor_generado,
+        observaciones=observaciones,
+    )
+    ensamble.full_clean()
+    ensamble.save()
+
+    lote_destino = Lote(
+        producto=paquete,
+        almacen=almacen,
+        numero_lote=f"Ensamble {ensamble.folio}",
+        fecha_ingreso=ensamble.fecha,
+        costo_unitario=paquete.precio_costo,
+        cantidad_inicial=cantidad,
+        cantidad_disponible=Decimal("0.00"),
+    )
+    lote_destino.full_clean()
+    lote_destino.save()
+    registrar_movimiento(
+        lote_destino,
+        MovimientoInventario.Tipo.ENTRADA,
+        cantidad,
+        motivo=f"Ensamble {ensamble.folio}",
+    )
+
+    return ensamble

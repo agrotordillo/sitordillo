@@ -1,0 +1,67 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Ensambles de paquete{% endblock title %}
+{% block title_layout %}Ensambles de paquete{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Ensambles de paquete</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<a href="{% url 'inventario:ensamble-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Armar paquete
+</a>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="text-sm text-gray-500 mb-4">
+  Un paquete armado aquí queda con existencia propia: se vende directo de su inventario, sin volver a descontar
+  sus componentes en el momento de la venta. Si un paquete no tiene existencia armada, se sigue vendiendo como
+  siempre (se arma virtualmente al momento de vender).
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Almacén</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Paquete armado</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Valor consumido</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Valor generado</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Diferencia</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for ensamble in ensambles %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ ensamble.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ ensamble.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">
+          {{ ensamble.cantidad|floatformat:2 }} {{ ensamble.paquete.nombre }}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ ensamble.fecha|date:"d/m/Y" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">${{ ensamble.valor_consumido|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ ensamble.valor_generado|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-green-600">+${{ ensamble.diferencia|moneda }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay ensambles de paquete registrados</p>
+            <a href="{% url 'inventario:ensamble-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Armar el primero</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}
