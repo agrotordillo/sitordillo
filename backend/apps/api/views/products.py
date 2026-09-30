@@ -137,6 +137,40 @@ class ProductoBuscarView(APIView):
         return Response(data)
 
 
+class ProductoPreciosPorClienteView(APIView):
+    """Re-resuelve el precio_venta de una lista de productos ya elegidos en
+    un formset (ventas/cotizaciones) cuando el cliente de la operación
+    cambia DESPUÉS de haberlos agregado: ProductoBuscarView solo resuelve
+    el precio en el momento de buscar/elegir el producto, así que si el
+    cajero cambia de cliente sin volver a buscar cada línea, el precio
+    capturado se queda pegado al del cliente anterior -ver
+    producto-search.js, que llama aquí al detectar un "change" en el
+    campo de cliente-. Misma lógica de resolución que ProductoBuscarView,
+    solo que por id en vez de por texto."""
+
+    def post(self, request):
+        ids = request.data.get("ids", [])
+        if not isinstance(ids, list) or not ids:
+            return Response({"precios": {}})
+
+        cliente_raw = request.data.get("cliente")
+        cliente_id = str(cliente_raw).strip() if cliente_raw else None
+        precio_almacen_raw = request.data.get("precio_almacen")
+        precio_almacen_id = str(precio_almacen_raw).strip() if precio_almacen_raw else None
+        cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
+        lista_precio = resolver_lista_precio_cliente(cliente)
+
+        precios = {}
+        for p in Producto.objects.filter(pk__in=ids, is_active=True):
+            precio_venta = p.precio_venta
+            if lista_precio is not None:
+                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
+                if resuelto is not None:
+                    precio_venta = resuelto
+            precios[str(p.id)] = str(precio_venta)
+        return Response({"precios": precios})
+
+
 class ProductoResolverSkusView(APIView):
     """Resuelve una lista de SKUs a productos (coincidencia exacta,
     insensible a mayúsculas/minúsculas). Pensado para la carga por lista de

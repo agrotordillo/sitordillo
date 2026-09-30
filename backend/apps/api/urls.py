@@ -6,6 +6,7 @@ from .views.products import (
     LineaQuickCreateView,
     ProductoActualizarCostoView,
     ProductoBuscarView,
+    ProductoPreciosPorClienteView,
     ProductoResolverSkusView,
     SubcategoriesByCategoryView,
     UnitMeasureQuickCreateView,
@@ -57,6 +58,11 @@ urlpatterns = [
         "products/resolver-skus/",
         ProductoResolverSkusView.as_view(),
         name="producto-resolver-skus",
+    ),
+    path(
+        "products/precios-por-cliente/",
+        ProductoPreciosPorClienteView.as_view(),
+        name="producto-precios-por-cliente",
     ),
     path(
         "compras/promocion-vigente/",

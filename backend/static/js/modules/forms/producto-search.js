@@ -19,6 +19,63 @@ document.addEventListener("DOMContentLoaded", () => {
     ocultarTodos((wrapper) => !wrapper.contains(event.target));
   });
 
+  // Si el cliente de la venta/cotización cambia DESPUÉS de ya haber
+  // agregado productos, el precio de esas líneas se había quedado pegado
+  // al del cliente anterior -solo se resolvía al buscar/elegir cada
+  // producto, nunca al cambiar de cliente-. cliente-search.js dispara
+  // "change" (bubbles) en su campo oculto tanto al elegir un cliente
+  // normal como "PUBLICO EN GENERAL", así que basta escucharlo aquí.
+  document.addEventListener("change", (event) => {
+    if (!event.target.matches('.cliente-search input[type="hidden"]')) return;
+    recalcularPreciosPorCliente(event.target);
+  });
+
+  async function recalcularPreciosPorCliente(clienteInput) {
+    const wrappers = Array.from(
+      document.querySelectorAll(`.producto-search[data-producto-search-cliente-field="${clienteInput.id}"]`)
+    ).filter((w) => w.dataset.productoSearchPrecioCampo === "venta" && w.dataset.productoSearchRecalcularUrl);
+    if (!wrappers.length) return;
+
+    const filas = wrappers
+      .map((wrapper) => {
+        const hiddenInput = wrapper.querySelector('input[type="hidden"]');
+        const precioInput = hiddenInput?.closest(".formset-row")?.querySelector(".fs-precio");
+        return hiddenInput?.value && precioInput ? { wrapper, productoId: hiddenInput.value, precioInput } : null;
+      })
+      .filter(Boolean);
+    if (!filas.length) return;
+
+    const url = wrappers[0].dataset.productoSearchRecalcularUrl;
+    const precioAlmacenFieldId = wrappers[0].dataset.productoSearchPrecioAlmacenField;
+    const precioAlmacenValue = precioAlmacenFieldId ? document.getElementById(precioAlmacenFieldId)?.value : "";
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": obtenerCsrfToken() },
+        body: JSON.stringify({
+          ids: [...new Set(filas.map((f) => f.productoId))],
+          cliente: clienteInput.value,
+          precio_almacen: precioAlmacenValue || null,
+        }),
+      });
+      if (!res.ok) return;
+      const { precios } = await res.json();
+      filas.forEach(({ productoId, precioInput }) => {
+        const nuevoPrecio = precios[productoId];
+        if (nuevoPrecio === undefined) return;
+        precioInput.value = nuevoPrecio;
+        precioInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    } catch (err) {
+      if (window.App?.isDev) console.error("[producto-search]", err);
+    }
+  }
+
+  function obtenerCsrfToken() {
+    return document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
+  }
+
   // El panel de resultados se posiciona con position:fixed (ver
   // posicionarPanel) para no quedar recortado por el overflow-x-auto de la
   // tabla que lo contiene; al no seguir el flujo normal, hay que ocultarlo
