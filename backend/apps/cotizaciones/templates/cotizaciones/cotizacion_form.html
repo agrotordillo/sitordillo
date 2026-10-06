@@ -39,7 +39,7 @@
           <p class="text-sm text-gray-700 py-2">{{ object.almacen.nombre }} <span class="text-gray-400">· {{ object.punto_venta.nombre }}</span></p>
           <input type="hidden" id="id_almacen" value="{{ object.almacen.pk }}">
           {% else %}
-          <p class="text-sm text-gray-700 py-2">{{ almacen.nombre }} <span class="text-gray-400">· Caja: {{ turno.punto_venta.nombre }} ({{ turno.folio }})</span></p>
+          <p class="text-sm text-gray-700 py-2">{{ almacen.nombre }} <span class="text-gray-400">· {% if turno.es_de_cobro %}Caja{% else %}Mostrador{% endif %}: {{ turno.punto_venta.nombre }} ({{ turno.folio }})</span></p>
           <input type="hidden" id="id_almacen" value="{{ almacen.pk }}">
           {% endif %}
         </div>

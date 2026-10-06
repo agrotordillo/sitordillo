@@ -15,7 +15,7 @@
 {% endblock breadcrumbs %}
 {% block table_actions %}
 <form method="get" class="flex items-center gap-2">
-  <input type="month" name="mes" value="{{ mes_seleccionado }}" class="input" onchange="this.form.submit()">
+  <input type="month" name="mes" value="{{ mes_seleccionado }}" class="input" data-enviar-al-cambiar>
 </form>
 {% endblock table_actions %}
 {% block main_content %}

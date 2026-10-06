@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
@@ -9,14 +7,17 @@ from django.http import HttpResponseRedirect
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
-from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
-from apps.compras.models import OrdenCompra
+from apps.compras.models import OrdenCompra, OrdenCompraDetalle
 from apps.compras.forms import CargarCFDIForm, OrdenCompraForm, OrdenCompraDetalleFormSet
 from apps.compras.services import CFDIImportError, importar_cfdi_compra
-from apps.pagos.models import Pago
+from apps.core.envio_unico import EnvioDuplicado, EnvioUnicoMixin, reservar_envio, respuesta_envio_duplicado
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
+from apps.core.parametros import fecha, filtrar_por_id
+from apps.pagos.models import CuentaPorPagar, Pago
+from apps.pagos.services import resincronizar_cuenta_por_pagar
 
 
 class OrdenCompraListView(PermissionRequiredMixin, ListView):
@@ -53,14 +54,12 @@ class OrdenCompraListView(PermissionRequiredMixin, ListView):
                 | Q(proveedor__rfc__icontains=q)
             )
 
-        proveedor_id = self.request.GET.get("proveedor", "").strip()
-        if proveedor_id:
-            queryset = queryset.filter(proveedor_id=proveedor_id)
+        queryset = filtrar_por_id(queryset, "proveedor_id", self.request.GET.get("proveedor"))
 
-        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        fecha_desde = fecha(self.request.GET.get("fecha_desde"))
         if fecha_desde:
             queryset = queryset.filter(fecha_orden__gte=fecha_desde)
-        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        fecha_hasta = fecha(self.request.GET.get("fecha_hasta"))
         if fecha_hasta:
             queryset = queryset.filter(fecha_orden__lte=fecha_hasta)
 
@@ -75,7 +74,7 @@ class OrdenCompraListView(PermissionRequiredMixin, ListView):
         return context
 
 
-class OrdenCompraCreateView(PermissionRequiredMixin, CreateView):
+class OrdenCompraCreateView(PermissionRequiredMixin, EnvioUnicoMixin, CreateView):
     permission_required = "compras.add_ordencompra"
     model = OrdenCompra
     form_class = OrdenCompraForm
@@ -97,10 +96,15 @@ class OrdenCompraCreateView(PermissionRequiredMixin, CreateView):
         formset = OrdenCompraDetalleFormSet(self.request.POST, instance=form.instance, prefix="detalles")
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
-        with transaction.atomic():
-            self.object = form.save()
-            formset.instance = self.object
-            formset.save()
+        try:
+            with transaction.atomic():
+                envio = reservar_envio(self.request)
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+                envio.completar(self.get_success_url())
+        except EnvioDuplicado as duplicado:
+            return respuesta_envio_duplicado(self.request, duplicado.url_resultado, self.success_url)
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
 
@@ -174,7 +178,7 @@ class OrdenCompraUpdateView(PermissionRequiredMixin, UpdateView):
         el/los pago(s) activos de su cuenta desde "Registrar pago" -esto
         libera el candado-, 2) editar la orden -al guardar, esta vista
         resincroniza sola el monto_total de la cuenta con el nuevo total,
-        ver _resincronizar_cuenta_por_pagar-, 3) reactivar el/los pago(s)
+        ver pagos.services.resincronizar_cuenta_por_pagar-, 3) reactivar el/los pago(s)
         (o registrar uno nuevo si el monto cambió). Un pago Inactivo no
         cuenta aquí a propósito: es justo lo que permite este flujo."""
         if not hasattr(orden, "cuenta_por_pagar"):
@@ -185,23 +189,6 @@ class OrdenCompraUpdateView(PermissionRequiredMixin, UpdateView):
             f"La orden {orden.folio} tiene pagos activos en su cuenta por pagar; "
             "anúlalos primero desde \"Registrar pago\" para poder editarla."
         )
-
-    def _resincronizar_cuenta_por_pagar(self, orden):
-        """El monto_total de la cuenta por pagar es una foto tomada al
-        generarla (ver generar_cuenta_por_pagar) y nunca se actualiza solo;
-        cada vez que se edita la orden hay que resincronizarlo con el
-        total real, o quedaría desfasado (justo lo que este candado busca
-        evitar). No hace nada si la orden todavía no tiene cuenta
-        generada."""
-        if not hasattr(orden, "cuenta_por_pagar"):
-            return
-        cuenta = orden.cuenta_por_pagar
-        nuevo_total = orden.total.quantize(Decimal("0.01"))
-        if cuenta.monto_total != nuevo_total:
-            cuenta.monto_total = nuevo_total
-            cuenta.full_clean()
-            cuenta.save(update_fields=["monto_total"])
-        cuenta.actualizar_estatus()
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -232,11 +219,41 @@ class OrdenCompraUpdateView(PermissionRequiredMixin, UpdateView):
         formset = OrdenCompraDetalleFormSet(self.request.POST, instance=form.instance, prefix="detalles")
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
-        with transaction.atomic():
-            self.object = form.save()
-            formset.instance = self.object
-            formset.save()
-            self._resincronizar_cuenta_por_pagar(self.object)
+        try:
+            with transaction.atomic():
+                # Mismo candado que la recepción (inventario.views.recepcion_views._recibir):
+                # las reglas de B20 (estatus, no quitar, cambiar ni bajar lo
+                # recibido) se decidieron con lo recibido al cargar el
+                # formulario; si desde entonces entró o se corrigió una
+                # recepción, ya no corresponden y no se guarda nada.
+                OrdenCompra.objects.select_for_update().get(pk=self.object.pk)
+                recibido_ahora = dict(
+                    OrdenCompraDetalle.objects.filter(orden_compra=self.object).values_list("pk", "cantidad_recibida")
+                )
+                if recibido_ahora != form.recibido_al_cargar:
+                    raise ValueError(
+                        "Se registró una recepción de esta orden mientras la editabas. "
+                        "Vuelve a abrirla para ver lo recibido y captura de nuevo tus cambios."
+                    )
+                # generar_cuenta_por_pagar toma el mismo candado.
+                if (
+                    form.cleaned_data.get("estatus") == OrdenCompra.Estatus.CANCELADA
+                    and CuentaPorPagar.objects.filter(orden_compra=self.object).exists()
+                ):
+                    raise ValueError("No se puede cancelar una orden que ya tiene cuenta por pagar.")
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+                # Con mercancía recibida el estatus no se elige: si se subió o
+                # bajó la cantidad pedida, pasa a Parcial o Recibida aquí.
+                self.object.actualizar_estatus_por_recepcion()
+                # Cada edición puede mover el total: la cuenta por pagar (si ya
+                # existe) se resincroniza aquí mismo, en la misma transacción.
+                resincronizar_cuenta_por_pagar(self.object)
+        except ERRORES_DE_NEGOCIO as e:
+            for mensaje in mensajes_de_error(e):
+                messages.error(self.request, mensaje)
+            return self.render_to_response(self.get_context_data(form=form, formset=formset))
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
 

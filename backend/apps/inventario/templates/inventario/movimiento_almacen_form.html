@@ -1,0 +1,137 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
+{% block title %}{% if object %}Editar movimiento {{ object.folio }}{% else %}Nuevo movimiento de almacén{% endif %}{% endblock title %}
+{% block title_layout %}{% if object %}Editar movimiento {{ object.folio }}{% else %}Nuevo movimiento de almacén{% endif %}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:movimiento-almacen-list' %}" class="text-gray-400 hover:text-primary-600">Movimientos de almacén</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Nuevo{% endif %}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+{{ conceptos_con_proveedor|json_script:"conceptos-con-proveedor" }}
+{# El valor enviado nunca se pega dentro del código de x-data (B32): llega como JSON. #}
+{{ form.concepto.value|default:""|json_script:"concepto-inicial" }}
+<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid gap-8">
+
+    <div x-data="{ concepto: JSON.parse(document.getElementById('concepto-inicial').textContent), conProveedor: JSON.parse(document.getElementById('conceptos-con-proveedor').textContent) }">
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos generales</h3>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="{{ form.concepto.id_for_label }}" class="label">Concepto</label>
+          {{ form.concepto }}
+          {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.fecha.id_for_label }}" class="label">Fecha</label>
+          {{ form.fecha }}
+          {% if form.fecha.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.fecha.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.almacen.id_for_label }}" class="label">
+            <span x-show="concepto !== '{{ concepto_movil }}'">Almacén que se afecta</span>
+            <span x-show="concepto === '{{ concepto_movil }}'" x-cloak>Almacén móvil (de donde sale)</span>
+          </label>
+          {{ form.almacen }}
+          {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
+        </div>
+        <div x-show="concepto === '{{ concepto_movil }}'" x-cloak>
+          <label for="{{ form.almacen_destino.id_for_label }}" class="label">Almacén al que regresa</label>
+          {{ form.almacen_destino }}
+          {% if form.almacen_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen_destino.errors.0 }}</p>{% endif %}
+        </div>
+        <div x-show="conProveedor.includes(concepto)" x-cloak>
+          <label for="{{ form.proveedor.id_for_label }}" class="label">Proveedor</label>
+          {{ form.proveedor }}
+          {% if form.proveedor.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.proveedor.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.documento_referencia.id_for_label }}" class="label">Documento de referencia <span class="text-gray-400 font-normal">(factura, nota; opcional)</span></label>
+          {{ form.documento_referencia }}
+          {% if form.documento_referencia.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.documento_referencia.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.movimiento_relacionado_folio.id_for_label }}" class="label">Movimiento que lo antecede <span class="text-gray-400 font-normal">(folio MAL-…; opcional)</span></label>
+          {{ form.movimiento_relacionado_folio }}
+          {% if form.movimiento_relacionado_folio.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.movimiento_relacionado_folio.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.orden_compra_folio.id_for_label }}" class="label">Orden de compra relacionada <span class="text-gray-400 font-normal">(folio; opcional)</span></label>
+          {{ form.orden_compra_folio }}
+          {% if form.orden_compra_folio.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.orden_compra_folio.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+          {{ form.observaciones }}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        El movimiento se guarda en borrador y no afecta existencias hasta que lo apliques. Las entradas se
+        valorizan al último costo de compra de cada producto; las salidas descuentan por FIFO.
+      </p>
+
+      {{ formset.management_form }}
+      {% if formset.non_form_errors %}
+      <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold">Cantidad</th>
+              <th scope="col" class="px-3 py-2.5 font-semibold"></th>
+            </tr>
+          </thead>
+          <tbody x-ref="rows" class="divide-y divide-gray-100">
+            {% for detalle_form in formset %}
+            {% include "inventario/includes/_movimiento_almacen_detalle_row.html" with form=detalle_form %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <template x-ref="emptyRow">{% include "inventario/includes/_movimiento_almacen_detalle_row.html" with form=formset.empty_form %}</template>
+
+      <button type="button" class="btn-secondary mt-3" @click="addRow()">
+        <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+        </svg>
+        Agregar línea
+      </button>
+    </div>
+
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% if object %}{% url 'inventario:movimiento-almacen-detail' object.pk %}{% else %}{% url 'inventario:movimiento-almacen-list' %}{% endif %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Guardar borrador</button>
+  </div>
+</form>
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/formset-rows.js' %}"></script>
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

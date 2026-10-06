@@ -12,6 +12,9 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
+<form method="get" class="w-full sm:w-auto">
+  {% include "core/includes/_filtro_fecha.html" %}
+</form>
 <a href="{% url 'ventas:devolucion-list' %}" class="btn-secondary w-full sm:w-auto">Devoluciones</a>
 <a href="{% url 'ventas:venta-create' %}" class="btn-primary w-full sm:w-auto">
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -36,14 +39,17 @@
     <tbody class="divide-y divide-gray-100">
       {% for venta in ventas %}
       <tr class="hover:bg-gray-50/50 transition-colors">
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ venta.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">
+          {{ venta.folio }}
+          {% if venta.es_remision %}<span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">Remisión</span>{% endif %}
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ venta.cliente.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ venta.almacen.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ venta.fecha_venta|date:"d/m/Y H:i" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
           <a href="{% url 'ventas:venta-ticket' venta.pk %}" target="_blank" rel="noopener" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Ticket</a>
-          {% if not venta.factura %}
+          {% if not venta.factura and not venta.es_remision %}
           <a href="{% url 'facturacion:factura-generar' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Facturar</a>
           {% endif %}
           <a href="{% url 'ventas:venta-devolver' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Devolver</a>

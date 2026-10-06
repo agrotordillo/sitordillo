@@ -4,6 +4,7 @@ from django.db.models import Max, OuterRef, Q, Subquery, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
+from apps.core.parametros import entero, filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote, MovimientoInventario
 from apps.products.models import Almacen
@@ -69,15 +70,15 @@ def existencia_sin_movimiento_view(request):
         qs = qs.filter(almacen__in=visibles.values_list("pk", flat=True))
 
     almacen_id = request.GET.get("almacen", "").strip()
-    if almacen_id:
-        qs = qs.filter(almacen_id=almacen_id)
+    qs = filtrar_por_id(qs, "almacen_id", almacen_id)
 
     buscar = request.GET.get("q", "").strip()
     if buscar:
         qs = qs.filter(Q(producto__nombre__icontains=buscar) | Q(producto__sku__icontains=buscar))
 
-    dias_minimos_raw = request.GET.get("dias_minimos", "").strip()
-    dias_minimos = int(dias_minimos_raw) if dias_minimos_raw.isdigit() else 60
+    dias_minimos = entero(request.GET.get("dias_minimos"), maximo=100_000)
+    if dias_minimos is None:
+        dias_minimos = 60
 
     hoy = timezone.localdate()
     filas = []

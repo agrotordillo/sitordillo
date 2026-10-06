@@ -28,7 +28,7 @@ DJANGO_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'config.estaticos.EstaticosConfig',
     'django.contrib.humanize',
 ]
 
@@ -53,6 +53,7 @@ LOCAL_APPS = [
     'apps.traspasos',
     'apps.ventas',
     'apps.cotizaciones',
+    'apps.pedidos',
     'apps.cobros',
     'apps.comisiones',
     'apps.comisiones_ruta',
@@ -132,6 +133,12 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Los archivos subidos siempre se descargan a través de Django, que revisa
+# sesión y permiso (ver apps.core.archivos). Si en producción nginx debe
+# entregarlos, define aquí el prefijo de una location `internal` que apunte
+# a MEDIA_ROOT (p. ej. "/_media_protegida/") y Django solo responderá con
+# X-Accel-Redirect. Vacío: Django transmite el archivo él mismo.
+MEDIA_X_ACCEL_REDIRECT = env('MEDIA_X_ACCEL_REDIRECT', default='')
 
 FACTURAMA_API_USER = env('FACTURAMA_API_USER', default='')
 FACTURAMA_API_PASSWORD = env('FACTURAMA_API_PASSWORD', default='')
@@ -241,7 +248,13 @@ CONTENT_SECURITY_POLICY = {
         'default-src': ["'self'"],
         'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
         'img-src': ["'self'", 'data:'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        # Sin 'unsafe-inline' (B32 en docs/AUDITORIA.md): ningún <script> en
+        # línea ni atributo on* se ejecuta, así que un HTML inyectado no corre
+        # JavaScript. Los comportamientos van en archivos estáticos (ver
+        # static/js/modules/ui/acciones.js). 'unsafe-eval' sigue porque la
+        # versión normal de Alpine evalúa sus expresiones x-data/@click; quitarlo
+        # exige migrar todas las plantillas a la versión CSP de Alpine.
+        'script-src': ["'self'", "'unsafe-eval'"],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'connect-src': [
             "'self'",

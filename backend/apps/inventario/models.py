@@ -1,8 +1,22 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from apps.core.models import BaseAbstractModel
+
+DOS_DECIMALES = Decimal("0.01")
+
+
+def redondear_costo(valor):
+    """Costo unitario a 2 decimales (redondeo comercial, ROUND_HALF_UP): la
+    precisión de Lote.costo_unitario y de todo costo que se copia de un lote
+    (VentaDetalleLote, PedidoDetalleLote, MovimientoAlmacenDetalle). El costo
+    de catálogo (Producto.precio_costo) tiene 4 decimales y un costo promedio
+    puede traer decimales infinitos; sin redondear, Lote.full_clean() los
+    rechaza -aun con ceros a la derecha, Decimal('12.5000')-."""
+    if not isinstance(valor, Decimal):
+        valor = Decimal(str(valor))
+    return valor.quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
 
 
 class Lote(BaseAbstractModel):
@@ -70,6 +84,27 @@ class Lote(BaseAbstractModel):
     def esta_caducado(self):
         return bool(self.fecha_caducidad and self.fecha_caducidad < timezone.localdate())
 
+    def _normalizar_costo(self):
+        """Red de seguridad para cualquier ruta que dé de alta un lote: el
+        costo se redondea aquí (ver redondear_costo) antes de validarlo o
+        guardarlo, igual que ya lo redondearía la base de datos. Un valor
+        que ni siquiera es numérico se deja tal cual para que la validación
+        normal del campo lo reporte."""
+        if self.costo_unitario is None:
+            return
+        try:
+            self.costo_unitario = redondear_costo(self.costo_unitario)
+        except (InvalidOperation, TypeError, ValueError):
+            pass
+
+    def clean_fields(self, exclude=None):
+        self._normalizar_costo()
+        super().clean_fields(exclude=exclude)
+
+    def save(self, *args, **kwargs):
+        self._normalizar_costo()
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         if self.cantidad_inicial is not None and self.cantidad_inicial <= 0:
@@ -88,6 +123,11 @@ class MovimientoInventario(BaseAbstractModel):
         MERMA = "merma", "Merma"
         TRASPASO = "traspaso", "Traspaso"
         DEVOLUCION = "devolucion", "Devolución de cliente"
+        # Apartado temporal de un pedido (ver apps.pedidos.services): igual
+        # que TRASPASO, un solo tipo para ambos sentidos -negativo al
+        # apartar, positivo al liberar (cancelación, edición o conversión
+        # a venta, que enseguida registra su propia SALIDA)-.
+        PEDIDO = "pedido", "Apartado de pedido"
 
     lote = models.ForeignKey(
         Lote,
@@ -331,7 +371,8 @@ class EnsamblePaquete(BaseAbstractModel):
     descuenta cada componente de su receta (products.PaqueteComponente) por
     FIFO -mismo mecanismo que una venta, ver
     apps.inventario.services.registrar_ensamble_paquete- y da de alta un
-    lote nuevo del paquete armado con esa cantidad, a su costo de catálogo.
+    lote nuevo del paquete armado con esa cantidad, al costo real de los
+    componentes que consumió.
 
     A diferencia del paquete "virtual" (que se arma solo al momento de
     vender, sin existencia propia -ver
@@ -343,9 +384,13 @@ class EnsamblePaquete(BaseAbstractModel):
     siempre.
 
     Es una actividad de Almacén, igual que Conversión, sobre la que se
-    modela: incluye la misma validación de que el valor generado supere
-    al valor consumido (armar no debería costar menos que los componentes
-    sueltos)."""
+    modela, con una diferencia (B25 en docs/AUDITORIA.md, decisión del
+    usuario): un paquete suele ser una promoción -se vende con la lista
+    PROMOCION, ver products.services.resolver_precio_linea- y puede valer
+    igual o menos que sus partes, así que no se exige que el valor generado
+    supere al consumido. El lote armado vale exactamente lo que costaron sus
+    componentes: armar no sube ni baja el valor del inventario; la promoción
+    se refleja en el margen al venderlo."""
 
     almacen = models.ForeignKey(
         "products.Almacen",
@@ -371,7 +416,7 @@ class EnsamblePaquete(BaseAbstractModel):
         max_digits=12,
         decimal_places=2,
         verbose_name="Valor generado",
-        help_text="Cantidad armada × costo de catálogo del paquete.",
+        help_text="Cantidad armada × costo unitario del lote armado (el costo real de sus componentes).",
     )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
 
@@ -404,8 +449,9 @@ class EnsamblePaquete(BaseAbstractModel):
         return self.__str__()
 
     @property
-    def diferencia(self):
-        return self.valor_generado - self.valor_consumido
+    def costo_unitario(self):
+        """Costo de cada paquete armado (el de su lote)."""
+        return (self.valor_generado / self.cantidad) if self.cantidad else Decimal("0.00")
 
     def clean(self):
         super().clean()
@@ -413,14 +459,280 @@ class EnsamblePaquete(BaseAbstractModel):
             raise ValidationError({"cantidad": "La cantidad armada debe ser mayor a cero."})
         if self.paquete_id and self.paquete.tipo != self.paquete.TipoProducto.PAQUETE:
             raise ValidationError({"paquete": "Solo se pueden armar productos de tipo Paquete/Combo."})
-        if (
-            self.valor_generado is not None
-            and self.valor_consumido is not None
-            and self.valor_generado <= self.valor_consumido
-        ):
-            raise ValidationError({
-                "valor_generado": (
-                    "El valor generado debe superar al valor consumido: armar el paquete no debería costar menos "
-                    "que sus componentes sueltos. Revisa el costo de catálogo del paquete."
-                ),
-            })
+
+
+class MovimientoAlmacen(BaseAbstractModel):
+    """Movimiento MANUAL de almacén: entradas y salidas que no nacen de una
+    compra, venta, traspaso o conversión (esas se registran solas en su
+    propio módulo). Solo lo captura Compras o el Administrador.
+
+    Se guarda en Borrador -sin tocar existencias- para poder ir agregando
+    productos; al Aplicar se afecta el inventario, y Cancelar un movimiento
+    aplicado registra el movimiento contrario sobre los mismos lotes (nunca
+    se borra nada, igual que el resto del inventario). Toda entrada genera
+    un lote nuevo valorizado al último costo de compra del producto (ver
+    apps.inventario.services.ultimo_costo); toda salida descuenta por FIFO.
+
+    `movimiento_relacionado` liga el movimiento con el que lo antecede (p.
+    ej. la salida por ajuste que regulariza una entrada por ajuste
+    temporal, o la entrada por devolución del proveedor que regresa una
+    salida por devolución a proveedor)."""
+
+    class Concepto(models.TextChoices):
+        ENTRADA_AJUSTE = "entrada_ajuste", "Entrada por ajuste"
+        ENTRADA_SOBRANTE = "entrada_sobrante", "Entrada por sobrante"
+        ENTRADA_REGALIA = "entrada_regalia", "Entrada por regalía"
+        ENTRADA_DEVOLUCION_PROVEEDOR = "entrada_dev_proveedor", "Entrada por devolución del proveedor"
+        SALIDA_AJUSTE = "salida_ajuste", "Salida por ajuste"
+        SALIDA_FALTANTE = "salida_faltante", "Salida por faltante"
+        SALIDA_MERMA = "salida_merma", "Salida por merma"
+        SALIDA_REGALIA = "salida_regalia", "Salida por regalía"
+        SALIDA_DEVOLUCION_PROVEEDOR = "salida_dev_proveedor", "Salida por devolución a proveedor"
+        SALIDA_CONSUMO = "salida_consumo", "Salida por consumo de la empresa"
+        # La unidad móvil regresa al final del día lo que el cliente no
+        # compró de su pedido: sale del almacén móvil y entra al almacén
+        # destino en el mismo paso.
+        SALIDA_DEVOLUCION_MOVIL = "salida_dev_movil", "Salida por devolución del cliente en móvil"
+
+    class Estado(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        APLICADO = "aplicado", "Aplicado"
+        CANCELADO = "cancelado", "Cancelado"
+
+    CONCEPTOS_ENTRADA = frozenset({
+        Concepto.ENTRADA_AJUSTE,
+        Concepto.ENTRADA_SOBRANTE,
+        Concepto.ENTRADA_REGALIA,
+        Concepto.ENTRADA_DEVOLUCION_PROVEEDOR,
+    })
+    CONCEPTOS_CON_PROVEEDOR = frozenset({
+        Concepto.ENTRADA_REGALIA,
+        Concepto.ENTRADA_DEVOLUCION_PROVEEDOR,
+        Concepto.SALIDA_DEVOLUCION_PROVEEDOR,
+    })
+
+    concepto = models.CharField(max_length=30, choices=Concepto.choices, verbose_name="Concepto")
+    almacen = models.ForeignKey(
+        "products.Almacen",
+        on_delete=models.PROTECT,
+        related_name="movimientos_almacen",
+        verbose_name="Almacén",
+    )
+    almacen_destino = models.ForeignKey(
+        "products.Almacen",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movimientos_almacen_recibidos",
+        verbose_name="Almacén destino",
+        help_text="Solo para la devolución del cliente en móvil: a dónde regresa la mercancía.",
+    )
+    fecha = models.DateField(default=timezone.localdate, verbose_name="Fecha")
+    estado = models.CharField(
+        max_length=10,
+        choices=Estado.choices,
+        default=Estado.BORRADOR,
+        verbose_name="Estado",
+    )
+    proveedor = models.ForeignKey(
+        "proveedores.Proveedor",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movimientos_almacen",
+        verbose_name="Proveedor",
+    )
+    orden_compra = models.ForeignKey(
+        "compras.OrdenCompra",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movimientos_almacen",
+        verbose_name="Orden de compra relacionada",
+    )
+    movimiento_relacionado = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movimientos_derivados",
+        verbose_name="Movimiento que lo antecede",
+    )
+    documento_referencia = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Documento de referencia",
+        help_text="Factura, nota o remisión a la que corresponde.",
+    )
+    observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+    fecha_aplicacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de aplicación")
+    fecha_cancelacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de cancelación")
+    motivo_cancelacion = models.CharField(max_length=255, blank=True, verbose_name="Motivo de cancelación")
+
+    class Meta:
+        verbose_name = "Movimiento de almacén"
+        verbose_name_plural = "Movimientos de almacén"
+        ordering = ["-fecha", "-created_at"]
+        indexes = [
+            models.Index(fields=["concepto"]),
+            models.Index(fields=["estado"]),
+            models.Index(fields=["fecha"]),
+            models.Index(fields=["almacen"]),
+        ]
+
+    def __str__(self):
+        return f"{self.folio} · {self.get_concepto_display()}"
+
+    def get_folio_prefix(self):
+        return "MAL"
+
+    def get_slug_source(self):
+        return f"{self.folio}-{self.almacen_id}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def es_entrada(self):
+        return self.concepto in self.CONCEPTOS_ENTRADA
+
+    @property
+    def requiere_proveedor(self):
+        return self.concepto in self.CONCEPTOS_CON_PROVEEDOR
+
+    @property
+    def es_devolucion_movil(self):
+        return self.concepto == self.Concepto.SALIDA_DEVOLUCION_MOVIL
+
+    def clean(self):
+        super().clean()
+        errores = {}
+        if self.requiere_proveedor and not self.proveedor_id:
+            errores["proveedor"] = "Este concepto requiere indicar el proveedor."
+        if self.es_devolucion_movil:
+            if self.almacen_id and self.almacen.tipo != self.almacen.Tipo.MOVIL:
+                errores["almacen"] = "La devolución en móvil sale de un almacén de tipo Móvil."
+            if not self.almacen_destino_id:
+                errores["almacen_destino"] = "Indica a qué almacén regresa la mercancía."
+            elif self.almacen_destino_id == self.almacen_id:
+                errores["almacen_destino"] = "El almacén destino debe ser distinto al almacén móvil."
+        elif self.almacen_destino_id:
+            errores["almacen_destino"] = "Solo la devolución del cliente en móvil lleva almacén destino."
+        if self.pk and self.movimiento_relacionado_id == self.pk:
+            errores["movimiento_relacionado"] = "Un movimiento no puede relacionarse consigo mismo."
+        if errores:
+            raise ValidationError(errores)
+
+
+class MovimientoAlmacenDetalle(BaseAbstractModel):
+    movimiento = models.ForeignKey(
+        MovimientoAlmacen,
+        on_delete=models.CASCADE,
+        related_name="detalles",
+        verbose_name="Movimiento de almacén",
+    )
+    producto = models.ForeignKey(
+        "products.Producto",
+        on_delete=models.PROTECT,
+        related_name="detalles_movimiento_almacen",
+        verbose_name="Producto",
+    )
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad")
+    costo_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Costo unitario",
+        help_text="Se fija al aplicar: último costo en entradas, costo promedio de los lotes consumidos en salidas.",
+    )
+
+    class Meta:
+        verbose_name = "Detalle de movimiento de almacén"
+        verbose_name_plural = "Detalles de movimiento de almacén"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(cantidad__gt=0), name="mad_cantidad_positiva"),
+            models.UniqueConstraint(fields=["movimiento", "producto"], name="mad_producto_unico_por_movimiento"),
+        ]
+        indexes = [
+            models.Index(fields=["movimiento"]),
+            models.Index(fields=["producto"]),
+        ]
+
+    def __str__(self):
+        return f"{self.producto.nombre} x{self.cantidad}"
+
+    def get_folio_prefix(self):
+        return "MAD"
+
+    def get_slug_source(self):
+        return f"{self.movimiento_id}-{self.producto_id}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    @property
+    def importe(self):
+        if self.costo_unitario is None:
+            return None
+        return self.cantidad * self.costo_unitario
+
+    def clean(self):
+        super().clean()
+        if self.cantidad is not None and self.cantidad <= 0:
+            raise ValidationError({"cantidad": "La cantidad debe ser mayor a cero."})
+
+
+class MovimientoAlmacenLote(BaseAbstractModel):
+    """De qué lote salió (o qué lote se creó) cada línea al aplicar el
+    movimiento: es lo que permite cancelarlo regresando exactamente a los
+    mismos lotes. En la devolución en móvil, `lote_destino` es el lote que
+    se generó en el almacén que recibe."""
+
+    detalle = models.ForeignKey(
+        MovimientoAlmacenDetalle,
+        on_delete=models.CASCADE,
+        related_name="lotes",
+        verbose_name="Detalle",
+    )
+    lote = models.ForeignKey(
+        Lote,
+        on_delete=models.PROTECT,
+        related_name="movimientos_almacen",
+        verbose_name="Lote afectado",
+    )
+    lote_destino = models.ForeignKey(
+        Lote,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="movimientos_almacen_destino",
+        verbose_name="Lote generado en destino",
+    )
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Cantidad")
+
+    class Meta:
+        verbose_name = "Lote de movimiento de almacén"
+        verbose_name_plural = "Lotes de movimiento de almacén"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(cantidad__gt=0), name="mal_lote_cantidad_positiva"),
+        ]
+        indexes = [
+            models.Index(fields=["detalle"]),
+            models.Index(fields=["lote"]),
+        ]
+
+    def __str__(self):
+        return f"{self.lote} · {self.cantidad}"
+
+    def get_folio_prefix(self):
+        return "MLL"
+
+    def get_slug_source(self):
+        return f"{self.detalle_id}-{self.lote_id}-{self.uuid}"
+
+    @property
+    def display_name(self):
+        return self.__str__()

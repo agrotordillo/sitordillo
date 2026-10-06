@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.forms import CorregirLoteForm, ReportarMermaForm
 from apps.inventario.models import Lote
@@ -34,8 +35,9 @@ def corregir_lote_view(request, pk):
                     form.cleaned_data["producto"],
                     motivo=form.cleaned_data["motivo"],
                 )
-            except ValueError as exc:
-                form.add_error(None, str(exc))
+            except ERRORES_DE_NEGOCIO as exc:
+                for mensaje in mensajes_de_error(exc):
+                    form.add_error(None, mensaje)
             else:
                 messages.success(request, "Recepción corregida correctamente.")
                 return redirect("inventario:lote-list")
@@ -65,9 +67,12 @@ def reportar_merma_view(request, pk):
                     lote,
                     form.cleaned_data["cantidad"],
                     motivo=form.cleaned_data["motivo"],
+                    iva=form.cleaned_data["iva"],
+                    ieps=form.cleaned_data["ieps"],
                 )
-            except ValueError as exc:
-                form.add_error(None, str(exc))
+            except ERRORES_DE_NEGOCIO as exc:
+                for mensaje in mensajes_de_error(exc):
+                    form.add_error(None, mensaje)
             else:
                 messages.success(request, "Merma registrada correctamente.")
                 return redirect("inventario:lote-list")

@@ -152,6 +152,10 @@ class Almacen(BaseAbstractModel):
     class Tipo(models.TextChoices):
         CEDIS = "cedis", "CEDIS"
         SUCURSAL = "sucursal", "Sucursal"
+        # Unidad que sale a ruta a entregar pedidos; al final del día
+        # regresa lo que el cliente no compró (ver
+        # MovimientoAlmacen.Concepto.SALIDA_DEVOLUCION_MOVIL).
+        MOVIL = "movil", "Móvil"
 
     nombre = models.CharField(max_length=200)
     tipo = models.CharField(
@@ -227,9 +231,9 @@ class Almacen(BaseAbstractModel):
 class PuntoVenta(BaseAbstractModel):
     """Caja o mostrador de una sucursal, de tipo "cobro" (cajas donde se
     recibe el pago) o "pedido" (mostradores donde se toma el pedido del
-    cliente pero se cobra después en una caja). El turno de operación (ver
-    `Turno`) se maneja por sucursal completa, no por punto de venta
-    individual."""
+    cliente pero se cobra después en una caja). Cada uno lleva su propio
+    turno (ver `Turno`): el de una caja permite cobrar; el de un mostrador,
+    solo cotizar y levantar pedidos."""
 
     class Tipo(models.TextChoices):
         COBRO = "cobro", "Cobro"
@@ -257,6 +261,11 @@ class PuntoVenta(BaseAbstractModel):
         default=0,
         editable=False,
         verbose_name="Último consecutivo de cotización usado",
+    )
+    consecutivo_pedido = models.PositiveIntegerField(
+        default=0,
+        editable=False,
+        verbose_name="Último consecutivo de pedido usado",
     )
 
     class Meta:
@@ -300,15 +309,32 @@ class PuntoVenta(BaseAbstractModel):
         self.save(update_fields=["consecutivo_cotizacion", "updated_at", "updated_by"])
         return f"{self.almacen.numero:02d}{self.numero:02d}C{self.consecutivo_cotizacion:07d}"
 
+    def tomar_siguiente_folio_pedido(self):
+        """Igual que tomar_siguiente_folio_cotizacion, con su propio
+        consecutivo y la letra "P" en vez de "C" -así el folio de un pedido
+        nunca choca con el de una cotización del mismo punto de venta-."""
+        self.consecutivo_pedido += 1
+        self.save(update_fields=["consecutivo_pedido", "updated_at", "updated_by"])
+        return f"{self.almacen.numero:02d}{self.numero:02d}P{self.consecutivo_pedido:07d}"
+
 
 class Turno(BaseAbstractModel):
-    """Apertura y cierre de un turno de una caja (`PuntoVenta` de tipo
-    Cobro): quién estuvo a cargo y en qué rango de horas, para poder
-    ligarle los gastos que se registran mientras esa caja está operando
-    (ver `gastos.Gasto.turno`) y para exigir turno abierto al cobrar una
-    venta o levantar una cotización -de aquí sale también la sucursal de
-    ambas, ya no la elige quien las captura (ver
-    `products.services.turno_abierto_de`).
+    """Apertura y cierre de un turno de un punto de venta: quién estuvo a
+    cargo y en qué rango de horas. Es obligatorio para operar en mostrador
+    o caja -de aquí sale la sucursal de la operación, ya no la elige quien
+    la captura (ver `products.services.turno_abierto_de`)-, y lo que
+    permite depende del tipo de punto de venta:
+
+    - Cobro (una caja): cobrar ventas (directas o convirtiendo una
+      cotización/pedido), levantar cotizaciones y pedidos, y ligarle los
+      gastos que se pagan mientras esa caja opera (ver `gastos.Gasto.turno`).
+    - Pedido (un mostrador): solo levantar cotizaciones y pedidos; nunca
+      cobrar. Así mostrador y caja trabajan cada quien con su propio turno
+      sin estorbarse (un solo turno abierto por punto de venta).
+
+    Quién puede abrir turno en cada tipo lo decide su rol (ver
+    `products.services.tipos_punto_venta_de`), asignado desde la
+    administración de usuarios.
 
     Se ata a la caja, no a la sucursal completa: así una misma sucursal
     puede operar con más de una caja abierta a la vez (cada una con su
@@ -350,6 +376,9 @@ class Turno(BaseAbstractModel):
                 fields=["punto_venta"],
                 condition=models.Q(estatus="abierto"),
                 name="trn_un_turno_abierto_por_punto_venta",
+                # full_clean() la revisa antes de guardar: sin esto el
+                # usuario veía el nombre técnico de la restricción (B27).
+                violation_error_message="Este punto de venta ya tiene un turno abierto.",
             ),
         ]
         indexes = [
@@ -383,12 +412,11 @@ class Turno(BaseAbstractModel):
     def esta_abierto(self):
         return self.estatus == self.Estatus.ABIERTO
 
-    def clean(self):
-        super().clean()
-        if self.punto_venta_id and self.punto_venta.tipo != PuntoVenta.Tipo.COBRO:
-            raise ValidationError({
-                "punto_venta": "Un turno solo se abre en un punto de venta de tipo Cobro (una caja).",
-            })
+    @property
+    def es_de_cobro(self):
+        """Solo un turno de caja (Cobro) puede cobrar ventas; uno de
+        mostrador (Pedido) solo levanta cotizaciones y pedidos."""
+        return self.punto_venta.tipo == PuntoVenta.Tipo.COBRO
 
     def cerrar(self):
         if not self.esta_abierto:

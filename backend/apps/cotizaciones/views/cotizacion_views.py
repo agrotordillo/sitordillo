@@ -7,6 +7,7 @@ from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView, UpdateView
 
+from apps.core.filtros_fecha import FiltroFechaMixin
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.models import Cotizacion, CotizacionDetalle
 from apps.cotizaciones.forms import CotizacionForm, CotizacionDetalleFormSet
@@ -14,15 +15,17 @@ from apps.cotizaciones.pdf import generar_pdf_cotizacion
 from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 
 
-class CotizacionListView(PermissionRequiredMixin, ListView):
+class CotizacionListView(FiltroFechaMixin, PermissionRequiredMixin, ListView):
     permission_required = "cotizaciones.view_cotizacion"
     model = Cotizacion
     template_name = "cotizaciones/cotizacion_list.html"
     context_object_name = "cotizaciones"
     extra_context = {"active_module": "quotes"}
+    filtro_fecha_campo = "fecha_cotizacion"
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("cliente", "almacen", "venta").prefetch_related("detalles")
+        queryset = self.aplicar_filtro_fecha(queryset)
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)

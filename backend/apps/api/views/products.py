@@ -1,5 +1,3 @@
-from decimal import Decimal, InvalidOperation
-
 from django.db.models import Q, Sum
 from django.db.models.functions import Upper
 from rest_framework.generics import ListAPIView
@@ -9,8 +7,10 @@ from rest_framework.views import APIView
 from apps.clientes.models import Cliente
 from apps.products.forms import BrandForm, ClaseForm, LineaForm, UnitMeasureForm
 from apps.products.models import Producto, Subcategoria
-from apps.products.services import resolver_lista_precio_cliente, resolver_precio_producto
-from apps.api.serializers.products import OptionSerializer
+from apps.core.parametros import id_valido, ids_validos
+from apps.products.services import resolver_lista_precio_cliente, resolver_precio_autorizado
+from apps.api.permissions import PuedeEditarProductos, RequierePermisos
+from apps.api.serializers.products import ActualizarCostoSerializer, OptionSerializer
 
 
 class SubcategoriesByCategoryView(ListAPIView):
@@ -19,7 +19,7 @@ class SubcategoriesByCategoryView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        category_id = self.request.query_params.get("category")
+        category_id = id_valido(self.request.query_params.get("category"))
         if not category_id:
             return Subcategoria.objects.none()
         return (
@@ -32,6 +32,8 @@ class SubcategoriesByCategoryView(ListAPIView):
 class BrandQuickCreateView(APIView):
     """Alta rápida de Marca desde el formulario de producto."""
 
+    permission_classes = [PuedeEditarProductos]
+
     def post(self, request):
         form = BrandForm(request.data)
         if not form.is_valid():
@@ -43,6 +45,8 @@ class BrandQuickCreateView(APIView):
 class LineaQuickCreateView(APIView):
     """Alta rápida de Línea desde el formulario de producto."""
 
+    permission_classes = [PuedeEditarProductos]
+
     def post(self, request):
         form = LineaForm(request.data)
         if not form.is_valid():
@@ -53,6 +57,8 @@ class LineaQuickCreateView(APIView):
 
 class ClaseQuickCreateView(APIView):
     """Alta rápida de Clase desde el formulario de producto."""
+
+    permission_classes = [PuedeEditarProductos]
 
     def post(self, request):
         form = ClaseForm(request.data)
@@ -76,7 +82,7 @@ class ProductoBuscarView(APIView):
     `precio_venta` deja de ser el precio_venta plano del producto y pasa a
     ser el resuelto para la lista de precios de ese cliente (o "PUBLICO" si
     no tiene una propia) y esa sucursal -ver
-    apps.products.services.resolver_precio_producto-, que sí respeta los
+    apps.products.services.resolver_precio_linea-, que sí respeta los
     precios específicos por sucursal (ProductoPrecio.almacen) que el precio
     plano no conoce. Es un parámetro aparte de "almacen" a propósito: no
     debe activar el filtro de existencia de arriba, que es solo para
@@ -94,8 +100,11 @@ class ProductoBuscarView(APIView):
             | Q(nombre__icontains=q)
         )
 
-        almacen_id = request.query_params.get("almacen", "").strip()
-        con_existencia = bool(almacen_id)
+        almacen_crudo = request.query_params.get("almacen", "").strip()
+        almacen_id = id_valido(almacen_crudo)
+        con_existencia = bool(almacen_crudo)
+        if con_existencia and almacen_id is None:
+            return Response([])
         if con_existencia:
             productos = productos.filter(
                 lotes__almacen_id=almacen_id, lotes__cantidad_disponible__gt=0
@@ -110,21 +119,20 @@ class ProductoBuscarView(APIView):
         # alguno de estos dos parámetros (hoy, solo ventas): así compras,
         # traspasos, comisiones, etc. no pagan consultas extra que no usan
         # y su resultado no cambia.
-        cliente_id = request.query_params.get("cliente", "").strip()
-        precio_almacen_id = request.query_params.get("precio_almacen", "").strip() or None
+        cliente_id = id_valido(request.query_params.get("cliente"))
+        precio_almacen_id = id_valido(request.query_params.get("precio_almacen"))
+        contexto_venta = bool(cliente_id or precio_almacen_id)
         lista_precio = None
-        if cliente_id or precio_almacen_id:
+        if contexto_venta:
             cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
             lista_precio = resolver_lista_precio_cliente(cliente)
 
         productos = productos.order_by("nombre")[:20]
         data = []
         for p in productos:
-            precio_venta = p.precio_venta
-            if lista_precio is not None:
-                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
-                if resuelto is not None:
-                    precio_venta = resuelto
+            precio_venta = (
+                resolver_precio_autorizado(p, lista_precio, precio_almacen_id) if contexto_venta else p.precio_venta
+            )
             data.append({
                 "id": p.id,
                 "folio": p.folio,
@@ -149,24 +157,19 @@ class ProductoPreciosPorClienteView(APIView):
     solo que por id en vez de por texto."""
 
     def post(self, request):
-        ids = request.data.get("ids", [])
-        if not isinstance(ids, list) or not ids:
+        datos = request.data if isinstance(request.data, dict) else {}
+        ids = ids_validos(datos.get("ids", []))
+        if not ids:
             return Response({"precios": {}})
 
-        cliente_raw = request.data.get("cliente")
-        cliente_id = str(cliente_raw).strip() if cliente_raw else None
-        precio_almacen_raw = request.data.get("precio_almacen")
-        precio_almacen_id = str(precio_almacen_raw).strip() if precio_almacen_raw else None
+        cliente_id = id_valido(datos.get("cliente"))
+        precio_almacen_id = id_valido(datos.get("precio_almacen"))
         cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
         lista_precio = resolver_lista_precio_cliente(cliente)
 
         precios = {}
         for p in Producto.objects.filter(pk__in=ids, is_active=True):
-            precio_venta = p.precio_venta
-            if lista_precio is not None:
-                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
-                if resuelto is not None:
-                    precio_venta = resuelto
+            precio_venta = resolver_precio_autorizado(p, lista_precio, precio_almacen_id)
             precios[str(p.id)] = str(precio_venta)
         return Response({"precios": precios})
 
@@ -185,7 +188,8 @@ class ProductoResolverSkusView(APIView):
     precios de ese cliente, igual que ProductoBuscarView."""
 
     def post(self, request):
-        skus = request.data.get("skus", [])
+        datos = request.data if isinstance(request.data, dict) else {}
+        skus = datos.get("skus", [])
         if not isinstance(skus, list):
             return Response({"detail": "Se espera una lista de SKUs."}, status=400)
 
@@ -193,7 +197,10 @@ class ProductoResolverSkusView(APIView):
         if not skus_norm:
             return Response({"productos": [], "no_encontrados": [], "sin_existencia": []})
 
-        almacen_id = str(request.data.get("almacen") or "").strip() or None
+        almacen_crudo = str(datos.get("almacen") or "").strip()
+        almacen_id = id_valido(almacen_crudo)
+        if almacen_crudo and almacen_id is None:
+            return Response({"detail": "Almacén inválido."}, status=400)
 
         productos_qs = (
             Producto.objects.filter(is_active=True)
@@ -216,22 +223,19 @@ class ProductoResolverSkusView(APIView):
             sin_existencia = [p.sku for p in productos if not ((p.disponible or 0) > 0)]
             productos = con_existencia
 
-        cliente_raw = request.data.get("cliente")
-        cliente_id = str(cliente_raw).strip() if cliente_raw else None
-        precio_almacen_raw = request.data.get("precio_almacen")
-        precio_almacen_id = str(precio_almacen_raw).strip() if precio_almacen_raw else None
+        cliente_id = id_valido(datos.get("cliente"))
+        precio_almacen_id = id_valido(datos.get("precio_almacen"))
+        contexto_venta = bool(cliente_id or precio_almacen_id)
         lista_precio = None
-        if cliente_id or precio_almacen_id:
+        if contexto_venta:
             cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
             lista_precio = resolver_lista_precio_cliente(cliente)
 
         data = []
         for p in productos:
-            precio_venta = p.precio_venta
-            if lista_precio is not None:
-                resuelto = resolver_precio_producto(p, lista_precio, almacen=precio_almacen_id)
-                if resuelto is not None:
-                    precio_venta = resuelto
+            precio_venta = (
+                resolver_precio_autorizado(p, lista_precio, precio_almacen_id) if contexto_venta else p.precio_venta
+            )
             data.append({
                 "id": p.id,
                 "folio": p.folio,
@@ -245,33 +249,29 @@ class ProductoResolverSkusView(APIView):
 
 class ProductoActualizarCostoView(APIView):
     """Actualiza el precio de costo de un producto desde la orden de compra,
-    cuando el precio pagado al proveedor supera el costo anterior registrado."""
+    cuando el precio pagado al proveedor supera el costo anterior registrado.
+    Exige el mismo permiso que editar el producto: cambiar el costo también
+    recalcula los precios de lista con % de utilidad (ver
+    Producto._recalcular_precios_por_utilidad)."""
+
+    permission_classes = [RequierePermisos]
+    permisos_requeridos = ("products.change_producto",)
 
     def post(self, request):
-        producto_id = request.data.get("producto")
-        precio_costo = request.data.get("precio_costo")
-        if not producto_id or precio_costo is None:
-            return Response({"detail": "Faltan datos."}, status=400)
+        serializer = ActualizarCostoSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"detail": "Datos inválidos.", "errors": serializer.errors}, status=400)
 
-        try:
-            producto = Producto.objects.get(pk=producto_id)
-        except (Producto.DoesNotExist, ValueError):
-            return Response({"detail": "Producto no encontrado."}, status=404)
-
-        try:
-            nuevo_costo = Decimal(str(precio_costo))
-        except InvalidOperation:
-            return Response({"detail": "Precio de costo inválido."}, status=400)
-        if nuevo_costo < 0:
-            return Response({"detail": "El precio de costo no puede ser negativo."}, status=400)
-
-        producto.precio_costo = nuevo_costo
-        producto.save(update_fields=["precio_costo"])
+        producto = serializer.validated_data["producto"]
+        producto.precio_costo = serializer.validated_data["precio_costo"]
+        producto.save(update_fields=["precio_costo", "updated_at", "updated_by"])
         return Response({"precio_costo": str(producto.precio_costo)})
 
 
 class UnitMeasureQuickCreateView(APIView):
     """Alta rápida de Unidad de medida desde el formulario de producto."""
+
+    permission_classes = [PuedeEditarProductos]
 
     def post(self, request):
         form = UnitMeasureForm(request.data)

@@ -8,7 +8,7 @@ from .views.linea_views import LineaCreateView, LineaListView
 from .views.clase_views import ClaseCreateView, ClaseListView
 from .views.warehouse_views import WarehouseCreateView, WarehouseListView, WarehouseUpdateView
 from .views.punto_venta_views import PuntoVentaCreateView, PuntoVentaListView, PuntoVentaUpdateView
-from .views.turno_views import TurnoListView, abrir_turno_view, cerrar_turno_view
+from .views.turno_views import TurnoListView, abrir_turno_view, cerrar_turno_view, turno_corte_view
 from .views.unit_measure_views import UnitMeasureCreateView, UnitMeasureListView
 from .views.paquete_views import paquete_componentes_view
 from .views.precio_views import producto_precios_view
@@ -51,6 +51,7 @@ urlpatterns = [
     path("turnos/", TurnoListView.as_view(), name="turno-list"),
     path("turnos/abrir/", abrir_turno_view, name="turno-abrir"),
     path("turnos/<int:pk>/cerrar/", cerrar_turno_view, name="turno-cerrar"),
+    path("turnos/<int:pk>/corte/", turno_corte_view, name="turno-corte"),
     path("unidades-medida/", UnitMeasureListView.as_view(), name="unit-list"),
     path("unidades-medida/crear/", UnitMeasureCreateView.as_view(), name="unit-create"),
 ]

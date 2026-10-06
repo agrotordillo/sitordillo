@@ -7,12 +7,13 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
+from apps.core.parametros import fecha, ids_validos
 from apps.fiscal.models import FormaPago
 from apps.pagos.forms import GenerarCuentaForm
 from apps.pagos.models import CuentaPorPagar
@@ -60,7 +61,7 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
 
         forma_pago_ids = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
         if forma_pago_ids:
-            qs = qs.filter(pagos__forma_pago_id__in=forma_pago_ids).distinct()
+            qs = qs.filter(pagos__forma_pago_id__in=ids_validos(forma_pago_ids)).distinct()
 
         return qs.order_by(
             "orden_compra__proveedor__nombre_comercial",
@@ -86,8 +87,8 @@ class CuentaPorPagarListView(PermissionRequiredMixin, ListView):
             return desde, desde + timedelta(days=6)
 
         if periodo == "rango":
-            desde = parse_date(self.request.GET.get("fecha_desde", ""))
-            hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+            desde = fecha(self.request.GET.get("fecha_desde"))
+            hasta = fecha(self.request.GET.get("fecha_hasta"))
             return desde, hasta
 
         return None, None
@@ -174,8 +175,9 @@ def generar_cuenta_view(request, pk):
                 )
                 messages.success(request, "Cuenta por pagar generada correctamente.")
                 return redirect("compras:orden-list")
-            except ValueError as e:
-                form.add_error(None, str(e))
+            except ERRORES_DE_NEGOCIO as e:
+                for mensaje in mensajes_de_error(e):
+                    form.add_error(None, mensaje)
     else:
         form = GenerarCuentaForm(initial={"fecha_emision": timezone.localdate()})
 

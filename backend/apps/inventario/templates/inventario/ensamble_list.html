@@ -33,9 +33,9 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Almacén</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Paquete armado</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Valor consumido</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Valor generado</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Diferencia</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo de componentes</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Valor del lote armado</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo por paquete</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -49,7 +49,7 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ ensamble.fecha|date:"d/m/Y" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-500">${{ ensamble.valor_consumido|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700 font-medium">${{ ensamble.valor_generado|moneda }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-green-600">+${{ ensamble.diferencia|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right font-semibold text-gray-800">${{ ensamble.costo_unitario|moneda }}</td>
       </tr>
       {% empty %}
       <tr>

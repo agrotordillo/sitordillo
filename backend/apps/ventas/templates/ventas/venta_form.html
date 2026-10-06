@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% load static %}
 {% block title %}Registrar venta{% endblock title %}
 {% block title_layout %}Registrar venta{% endblock title_layout %}
@@ -14,8 +15,19 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
+<div class="mb-6 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3">
+  <form method="get" action="{% url 'ventas:recuperar-documento' %}" class="flex flex-wrap items-end gap-2">
+    <div class="flex-1 min-w-[220px]">
+      <label for="folio-recuperar" class="label">¿Tienes un folio de cotización o pedido?</label>
+      <input type="text" name="folio" id="folio-recuperar" class="input" placeholder="Ej. 0101C0000001 o 0101P0000001" autocomplete="off">
+    </div>
+    <button type="submit" class="btn-secondary">Recuperar</button>
+  </form>
+</div>
+
 <form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
+  {% token_envio %}
 
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -45,6 +57,12 @@
         <div class="sm:col-span-2">
           <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
           {{ form.observaciones }}
+        </div>
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center gap-1.5 text-xs text-gray-500">
+            {{ form.es_remision }}
+            Es remisión <span class="text-gray-400">(sigue el mismo proceso, pero nunca se factura; se imprime como Nota de remisión)</span>
+          </label>
         </div>
       </div>
     </div>

@@ -97,7 +97,7 @@
                     {% else %}
                     <a href="{% url 'compras:orden-update' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
                     {% endif %}
-                    {% if orden.estatus != 'recibida' and orden.estatus != 'cancelada' %}
+                    {% if orden.estatus == 'enviada' or orden.estatus == 'parcial' %}
                     <a href="{% url 'compras:orden-recibir' orden.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Recibir</a>
                     {% endif %}
                     {% if orden.estatus == 'parcial' or orden.estatus == 'recibida' %}

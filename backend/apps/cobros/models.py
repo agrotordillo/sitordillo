@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
+from apps.core.archivos import RutaAleatoria
 from apps.core.models import BaseAbstractModel
 
 
@@ -147,7 +148,7 @@ class Cobro(BaseAbstractModel):
         help_text="Requerido cuando la forma de pago es cheque nominativo.",
     )
     comprobante = models.FileField(
-        upload_to="cobros/comprobantes/",
+        upload_to=RutaAleatoria("cobros/comprobantes"),
         null=True,
         blank=True,
         verbose_name="Comprobante de cobro",

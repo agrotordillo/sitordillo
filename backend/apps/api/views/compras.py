@@ -1,9 +1,8 @@
-from datetime import date
-
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.compras.models import PromocionProveedor
+from apps.core.parametros import fecha as leer_fecha, id_valido
 from apps.products.models import Producto
 
 
@@ -12,15 +11,10 @@ class PromocionVigenteView(APIView):
     en una fecha dada, usada para sugerir el precio en la Orden de Compra."""
 
     def get(self, request):
-        producto_id = request.query_params.get("producto")
-        proveedor_id = request.query_params.get("proveedor")
-        fecha_str = request.query_params.get("fecha")
-        if not (producto_id and proveedor_id and fecha_str):
-            return Response({"vigente": False})
-
-        try:
-            fecha = date.fromisoformat(fecha_str[:10])
-        except ValueError:
+        producto_id = id_valido(request.query_params.get("producto"))
+        proveedor_id = id_valido(request.query_params.get("proveedor"))
+        fecha = leer_fecha(str(request.query_params.get("fecha") or "")[:10])
+        if not (producto_id and proveedor_id and fecha):
             return Response({"vigente": False})
 
         promo = (

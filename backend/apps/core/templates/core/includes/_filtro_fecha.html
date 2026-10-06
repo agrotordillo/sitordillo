@@ -1,0 +1,29 @@
+{% comment %}
+Filtro de fecha "se ve hoy por default" (ver apps.core.filtros_fecha). El
+<input type="date"> se incluye DENTRO de un <form method="get"> ya
+existente (no trae su propio <form>, para que al cambiar de fecha se
+reenvíen juntos los demás filtros de esa misma lista, p. ej. "estatus" en
+Pedidos) y se envía solo al cambiar vía data-enviar-al-cambiar (ver
+static/js/modules/ui/acciones.js). Los enlaces de día anterior/siguiente/
+hoy sí son independientes del <form>: ya traen la querystring completa
+armada en el contexto (url_fecha_anterior/siguiente/hoy).
+
+Requiere en el contexto: fecha_filtro, fecha_hoy, url_fecha_anterior,
+url_fecha_siguiente, url_fecha_hoy (los arma contexto_filtro_fecha()).
+{% endcomment %}
+<div class="flex items-center gap-1.5">
+  <a href="{{ url_fecha_anterior }}" class="btn-icon-outline" aria-label="Día anterior" title="Día anterior">
+    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+    </svg>
+  </a>
+  <input type="date" name="fecha" value="{{ fecha_filtro|date:'Y-m-d' }}" class="input" data-enviar-al-cambiar aria-label="Fecha">
+  <a href="{{ url_fecha_siguiente }}" class="btn-icon-outline" aria-label="Día siguiente" title="Día siguiente">
+    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 0-1.06L10.94 10 7.21 6.29a.75.75 0 1 1 1.06-1.06l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+    </svg>
+  </a>
+  {% if fecha_filtro != fecha_hoy %}
+  <a href="{{ url_fecha_hoy }}" class="btn-secondary text-sm">Hoy</a>
+  {% endif %}
+</div>

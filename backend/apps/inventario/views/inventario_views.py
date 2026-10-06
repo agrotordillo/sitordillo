@@ -1,10 +1,10 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Sum
-from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.compras.models import OrdenCompra
 from apps.core.filtros_producto import FiltrosProductoMixin
+from apps.core.parametros import fecha, filtrar_por_id, id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
 
@@ -29,14 +29,11 @@ class LoteListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
-        orden_id = self.request.GET.get("orden")
-        if orden_id:
-            queryset = queryset.filter(orden_compra_detalle__orden_compra_id=orden_id)
-        return queryset
+        return filtrar_por_id(queryset, "orden_compra_detalle__orden_compra_id", self.request.GET.get("orden"))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        orden_id = self.request.GET.get("orden")
+        orden_id = id_valido(self.request.GET.get("orden"))
         if orden_id:
             context["orden"] = OrdenCompra.objects.filter(pk=orden_id).first()
         return context
@@ -64,10 +61,10 @@ class ExistenciaListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView
 
         # Fecha de ingreso del lote: cuándo entró esa mercancía, no cuándo
         # se registró en el sistema (created_at es solo auditoría).
-        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        fecha_desde = fecha(self.request.GET.get("fecha_desde"))
         if fecha_desde:
             queryset = queryset.filter(fecha_ingreso__gte=fecha_desde)
-        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        fecha_hasta = fecha(self.request.GET.get("fecha_hasta"))
         if fecha_hasta:
             queryset = queryset.filter(fecha_ingreso__lte=fecha_hasta)
 

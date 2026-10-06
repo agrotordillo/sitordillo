@@ -1,12 +1,13 @@
 from django import forms
 
+from apps.core.archivos import ComprobanteFormMixin
 from apps.core.forms import BaseModelForm
 from apps.pagos.forms import FormaPagoSelect
 from apps.pagos.models import Banco
 from .models import Cobro
 
 
-class CobroForm(BaseModelForm):
+class CobroForm(ComprobanteFormMixin, BaseModelForm):
     class Meta:
         model = Cobro
         fields = [

@@ -9,6 +9,8 @@ from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView, UpdateView
 
+from apps.core.envio_unico import EnvioDuplicado, EnvioUnicoMixin, reservar_envio, respuesta_envio_duplicado
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
 from apps.core.scoping import almacenes_visibles
 from apps.traspasos.models import Traspaso, TraspasoDetalle, TraspasoLote
 from apps.traspasos.forms import TraspasoForm, TraspasoDetalleFormSet
@@ -81,7 +83,7 @@ class TraspasoDetailView(PermissionRequiredMixin, DetailView):
         )
 
 
-class TraspasoCreateView(PermissionRequiredMixin, CreateView):
+class TraspasoCreateView(PermissionRequiredMixin, EnvioUnicoMixin, CreateView):
     permission_required = "traspasos.add_traspaso"
     model = Traspaso
     form_class = TraspasoForm
@@ -129,10 +131,15 @@ class TraspasoCreateView(PermissionRequiredMixin, CreateView):
                 form.add_error(None, error)
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
-        with transaction.atomic():
-            self.object = form.save()
-            formset.instance = self.object
-            formset.save()
+        try:
+            with transaction.atomic():
+                envio = reservar_envio(self.request)
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+                envio.completar(self.get_success_url())
+        except EnvioDuplicado as duplicado:
+            return respuesta_envio_duplicado(self.request, duplicado.url_resultado, self.success_url)
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
 
@@ -237,8 +244,9 @@ def traspaso_enviar_view(request, pk):
     try:
         enviar_traspaso(traspaso)
         messages.success(request, f"Traspaso {traspaso.folio} enviado. Stock descontado de {traspaso.almacen_origen.nombre}.")
-    except ValueError as e:
-        messages.error(request, str(e))
+    except ERRORES_DE_NEGOCIO as e:
+        for mensaje in mensajes_de_error(e):
+            messages.error(request, mensaje)
     return redirect("traspasos:traspaso-list")
 
 
@@ -259,8 +267,9 @@ def traspaso_recibir_view(request, pk):
     try:
         recibir_traspaso(traspaso)
         messages.success(request, f"Traspaso {traspaso.folio} recibido. Inventario dado de alta en la sucursal.")
-    except ValueError as e:
-        messages.error(request, str(e))
+    except ERRORES_DE_NEGOCIO as e:
+        for mensaje in mensajes_de_error(e):
+            messages.error(request, mensaje)
     return redirect("traspasos:traspaso-list")
 
 
@@ -275,6 +284,7 @@ def traspaso_cancelar_view(request, pk):
     try:
         cancelar_traspaso(traspaso)
         messages.success(request, f"Traspaso {traspaso.folio} cancelado.")
-    except ValueError as e:
-        messages.error(request, str(e))
+    except ERRORES_DE_NEGOCIO as e:
+        for mensaje in mensajes_de_error(e):
+            messages.error(request, mensaje)
     return redirect("traspasos:traspaso-list")

@@ -9,6 +9,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
+from apps.core.archivos import tipo_mime
+
 from .models import CuentaPorPagar, Pago, ReciboPago
 
 FIRMA_CORREO_PAGOS = (
@@ -43,7 +45,12 @@ def validar_limite_credito(proveedor, monto_nuevo, excluir_cuenta_id=None):
 
 @transaction.atomic
 def generar_cuenta_por_pagar(orden_compra, fecha_emision=None, observaciones=""):
-    if hasattr(orden_compra, "cuenta_por_pagar"):
+    from apps.compras.models import OrdenCompra
+
+    # Con la orden bloqueada: dos "Generar cuenta" a la vez no deben chocar
+    # con la relación 1 a 1 (error 500); el segundo encuentra la cuenta ya hecha.
+    orden_compra = OrdenCompra.objects.select_for_update().get(pk=orden_compra.pk)
+    if CuentaPorPagar.objects.filter(orden_compra=orden_compra).exists():
         raise ValueError("Esta orden de compra ya tiene una cuenta por pagar generada.")
 
     proveedor = orden_compra.proveedor
@@ -69,6 +76,39 @@ def generar_cuenta_por_pagar(orden_compra, fecha_emision=None, observaciones="")
     )
     cuenta.full_clean()
     cuenta.save()
+    return cuenta
+
+
+def bloquear_cuentas_por_pagar(ids):
+    """Relee con la fila bloqueada las cuentas por pagar `ids` (dentro de una
+    transacción) y las devuelve como {pk: cuenta}. Todo lo que valida o
+    mueve el saldo de una cuenta -registrar o editar un pago- lo hace con
+    ella bloqueada, para que dos pagos simultáneos no rebasen el saldo (B16
+    en docs/AUDITORIA.md). Se bloquean en orden de pk: dos pagos múltiples
+    sobre las mismas cuentas nunca se esperan mutuamente."""
+    return {c.pk: c for c in CuentaPorPagar.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
+
+
+def bloquear_cuenta_por_pagar(pk):
+    return bloquear_cuentas_por_pagar([pk])[pk]
+
+
+def resincronizar_cuenta_por_pagar(orden_compra):
+    """El monto_total de la cuenta por pagar es una foto del total de la
+    orden tomada al generarla (ver generar_cuenta_por_pagar) y nunca se
+    actualiza solo: hay que llamar esto después de cualquier cambio que
+    mueva OrdenCompra.total (edición de la orden, merma o corrección de una
+    recepción). No hace nada si la orden todavía no tiene cuenta. Quien
+    llama decide antes si un cambio así procede con pagos ya registrados."""
+    cuenta = CuentaPorPagar.objects.filter(orden_compra=orden_compra).first()
+    if cuenta is None:
+        return None
+    nuevo_total = orden_compra.total.quantize(Decimal("0.01"))
+    if cuenta.monto_total != nuevo_total:
+        cuenta.monto_total = nuevo_total
+        cuenta.full_clean()
+        cuenta.save(update_fields=["monto_total", "updated_at", "updated_by"])
+    cuenta.actualizar_estatus()
     return cuenta
 
 
@@ -143,6 +183,7 @@ def construir_texto_whatsapp_pago(pago):
 
 @transaction.atomic
 def registrar_pago(cuenta, fecha_pago, monto_pagado, forma_pago, aplica_descuento_pronto_pago=False, observaciones=""):
+    cuenta = bloquear_cuenta_por_pagar(cuenta.pk)
     pago = Pago(
         cuenta_por_pagar=cuenta,
         fecha_pago=fecha_pago,
@@ -228,6 +269,8 @@ def enviar_comprobante_pago(pagos, destinatario, cc, adjuntos):
 
     for archivo in adjuntos:
         archivo.seek(0)
-        email.attach(archivo.name, archivo.read(), archivo.content_type)
+        # Tipo según la extensión ya validada (EnviarComprobanteForm), no el
+        # que declaró el navegador al subirlo.
+        email.attach(archivo.name, archivo.read(), tipo_mime(archivo.name))
 
     email.send()

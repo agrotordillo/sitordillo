@@ -66,10 +66,19 @@
         {{ form.is_superuser }}
         <label for="{{ form.is_superuser.id_for_label }}" class="text-sm text-gray-700 font-medium">Es Administrador</label>
       </div>
+      {% if form.is_superuser.field.disabled %}<p class="-mt-2 mb-3 text-xs text-amber-600">{{ form.is_superuser.help_text }}</p>{% endif %}
+      {% if form.is_superuser.errors %}<p class="-mt-2 mb-3 text-xs text-red-600">{{ form.is_superuser.errors.0 }}</p>{% endif %}
       <p class="text-xs text-gray-400 mb-3">
-        Si es Administrador no hace falta marcar capacidades ni sucursales: ve y puede todo. Para los demás, marca una
-        o varias capacidades (puede tener más de una, como la persona única de una sucursal chica).
+        Si es Administrador no hace falta marcar capacidades ni sucursales: ve y puede todo, excepto Gastos, que
+        requiere su capacidad aunque sea Administrador. Para los demás, marca una o varias capacidades (puede tener
+        más de una, como la persona única de una sucursal chica).
       </p>
+      {% if form.capacidades_bloqueadas %}
+      <p class="text-xs text-gray-500 mb-3">
+        También tiene: <span class="font-medium text-gray-700">{{ form.capacidades_bloqueadas|join:", " }}</span>.
+        Esas capacidades solo las puede dar o quitar quien también las tiene.
+      </p>
+      {% endif %}
       <div class="grid gap-2 sm:grid-cols-2">
         {% for checkbox in form.groups %}
         <label class="inline-flex items-center gap-2">

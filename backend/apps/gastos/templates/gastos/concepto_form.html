@@ -6,7 +6,7 @@
   <ol class="inline-flex items-center gap-1.5 text-sm">
     <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
     <li class="text-gray-300">/</li>
-    <li><a href="{% url 'gastos:categoria-list' %}" class="text-gray-400 hover:text-primary-600">Conceptos</a></li>
+    <li><a href="{% url 'gastos:concepto-list' %}" class="text-gray-400 hover:text-primary-600">Conceptos</a></li>
     <li class="text-gray-300">/</li>
     <li class="text-gray-500 font-medium">{% if object %}Editar{% else %}Crear{% endif %}</li>
   </ol>
@@ -56,7 +56,7 @@
     </div>
   </div>
   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
-    <a href="{% url 'gastos:categoria-list' %}" class="btn-secondary">Cancelar</a>
+    <a href="{% url 'gastos:concepto-list' %}" class="btn-secondary">Cancelar</a>
     <button type="submit" class="btn-primary">Guardar</button>
   </div>
 </form>

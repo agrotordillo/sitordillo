@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% load static %}
 {% block primary_container_class %}container-form-wide{% endblock primary_container_class %}
 {% block title %}{% if object %}Editar orden de compra{% else %}Crear orden de compra{% endif %}{% endblock title %}
@@ -17,6 +18,7 @@
 {% block main_content %}
 <form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
+  {% token_envio %}
 
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -77,6 +79,8 @@
               <div>
                 <label for="{{ form.estatus.id_for_label }}" class="label">Estatus</label>
                 {{ form.estatus }}
+                {% if form.estatus.help_text %}<p class="mt-1.5 text-xs text-gray-400">{{ form.estatus.help_text }}</p>{% endif %}
+                {% if form.estatus.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.estatus.errors.0 }}</p>{% endif %}
               </div>
               <div>
                 <label for="{{ form.fecha_orden.id_for_label }}" class="label">Fecha de orden</label>

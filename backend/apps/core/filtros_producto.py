@@ -16,6 +16,7 @@ Se ofrecen dos formas de usarlo:
   también puede llamarlas a mano si su get_queryset() no pasa por
   super().get_queryset(), ver ExistenciaListView)."""
 
+from apps.core.parametros import filtrar_por_id, id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.products.models import Almacen, Categoria, Clase, Linea, Marca, Subcategoria
 
@@ -39,9 +40,7 @@ def aplicar_filtros_producto(queryset, filtros, *, prefix=""):
     si el queryset ya es de Producto, o algo como "producto__" /
     "lote__producto__" si hay que atravesar una FK primero."""
     for campo in CAMPOS_FILTRO_PRODUCTO:
-        valor = filtros.get(campo)
-        if valor:
-            queryset = queryset.filter(**{f"{prefix}{campo}_id": valor})
+        queryset = filtrar_por_id(queryset, f"{prefix}{campo}_id", filtros.get(campo))
     return queryset
 
 
@@ -49,10 +48,7 @@ def aplicar_filtro_almacen(queryset, filtros, *, campo="almacen"):
     """Aplica el filtro de sucursal si viene seleccionado. `campo` es el
     lookup hasta Almacen (p.ej. "almacen", "lote__almacen",
     "orden_compra__almacen_destino")."""
-    valor = filtros.get("almacen")
-    if valor:
-        queryset = queryset.filter(**{f"{campo}_id": valor})
-    return queryset
+    return filtrar_por_id(queryset, f"{campo}_id", filtros.get("almacen"))
 
 
 def contexto_filtros_producto(request, user=None, *, incluir_almacen=False, solo_sucursales=False):
@@ -62,14 +58,16 @@ def contexto_filtros_producto(request, user=None, *, incluir_almacen=False, solo
     pasa `user`, el catálogo de sucursales respeta almacenes_visibles(user),
     igual que ya hacía cada pantalla por su cuenta."""
     filtros = leer_filtros_producto(request, incluir_almacen=incluir_almacen)
-    contexto = {f"{campo}_id": valor for campo, valor in filtros.items()}
+    # A la plantilla solo llegan ids de verdad (o ""): estos valores se pintan
+    # dentro de atributos y de código de Alpine, y vienen de la URL (B32).
+    contexto = {f"{campo}_id": str(id_valido(valor) or "") for campo, valor in filtros.items()}
 
     contexto["marcas"] = Marca.objects.filter(is_active=True).order_by("nombre")
     contexto["lineas"] = Linea.objects.filter(is_active=True).order_by("nombre")
     contexto["categorias"] = Categoria.objects.filter(is_active=True).order_by("nombre")
     contexto["clases"] = Clase.objects.filter(is_active=True).order_by("nombre")
 
-    categoria_id = filtros.get("categoria")
+    categoria_id = id_valido(filtros.get("categoria"))
     contexto["subcategorias"] = (
         Subcategoria.objects.filter(categoria_id=categoria_id, is_active=True).order_by("nombre")
         if categoria_id

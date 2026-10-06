@@ -3,9 +3,9 @@ from decimal import Decimal
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum
 from django.db.models.functions import Abs
-from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
+from apps.core.parametros import fecha, filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import MovimientoInventario
 from apps.products.models import Almacen
@@ -44,22 +44,17 @@ class MovimientoCostoListView(PermissionRequiredMixin, ListView):
         if visibles is not None:
             qs = qs.filter(lote__almacen__in=visibles)
 
-        almacen_id = self.request.GET.get("almacen", "").strip()
-        if almacen_id:
-            qs = qs.filter(lote__almacen_id=almacen_id)
-
-        producto_id = self.request.GET.get("producto", "").strip()
-        if producto_id:
-            qs = qs.filter(lote__producto_id=producto_id)
+        qs = filtrar_por_id(qs, "lote__almacen_id", self.request.GET.get("almacen"))
+        qs = filtrar_por_id(qs, "lote__producto_id", self.request.GET.get("producto"))
 
         tipo = self.request.GET.get("tipo", "").strip()
         if tipo:
             qs = qs.filter(tipo=tipo)
 
-        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        fecha_desde = fecha(self.request.GET.get("fecha_desde"))
         if fecha_desde:
             qs = qs.filter(fecha_movimiento__date__gte=fecha_desde)
-        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        fecha_hasta = fecha(self.request.GET.get("fecha_hasta"))
         if fecha_hasta:
             qs = qs.filter(fecha_movimiento__date__lte=fecha_hasta)
 

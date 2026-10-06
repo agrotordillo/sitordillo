@@ -3,8 +3,8 @@ from decimal import Decimal
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Sum
 from django.shortcuts import render
-from django.utils.dateparse import parse_date
 
+from apps.core.parametros import fecha, id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote, MovimientoInventario
 from apps.products.models import Almacen, Producto
@@ -33,17 +33,17 @@ def kardex_producto_view(request):
 
     producto_id = request.GET.get("producto", "").strip()
     almacen_id = request.GET.get("almacen", "").strip()
-    fecha_desde = parse_date(request.GET.get("fecha_desde", ""))
-    fecha_hasta = parse_date(request.GET.get("fecha_hasta", ""))
+    fecha_desde = fecha(request.GET.get("fecha_desde"))
+    fecha_hasta = fecha(request.GET.get("fecha_hasta"))
 
     almacenes = Almacen.objects.filter(is_active=True)
     visibles = almacenes_visibles(request.user)
     if visibles is not None:
         almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
 
-    if producto_id and almacen_id:
-        producto = Producto.objects.filter(pk=producto_id).first()
-        almacen = almacenes.filter(pk=almacen_id).first()
+    if id_valido(producto_id) and id_valido(almacen_id):
+        producto = Producto.objects.filter(pk=id_valido(producto_id)).first()
+        almacen = almacenes.filter(pk=id_valido(almacen_id)).first()
 
     if producto and almacen:
         base_qs = (

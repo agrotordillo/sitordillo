@@ -69,6 +69,24 @@ class Venta(BaseAbstractModel):
         verbose_name="Veces impreso",
         help_text="Se incrementa cada vez que se abre el ticket para imprimirlo o reimprimirlo.",
     )
+    factura_global = models.ForeignKey(
+        "facturacion.FacturaGlobal",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ventas",
+        verbose_name="Factura global",
+        help_text="Venta a Público en general ya incluida en el cierre fiscal del turno "
+        "(ver facturacion.FacturaGlobal); vacío si todavía no se cierra el turno o si el "
+        "cliente pidió su propia factura (ver Venta.factura).",
+    )
+    es_remision = models.BooleanField(
+        default=False,
+        verbose_name="Es remisión",
+        help_text="Sigue el mismo proceso que cualquier venta (descuenta inventario, se cobra "
+        "igual), pero nunca tiene impacto fiscal: no se le genera factura individual ni entra "
+        "a la factura global del turno, y se imprime como Nota de remisión en vez de ticket.",
+    )
 
     class Meta:
         verbose_name = "Venta"
@@ -101,6 +119,19 @@ class Venta(BaseAbstractModel):
     def total(self):
         # Sin desglose de impuestos por ahora: se incorpora en la fase de Facturación.
         return self.subtotal
+
+    @property
+    def documento_mostrador(self):
+        """La Cotización o el Pedido de mostrador del que salió esta venta,
+        o None si se registró directa en caja. Quien lo levantó
+        (`created_by`) es el vendedor de mostrador al que se le atribuye la
+        venta en el ticket y en los reportes de comisiones."""
+        return getattr(self, "cotizacion_origen", None) or getattr(self, "pedido_origen", None)
+
+    @property
+    def vendedor_mostrador(self):
+        documento = self.documento_mostrador
+        return documento.created_by if documento else None
 
     @property
     def pago_dividido(self):

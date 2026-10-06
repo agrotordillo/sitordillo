@@ -1,0 +1,83 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Corte de caja{% endblock title %}
+{% block title_layout %}Corte de caja{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:turno-list' %}" class="text-gray-400 hover:text-primary-600">Turnos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Corte {{ turno.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="grid gap-4 sm:grid-cols-2 text-sm mb-6">
+  <div>
+    <span class="label">Caja</span>
+    <p class="text-gray-700 py-1">{{ turno.punto_venta.nombre }} · {{ turno.punto_venta.almacen.nombre }}</p>
+  </div>
+  <div>
+    <span class="label">Responsable</span>
+    <p class="text-gray-700 py-1">{{ turno.usuario.get_full_name|default:turno.usuario.username }}</p>
+  </div>
+  <div>
+    <span class="label">Apertura</span>
+    <p class="text-gray-700 py-1">{{ turno.hora_apertura|date:"d/m/Y H:i" }}</p>
+  </div>
+  <div>
+    <span class="label">Cierre</span>
+    <p class="text-gray-700 py-1">{{ turno.hora_cierre|date:"d/m/Y H:i"|default:"Sigue abierto" }}</p>
+  </div>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-2 mb-6">
+  <div class="rounded-xl border border-gray-100 px-4 py-3.5">
+    <p class="text-xs text-gray-400">Ventas</p>
+    <p class="text-xl font-semibold text-gray-800 mt-0.5">{{ resumen.total_ventas }}</p>
+  </div>
+  <div class="rounded-xl border border-gray-100 px-4 py-3.5">
+    <p class="text-xs text-gray-400">Total vendido</p>
+    <p class="text-xl font-semibold text-gray-800 mt-0.5">${{ resumen.total_vendido|moneda }}</p>
+  </div>
+</div>
+
+<h3 class="text-sm font-semibold text-gray-700 mb-3">Por forma de pago</h3>
+<div class="relative overflow-x-auto border border-gray-100 rounded-xl mb-6">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2.5 font-semibold">Forma de pago</th>
+        <th scope="col" class="px-3 py-2.5 font-semibold text-right">Monto</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for forma, monto in resumen.por_forma_pago.items %}
+      <tr>
+        <td class="px-3 py-2 text-gray-700">{{ forma }}</td>
+        <td class="px-3 py-2 text-right font-medium text-gray-800">${{ monto|moneda }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="2" class="px-3 py-6 text-center text-gray-400">Sin ventas en este turno.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="rounded-lg border {% if resumen.pendientes_factura_global %}border-amber-200 bg-amber-50 text-amber-700{% else %}border-emerald-200 bg-emerald-50 text-emerald-700{% endif %} px-4 py-3 text-sm">
+  {% if resumen.pendientes_factura_global %}
+  {{ resumen.pendientes_factura_global|length }} venta{{ resumen.pendientes_factura_global|length|pluralize }} a Público en general sin facturar todavía.
+  {% if not turno.esta_abierto %}
+  <a href="{% url 'facturacion:factura-global-generar' turno.pk %}" class="underline font-medium">Generar factura global</a>
+  {% endif %}
+  {% else %}
+  No hay ventas a Público en general pendientes de facturar.
+  {% endif %}
+</div>
+
+<div class="flex justify-end mt-6">
+  <a href="{% url 'products:turno-list' %}" class="btn-secondary">Volver a Turnos</a>
+</div>
+{% endblock main_content %}

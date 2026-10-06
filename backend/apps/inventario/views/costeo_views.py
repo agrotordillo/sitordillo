@@ -2,6 +2,7 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum
 from django.views.generic import ListView
 
+from apps.core.parametros import id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
 from apps.products.models import Almacen, Producto
@@ -32,15 +33,19 @@ class CosteoProductoListView(PermissionRequiredMixin, ListView):
 
     def _almacen_ids_para_filtro(self):
         """None = sin restricción (se ve todo). Una lista = solo esos
-        almacenes (por selección del filtro, o por las sucursales
-        visibles del usuario si no hay selección explícita)."""
+        almacenes: las sucursales visibles del usuario, acotadas a la
+        elegida en el filtro si eligió una. Un almacén que no le
+        corresponde da una lista vacía (no ve nada), nunca lo deja pasar
+        (B10 en docs/AUDITORIA.md)."""
         almacen_id = self.request.GET.get("almacen", "").strip()
-        if almacen_id:
-            return [almacen_id]
         visibles = almacenes_visibles(self.request.user)
-        if visibles is not None:
-            return list(visibles.values_list("pk", flat=True))
-        return None
+        ids_visibles = None if visibles is None else set(visibles.values_list("pk", flat=True))
+        if almacen_id:
+            elegido = id_valido(almacen_id)
+            if elegido is None:
+                return []
+            return [elegido] if ids_visibles is None or elegido in ids_visibles else []
+        return None if ids_visibles is None else list(ids_visibles)
 
     def get_queryset(self):
         almacen_ids = self._almacen_ids_para_filtro()

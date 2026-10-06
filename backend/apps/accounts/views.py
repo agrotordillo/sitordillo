@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.messages.views import SuccessMessageMixin
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -12,6 +12,14 @@ from .forms import AsignacionSucursalForm, AsignacionSucursalInlineFormSet, Usua
 from .models import AsignacionSucursal
 
 User = get_user_model()
+
+# Las reglas de unicidad (usuario, sucursal por usuario, una sola principal)
+# viven también en la BD: si otra persona guardó lo mismo al mismo tiempo,
+# la BD rechaza el segundo guardado completo.
+MENSAJE_GUARDADO_SIMULTANEO = (
+    "No se guardó: otra persona modificó este usuario o sus sucursales al mismo tiempo. "
+    "Revisa los datos e inténtalo de nuevo."
+)
 
 
 class LockoutView(TemplateView):
@@ -38,6 +46,11 @@ class UsuarioCreateView(SuperuserRequiredMixin, CreateView):
     success_message = "Usuario creado correctamente."
     extra_context = {"active_module": "system"}
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["solicitante"] = self.request.user
+        return kwargs
+
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
         if "formset" not in data:
@@ -52,10 +65,17 @@ class UsuarioCreateView(SuperuserRequiredMixin, CreateView):
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
-        with transaction.atomic():
-            self.object = form.save()
-            formset.instance = self.object
-            formset.save()
+        try:
+            with transaction.atomic():
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+        except IntegrityError:
+            # Nada quedó guardado: el usuario en memoria ya no existe en la BD.
+            self.object = None
+            form.instance.pk = None
+            messages.error(self.request, MENSAJE_GUARDADO_SIMULTANEO)
+            return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
@@ -73,6 +93,11 @@ class UsuarioUpdateView(SuperuserRequiredMixin, UpdateView):
     success_message = "Usuario actualizado correctamente."
     extra_context = {"active_module": "system"}
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["solicitante"] = self.request.user
+        return kwargs
+
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
         if "formset" not in data:
@@ -87,10 +112,14 @@ class UsuarioUpdateView(SuperuserRequiredMixin, UpdateView):
         if not formset.is_valid():
             return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
-        with transaction.atomic():
-            self.object = form.save()
-            formset.instance = self.object
-            formset.save()
+        try:
+            with transaction.atomic():
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+        except IntegrityError:
+            messages.error(self.request, MENSAJE_GUARDADO_SIMULTANEO)
+            return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
         # Si el Administrador se edita a sí mismo y cambia su propia
         # contraseña, set_password() invalida el hash de sesión guardado;

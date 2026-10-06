@@ -2,8 +2,24 @@ from decimal import Decimal
 
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum
 
-from apps.gastos.models import CentroCosto, Gasto, GastoDistribucion, GrupoGasto
+from apps.core.scoping import almacenes_visibles
+from apps.gastos.models import CentroCosto, Gasto, GastoDistribucion, GrupoGasto, mensaje_solo_personal
 from apps.ventas.models import VentaDetalle
+
+
+def gastos_visibles(user):
+    """Gastos que `user` puede ver, abrir o descargar (su comprobante). Un
+    usuario restringido a sucursal solo ve los de sus sucursales; de paso
+    excluye los centros de costo sin almacén (proyectos, unidades de
+    negocio, administración, personal): ese gasto corporativo/personal no
+    es suyo. Es el mismo filtro para el listado, la edición y la descarga
+    de comprobantes -no basta con ocultarlo del listado (B09 en
+    docs/AUDITORIA.md)-."""
+    queryset = Gasto.objects.all()
+    visibles = almacenes_visibles(user)
+    if visibles is not None:
+        queryset = queryset.filter(centro_costo__almacen__in=visibles)
+    return queryset
 
 
 def validar_distribucion(importe_total, montos):
@@ -32,6 +48,19 @@ def validar_distribucion(importe_total, montos):
     return errores
 
 
+def validar_centros_del_concepto(concepto_gasto, centros_costo):
+    """Valida que los centros entre los que se reparte un gasto compartido
+    admitan su concepto: un gasto personal de los dueños no puede quedar
+    repartido a una sucursal (ver ConceptoGasto.admite_centro). La
+    validación del centro de origen de un gasto no compartido la hace
+    Gasto.clean()."""
+    if concepto_gasto is None:
+        return []
+    if any(not concepto_gasto.admite_centro(centro) for centro in centros_costo):
+        return [mensaje_solo_personal(concepto_gasto)]
+    return []
+
+
 def gasto_directo_por_centro(centro_costo, fecha_inicio, fecha_fin):
     """Suma de gastos no compartidos registrados directamente contra este
     centro de costo en el periodo. Excluye los gastos Cancelados -su
@@ -45,7 +74,7 @@ def gasto_directo_por_centro(centro_costo, fecha_inicio, fecha_fin):
         es_compartido=False,
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin,
-        categoria__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
+        concepto_gasto__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
     ).exclude(condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("importe"))["total"]
     return total or Decimal("0.00")
 
@@ -60,7 +89,7 @@ def gasto_distribuido_por_centro(centro_costo, fecha_inicio, fecha_fin):
         gasto__es_compartido=True,
         gasto__fecha__gte=fecha_inicio,
         gasto__fecha__lte=fecha_fin,
-        gasto__categoria__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
+        gasto__concepto_gasto__grupo__clasificacion=GrupoGasto.Clasificacion.GASTO,
     ).exclude(gasto__condicion=Gasto.Condicion.CANCELADO).aggregate(total=Sum("monto"))["total"]
     return total or Decimal("0.00")
 

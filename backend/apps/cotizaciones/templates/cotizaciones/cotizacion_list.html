@@ -12,7 +12,12 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
+<form method="get" class="w-full sm:w-auto">
+  {% include "core/includes/_filtro_fecha.html" %}
+</form>
+{% if perms.ventas.add_venta %}
 <a href="{% url 'cotizaciones:cotizacion-buscar' %}" class="btn-secondary w-full sm:w-auto">Convertir por folio</a>
+{% endif %}
 <a href="{% url 'cotizaciones:cotizacion-create' %}" class="btn-primary w-full sm:w-auto">
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -55,7 +60,9 @@
           {% else %}
           <a href="{% url 'cotizaciones:cotizacion-pdf' cotizacion.pk %}" target="_blank" class="text-sm text-primary-600 hover:text-primary-700 font-medium">PDF</a>
           <a href="{% url 'cotizaciones:cotizacion-update' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
+          {% if perms.ventas.add_venta %}
           <a href="{% url 'cotizaciones:cotizacion-convertir' cotizacion.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Convertir a venta</a>
+          {% endif %}
           {% endif %}
         </td>
       </tr>

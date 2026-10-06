@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!q) {
       resultsEl.classList.add("hidden");
-      resultsEl.innerHTML = "";
+      resultsEl.replaceChildren();
       if (hiddenInput) hiddenInput.value = "";
       return;
     }
@@ -43,15 +43,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Los datos del proveedor los captura un usuario: se pintan siempre con
+  // textContent, nunca con innerHTML, para que un nombre con HTML no se
+  // ejecute en el navegador de quien busca (B07 en docs/AUDITORIA.md).
+  function crearMensaje(texto) {
+    const p = document.createElement("p");
+    p.className = "px-3 py-2.5 text-xs text-gray-400";
+    p.textContent = texto;
+    return p;
+  }
+
+  function crearOpcion(principal, secundario) {
+    const contenedor = document.createElement("span");
+    contenedor.className = "min-w-0 flex-1";
+    const linea1 = document.createElement("span");
+    linea1.className = "block truncate text-gray-800";
+    linea1.textContent = principal;
+    const linea2 = document.createElement("span");
+    linea2.className = "block text-xs text-gray-400 font-mono";
+    linea2.textContent = secundario;
+    contenedor.append(linea1, linea2);
+    return contenedor;
+  }
+
   function mostrarCargando(resultsEl) {
-    resultsEl.innerHTML = '<p class="px-3 py-2.5 text-xs text-gray-400">Buscando…</p>';
+    resultsEl.replaceChildren(crearMensaje("Buscando…"));
     resultsEl.classList.remove("hidden");
   }
 
   function mostrarResultados(items, input, hiddenInput, resultsEl) {
-    resultsEl.innerHTML = "";
+    resultsEl.replaceChildren();
     if (!items.length) {
-      resultsEl.innerHTML = '<p class="px-3 py-2.5 text-xs text-gray-400">Sin resultados</p>';
+      resultsEl.replaceChildren(crearMensaje("Sin resultados"));
       resultsEl.classList.remove("hidden");
       return;
     }
@@ -59,32 +82,27 @@ document.addEventListener("DOMContentLoaded", () => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "flex w-full items-center gap-2 text-left px-3 py-2.5 text-sm hover:bg-primary-50 transition-colors";
-      btn.innerHTML = `
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-gray-800">${item.nombre}</span>
-          <span class="block text-xs text-gray-400 font-mono">${item.rfc || "Sin RFC"}</span>
-        </span>`;
+      btn.append(crearOpcion(item.nombre, item.rfc || "Sin RFC"));
       btn.addEventListener("click", () => {
         hiddenInput.value = item.id;
-        // % base del proveedor: lo usa precio-alerta.js para comparar contra
-        // el costo registrado, independiente de lo que se capture como
-        // adicional en "Descuento proveedor (%)" de la orden.
-        if (item.descuento !== undefined) hiddenInput.dataset.descuento = item.descuento;
+        // % base del proveedor: lo usan formset-rows.js (total) y
+        // precio-alerta.js (costo de referencia). Se suma solo, igual que en
+        // OrdenCompra.descuento_pct_total: NO se copia al campo "Descuento
+        // proveedor (%)", que es solo el adicional de esta orden -copiarlo
+        // ahí descontaba el base dos veces-. Una orden cargada desde CFDI
+        // nunca lleva base (su precio ya viene neto).
+        if (hiddenInput.dataset.sinDescuentoBase === "true") {
+          hiddenInput.dataset.descuento = "0";
+        } else if (item.descuento !== undefined) {
+          hiddenInput.dataset.descuento = item.descuento;
+        }
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
         input.value = `${item.rfc} · ${item.nombre}`;
         resultsEl.classList.add("hidden");
-
-        // Sugiere el % de descuento general del proveedor en la orden de
-        // compra (solo si el campo sigue en su valor por default, para no
-        // pisar un descuento ya capturado/editado a mano).
-        const descuentoField = document.getElementById("id_descuento_pct");
-        if (descuentoField && item.descuento !== undefined) {
-          const actual = descuentoField.value.trim();
-          if (!actual || actual === "0" || actual === "0.00") {
-            descuentoField.value = item.descuento;
-            descuentoField.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-        }
+        // formset-rows.js solo recalcula con "input" de los campos de la
+        // orden: se avisa para que el total refleje el % base del nuevo
+        // proveedor de inmediato.
+        document.querySelector(".fs-descuento-general")?.dispatchEvent(new Event("input", { bubbles: true }));
       });
       resultsEl.appendChild(btn);
     });

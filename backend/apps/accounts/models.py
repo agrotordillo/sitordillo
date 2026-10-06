@@ -4,10 +4,25 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.models import BaseAbstractModel
+from apps.core.permisos_estrictos import APPS_PERMISO_ESTRICTO, es_permiso_estricto, permisos_explicitos
 
 
 class User(AbstractUser):
-    pass
+    """Igual que el usuario de Django, salvo que en los módulos de
+    APPS_PERMISO_ESTRICTO (hoy Gastos) ser superusuario no basta: solo
+    cuentan los permisos asignados de verdad. Al resolverse aquí, lo
+    respetan sin cambios PermissionRequiredMixin, `user.has_perm()` y
+    `{% if perms.gastos... %}` en menús y plantillas."""
+
+    def has_perm(self, perm, obj=None):
+        if es_permiso_estricto(perm):
+            return perm in permisos_explicitos(self)
+        return super().has_perm(perm, obj)
+
+    def has_module_perms(self, app_label):
+        if app_label in APPS_PERMISO_ESTRICTO:
+            return any(perm.startswith(f"{app_label}.") for perm in permisos_explicitos(self))
+        return super().has_module_perms(app_label)
 
 
 class AsignacionSucursal(BaseAbstractModel):
@@ -48,6 +63,16 @@ class AsignacionSucursal(BaseAbstractModel):
         ordering = ["usuario", "-es_principal"]
         constraints = [
             models.UniqueConstraint(fields=["usuario", "almacen"], name="asu_unico_usuario_almacen"),
+            # Fuente de verdad de "una sola principal" (B21 en
+            # docs/AUDITORIA.md). Por ser condicional no se puede diferir:
+            # al cambiar la principal, primero se desmarca la anterior (ver
+            # accounts.forms.AsignacionSucursalBaseFormSet.save).
+            models.UniqueConstraint(
+                fields=["usuario"],
+                condition=models.Q(es_principal=True),
+                name="asu_una_principal_por_usuario",
+                violation_error_message="Este usuario ya tiene otra sucursal marcada como principal.",
+            ),
         ]
         indexes = [
             models.Index(fields=["usuario"]),
@@ -67,9 +92,14 @@ class AsignacionSucursal(BaseAbstractModel):
     def display_name(self):
         return self.__str__()
 
+    # El formulario de usuario (sucursales en un formset) lo apaga: ahí la
+    # regla se revisa sobre todas las filas juntas, y contra la BD daría un
+    # falso choque al mover la principal de A a B en un mismo guardado.
+    validar_principal_contra_bd = True
+
     def clean(self):
         super().clean()
-        if self.es_principal and self.usuario_id:
+        if self.es_principal and self.usuario_id and self.validar_principal_contra_bd:
             ya_tiene_principal = (
                 AsignacionSucursal.objects.filter(usuario_id=self.usuario_id, es_principal=True)
                 .exclude(pk=self.pk)

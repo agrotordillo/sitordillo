@@ -4,8 +4,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.cobros.services import generar_cuenta_por_cobrar
+from apps.core.envio_unico import EnvioDuplicado, envio_ya_procesado, reservar_envio, respuesta_envio_duplicado
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.forms import BuscarFolioForm
 from apps.cotizaciones.models import Cotizacion
@@ -14,9 +17,14 @@ from apps.ventas.forms import VentaDetalleForm, VentaDetalleFormSet, VentaForm
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.services import (
     procesar_lineas_venta,
+    validar_efectivo_recibido,
     validar_stock_disponible,
     validar_venta_a_credito,
 )
+
+
+class CotizacionYaConvertida(Exception):
+    """Otra conversión de la misma cotización se confirmó primero."""
 
 
 @permission_required("cotizaciones.view_cotizacion", raise_exception=True)
@@ -53,6 +61,11 @@ def convertir_cotizacion_view(request, pk):
         cotizaciones_qs = cotizaciones_qs.filter(almacen__in=visibles)
     cotizacion = get_object_or_404(cotizaciones_qs, pk=pk)
 
+    # Doble clic o recarga de una conversión que ya se guardó: a la venta
+    # creada, sin volver a validar (ver apps.core.envio_unico).
+    if request.method == "POST" and (url := envio_ya_procesado(request)):
+        return respuesta_envio_duplicado(request, url)
+
     if cotizacion.estatus == Cotizacion.Estatus.CONVERTIDA:
         return render(
             request,
@@ -70,9 +83,9 @@ def convertir_cotizacion_view(request, pk):
     # directa, esa sucursal debe ser la MISMA de la cotización (el precio
     # y el stock ya se cotizaron contra ese almacén; convertirla desde
     # otra sucursal decontaría el inventario equivocado).
-    turno = turno_abierto_de(request.user)
+    turno = turno_abierto_de(request.user, solo_cobro=True)
     if turno is None:
-        messages.error(request, "No tienes un turno abierto. Ábrelo antes de convertir la cotización en venta.")
+        messages.error(request, "No tienes un turno abierto en una caja. Ábrelo antes de convertir la cotización en venta.")
         return redirect("products:turno-list")
     if turno.punto_venta.almacen_id != cotizacion.almacen_id:
         messages.error(
@@ -122,9 +135,19 @@ def convertir_cotizacion_view(request, pk):
                 if not errores_stock:
                     try:
                         with transaction.atomic():
+                            envio = reservar_envio(request)
+                            # Con la fila bloqueada: dos cajas (o un doble
+                            # clic) convirtiendo la misma cotización a la vez
+                            # no deben generar dos ventas (B15 en
+                            # docs/AUDITORIA.md). La segunda espera aquí a la
+                            # primera y después la encuentra ya convertida.
+                            cotizacion = Cotizacion.objects.select_for_update().get(pk=cotizacion.pk)
+                            if cotizacion.estatus == Cotizacion.Estatus.CONVERTIDA:
+                                raise CotizacionYaConvertida
                             venta = form.save()
                             formset.instance = venta
                             formset.save()
+                            validar_efectivo_recibido(venta)
                             error_credito = validar_venta_a_credito(
                                 venta.cliente, venta.forma_pago, venta.total
                             )
@@ -135,9 +158,19 @@ def convertir_cotizacion_view(request, pk):
                                 generar_cuenta_por_cobrar(venta)
                             cotizacion.venta = venta
                             cotizacion.estatus = Cotizacion.Estatus.CONVERTIDA
-                            cotizacion.save(update_fields=["venta", "estatus", "updated_at"])
-                    except ValueError as e:
-                        form.add_error(None, str(e))
+                            cotizacion.save(update_fields=["venta", "estatus", "updated_at", "updated_by"])
+                            envio.completar(reverse("ventas:venta-list"))
+                    except EnvioDuplicado as duplicado:
+                        return respuesta_envio_duplicado(request, duplicado.url_resultado, "ventas:venta-list")
+                    except CotizacionYaConvertida:
+                        return render(
+                            request,
+                            "cotizaciones/ya_convertida.html",
+                            {"cotizacion": Cotizacion.objects.get(pk=cotizacion.pk), "active_module": "quotes"},
+                        )
+                    except ERRORES_DE_NEGOCIO as e:
+                        for mensaje in mensajes_de_error(e):
+                            form.add_error(None, mensaje)
                     else:
                         messages.success(
                             request,

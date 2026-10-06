@@ -1,0 +1,64 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Facturas globales{% endblock title %}
+{% block title_layout %}Facturas globales{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'facturacion:factura-list' %}" class="text-gray-400 hover:text-primary-600">Facturas</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Globales</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Serie-Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Turno</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for factura_global in facturas_globales %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-600">{{ factura_global.serie_folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ factura_global.turno.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ factura_global.turno.punto_venta.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ factura_global.total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium
+              {% if factura_global.estatus == 'timbrada' %}text-emerald-600
+              {% elif factura_global.estatus == 'cancelada' or factura_global.estatus == 'error' %}text-red-500
+              {% elif factura_global.estatus == 'timbrando' %}text-amber-600
+              {% else %}text-gray-500{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full
+                {% if factura_global.estatus == 'timbrada' %}bg-emerald-500
+                {% elif factura_global.estatus == 'cancelada' or factura_global.estatus == 'error' %}bg-red-400
+                {% elif factura_global.estatus == 'timbrando' %}bg-amber-400
+                {% else %}bg-gray-400{% endif %}"></span>
+            {{ factura_global.get_estatus_display }}
+          </span>
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+          <a href="{% url 'facturacion:factura-global-detalle' factura_global.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay facturas globales registradas. Se generan al cerrar un turno con ventas a Público en general.</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

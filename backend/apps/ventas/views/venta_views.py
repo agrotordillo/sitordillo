@@ -1,35 +1,44 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import CreateView
 
+from apps.core.envio_unico import EnvioDuplicado, EnvioUnicoMixin, reservar_envio, respuesta_envio_duplicado
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
+from apps.core.filtros_fecha import FiltroFechaMixin
 from apps.core.scoping import almacenes_visibles
+from apps.cotizaciones.models import Cotizacion
+from apps.pedidos.models import Pedido
 from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 from apps.ventas.models import Venta, VentaDetalle
 from apps.ventas.forms import VentaForm, VentaDetalleFormSet, VentaPagoFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
     procesar_lineas_venta,
+    validar_efectivo_recibido,
     validar_pago_dividido,
     validar_stock_disponible,
     validar_venta_a_credito,
 )
 
 
-class VentaListView(PermissionRequiredMixin, ListView):
+class VentaListView(FiltroFechaMixin, PermissionRequiredMixin, ListView):
     permission_required = "ventas.view_venta"
     model = Venta
     template_name = "ventas/venta_list.html"
     context_object_name = "ventas"
     extra_context = {"active_module": "sales"}
+    filtro_fecha_campo = "fecha_venta"
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("cliente", "almacen").prefetch_related("detalles")
+        queryset = self.aplicar_filtro_fecha(queryset)
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
@@ -55,6 +64,8 @@ class VentaTicketView(PermissionRequiredMixin, DetailView):
                 "turno__usuario",
                 "cotizacion_origen",
                 "cotizacion_origen__created_by",
+                "pedido_origen",
+                "pedido_origen__created_by",
             )
             .prefetch_related("detalles__producto__unidad_medida", "pagos__forma_pago")
         )
@@ -97,7 +108,43 @@ class VentaTicketView(PermissionRequiredMixin, DetailView):
         return context
 
 
-class VentaCreateView(PermissionRequiredMixin, CreateView):
+@permission_required("ventas.add_venta", raise_exception=True)
+def recuperar_documento_view(request):
+    """Punto de entrada único desde "Registrar venta" para recuperar una
+    Cotización o un Pedido por folio y seguir su conversión en la
+    pantalla especializada de cada uno -nunca intenta reimplementar esa
+    conversión aquí, cada una ya tiene su propio comportamiento (líneas
+    editables en Cotización, bloqueadas en Pedido porque ya aparta
+    inventario)-. No se le pide al cajero elegir el tipo: primero prueba
+    Cotización y, si no hay coincidencia, Pedido."""
+    folio = request.GET.get("folio", "").strip()
+    if not folio:
+        messages.error(request, "Escribe un folio de cotización o pedido para recuperarlo.")
+        return redirect("ventas:venta-create")
+
+    visibles = almacenes_visibles(request.user)
+
+    cotizaciones_qs = Cotizacion.objects.all()
+    if visibles is not None:
+        cotizaciones_qs = cotizaciones_qs.filter(almacen__in=visibles)
+    cotizacion = cotizaciones_qs.filter(Q(numero_documento__iexact=folio) | Q(folio__iexact=folio)).first()
+    if cotizacion is not None:
+        return redirect("cotizaciones:cotizacion-convertir", pk=cotizacion.pk)
+
+    pedidos_qs = Pedido.objects.all()
+    if visibles is not None:
+        pedidos_qs = pedidos_qs.filter(almacen__in=visibles)
+    pedido = pedidos_qs.filter(Q(numero_documento__iexact=folio) | Q(folio__iexact=folio)).first()
+    if pedido is not None:
+        return redirect("pedidos:pedido-convertir", pk=pedido.pk)
+
+    messages.error(request, f"No se encontró ninguna cotización ni pedido con el folio '{folio}'.")
+    return redirect("ventas:venta-create")
+
+
+# EnvioUnicoMixin: un doble clic o una recarga no registra la venta dos
+# veces; lleva al ticket de la que ya se hizo (ver apps.core.envio_unico).
+class VentaCreateView(PermissionRequiredMixin, EnvioUnicoMixin, CreateView):
     permission_required = "ventas.add_venta"
     model = Venta
     form_class = VentaForm
@@ -111,9 +158,10 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
         # products.services.turno_abierto_de) -si no tiene ninguno, no
         # tiene caso ni mostrarle el formulario, porque no hay de dónde
         # sacar la sucursal ni se podría cobrar al final.
-        self.turno = turno_abierto_de(request.user)
+        # Solo un turno de caja (Cobro): uno de mostrador no cobra.
+        self.turno = turno_abierto_de(request.user, solo_cobro=True)
         if self.turno is None:
-            messages.error(request, "No tienes un turno abierto. Ábrelo antes de registrar una venta.")
+            messages.error(request, "No tienes un turno abierto en una caja. Ábrelo antes de registrar una venta.")
             return redirect("products:turno-list")
         self.almacen = self.turno.punto_venta.almacen
         return super().dispatch(request, *args, **kwargs)
@@ -165,6 +213,10 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
         pago_dividido = form.cleaned_data.get("pago_dividido")
         if pago_dividido:
             form.instance.forma_pago = None
+            # El "recibido" de un cobro dividido va en cada VentaPago; el de la
+            # venta pudo quedar capturado (oculto) de cuando se eligió
+            # Efectivo, y calcularía un cambio que no corresponde (B24).
+            form.instance.efectivo_recibido = None
             if not pagos_formset.is_valid():
                 return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
         elif not form.cleaned_data.get("forma_pago"):
@@ -198,6 +250,7 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
 
         try:
             with transaction.atomic():
+                envio = reservar_envio(self.request)
                 self.object = form.save()
                 formset.instance = self.object
                 formset.save()
@@ -217,11 +270,11 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
                         raise ValueError(" ".join(errores_pago))
                     pagos_formset.instance = self.object
                     pagos_formset.save()
-                elif self.object.efectivo_recibido is not None and self.object.efectivo_recibido < self.object.total:
+                else:
                     # Igual que arriba: self.object.total (la suma de los
                     # detalles ya guardados) solo se conoce hasta aquí, así
                     # que esta comparación no puede vivir en Venta.clean().
-                    raise ValueError("El efectivo recibido no puede ser menor que el total de la venta.")
+                    validar_efectivo_recibido(self.object)
 
                 # La venta ya tiene su total real: aquí, no antes, es donde
                 # se puede validar el crédito con el monto exacto.
@@ -233,8 +286,12 @@ class VentaCreateView(PermissionRequiredMixin, CreateView):
                 procesar_lineas_venta(self.object)
                 if self.object.forma_pago and self.object.forma_pago.clave == Venta.CLAVE_CREDITO:
                     generar_cuenta_por_cobrar(self.object)
-        except ValueError as e:
-            form.add_error(None, str(e))
+                envio.completar(self.get_success_url())
+        except EnvioDuplicado as duplicado:
+            return respuesta_envio_duplicado(self.request, duplicado.url_resultado, "ventas:venta-list")
+        except ERRORES_DE_NEGOCIO as e:
+            for mensaje in mensajes_de_error(e):
+                form.add_error(None, mensaje)
             return self.render_to_response(self.get_context_data(form=form, formset=formset, pagos_formset=pagos_formset))
 
         messages.success(self.request, self.success_message)

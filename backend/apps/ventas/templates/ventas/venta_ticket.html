@@ -3,7 +3,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Ticket {{ venta.folio }}</title>
+<title>{% if venta.es_remision %}Nota de remisión{% else %}Ticket{% endif %} {{ venta.folio }}</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -75,6 +75,7 @@
     {% endif %}
     {% if venta.almacen.direccion %}<div class="muted">{{ venta.almacen.direccion }}</div>{% endif %}
     <div class="muted">{{ venta.almacen.nombre }}</div>
+    {% if venta.es_remision %}<div class="bold" style="margin-top:4px;">NOTA DE REMISIÓN (sin factura)</div>{% endif %}
   </div>
 
   <hr class="sep">
@@ -84,9 +85,11 @@
   <div class="muted">Punto de venta: {{ venta.turno.punto_venta.codigo }} {{ venta.turno.punto_venta.nombre }}</div>
   <div class="muted">Cajero: {{ venta.turno.usuario.get_full_name|default:venta.turno.usuario.get_username }}</div>
   {% endif %}
-  {% if venta.cotizacion_origen.created_by %}
-  <div class="muted">Vendedor (mostrador): {{ venta.cotizacion_origen.created_by.get_full_name|default:venta.cotizacion_origen.created_by.get_username }}</div>
+  {% with vendedor=venta.vendedor_mostrador %}
+  {% if vendedor %}
+  <div class="muted">Vendedor (mostrador): {{ vendedor.get_full_name|default:vendedor.get_username }}</div>
   {% endif %}
+  {% endwith %}
 
   <hr class="sep">
 
@@ -167,7 +170,8 @@
 </div>
 
 <div class="acciones no-print">
-  <button type="button" id="btn-imprimir-ticket" class="btn-imprimir" {% if not ticket_data %}onclick="window.print()"{% endif %}>Imprimir ticket</button>
+  <button type="button" id="btn-imprimir-ticket" class="btn-imprimir"
+          data-url-certificado="{% url 'ventas:qz-certificado' %}" data-url-firmar="{% url 'ventas:qz-firmar' %}">Imprimir ticket</button>
   <a href="{% url 'ventas:venta-list' %}" class="btn-volver">Volver a ventas</a>
   <p id="qz-estado" class="mt-2 text-xs text-gray-500"></p>
 </div>
@@ -175,68 +179,9 @@
 {% if ticket_data %}
 {{ ticket_data|json_script:"ticket-data" }}
 <script src="{% static 'js/vendor/qz-tray.js' %}"></script>
-<script>
-(function () {
-  var datos = JSON.parse(document.getElementById('ticket-data').textContent);
-  var estado = document.getElementById('qz-estado');
-  var boton = document.getElementById('btn-imprimir-ticket');
-
-  // Firma cada solicitud con el certificado del servidor (ver
-  // apps/ventas/views/qz_views.py) para que QZ Tray confíe en esta
-  // conexión -sin esto, cada conexión es "anónima" y el diálogo de "Remember
-  // this decision" de QZ Tray no persiste porque no hay ningún certificado
-  // estable contra el cual recordarla-. Una vez que ese mismo certificado se
-  // instale como override.crt en QZ Tray de esa PC, deja de preguntar.
-  qz.security.setCertificatePromise(function (resolve, reject) {
-    fetch("{% url 'ventas:qz-certificado' %}", { cache: 'no-store' })
-      .then(function (data) { data.ok ? resolve(data.text()) : reject(data.text()); });
-  });
-  qz.security.setSignatureAlgorithm('SHA512');
-  qz.security.setSignaturePromise(function (toSign) {
-    return function (resolve, reject) {
-      fetch("{% url 'ventas:qz-firmar' %}?request=" + encodeURIComponent(toSign), { cache: 'no-store' })
-        .then(function (data) { data.ok ? resolve(data.text()) : reject(data.text()); });
-    };
-  });
-
-  function mostrarEstado(texto) {
-    if (estado) { estado.textContent = texto; }
-  }
-
-  function enviarAImpresora() {
-    var conectar = qz.websocket.isActive() ? Promise.resolve() : qz.websocket.connect();
-    return conectar.then(function () {
-      var config = qz.configs.create(datos.printer);
-      var payload = [{ type: 'raw', format: 'command', flavor: 'base64', data: datos.data }];
-      return qz.print(config, payload);
-    });
-  }
-
-  if (boton) {
-    boton.addEventListener('click', function () {
-      mostrarEstado('Enviando a la impresora...');
-      enviarAImpresora()
-        .then(function () { mostrarEstado('Ticket enviado a la impresora.'); })
-        .catch(function (err) {
-          console.error('QZ Tray:', err);
-          mostrarEstado('No se pudo imprimir con QZ Tray (¿está abierto en esta PC?). Se abre la vista de impresión normal.');
-          window.print();
-        });
-    });
-  }
-
-  if (datos.auto) {
-    mostrarEstado('Imprimiendo automáticamente...');
-    enviarAImpresora()
-      .then(function () { mostrarEstado('Ticket enviado a la impresora.'); })
-      .catch(function (err) {
-        console.error('QZ Tray:', err);
-        mostrarEstado('No se pudo imprimir automáticamente (¿QZ Tray está abierto en esta PC?). Usa el botón "Imprimir ticket".');
-      });
-  }
-})();
-</script>
 {% endif %}
+{# Sin impresora configurada solo conecta el botón a la impresión normal. #}
+<script src="{% static 'js/pages/venta-ticket.js' %}"></script>
 
 </body>
 </html>

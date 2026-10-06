@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% load static %}
 {% block title %}{% if object %}Editar traspaso{% else %}Crear traspaso{% endif %}{% endblock title %}
 {% block title_layout %}{% if object %}Editar traspaso{% else %}Crear traspaso{% endif %}{% endblock title_layout %}
@@ -16,6 +17,7 @@
 {% block main_content %}
 <form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
+  {% token_envio %}
 
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

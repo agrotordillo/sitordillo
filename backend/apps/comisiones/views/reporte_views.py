@@ -3,10 +3,10 @@ from decimal import Decimal
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 
 from apps.accounts.models import User
 from apps.comisiones.models import ComisionLinea, ComisionProducto
+from apps.core.parametros import fecha, filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.products.models import Almacen
 from apps.ventas.models import VentaDetalle
@@ -35,8 +35,8 @@ def reporte_comisiones_view(request):
     espera capturar esto para todo el catálogo, solo lo que de verdad da
     comisión."""
     hoy = timezone.localdate()
-    fecha_desde = parse_date(request.GET.get("fecha_desde", "")) or hoy.replace(day=1)
-    fecha_hasta = parse_date(request.GET.get("fecha_hasta", "")) or hoy
+    fecha_desde = fecha(request.GET.get("fecha_desde")) or hoy.replace(day=1)
+    fecha_hasta = fecha(request.GET.get("fecha_hasta")) or hoy
 
     detalles = (
         VentaDetalle.objects.filter(
@@ -47,6 +47,7 @@ def reporte_comisiones_view(request):
             "producto", "producto__linea",
             "venta", "venta__created_by", "venta__almacen",
             "venta__cotizacion_origen", "venta__cotizacion_origen__created_by",
+            "venta__pedido_origen", "venta__pedido_origen__created_by",
         )
         .prefetch_related("devoluciones")
     )
@@ -56,8 +57,7 @@ def reporte_comisiones_view(request):
         detalles = detalles.filter(venta__almacen__in=visibles)
 
     almacen_id = request.GET.get("almacen", "").strip()
-    if almacen_id:
-        detalles = detalles.filter(venta__almacen_id=almacen_id)
+    detalles = filtrar_por_id(detalles, "venta__almacen_id", almacen_id)
 
     pct_por_producto = dict(ComisionProducto.objects.values_list("producto_id", "porcentaje"))
     pct_por_linea = dict(ComisionLinea.objects.values_list("linea_id", "porcentaje"))
@@ -74,8 +74,8 @@ def reporte_comisiones_view(request):
         if cantidad_neta <= 0:
             continue
 
-        cotizacion = getattr(detalle.venta, "cotizacion_origen", None)
-        empleado = cotizacion.created_by if cotizacion else detalle.venta.created_by
+        documento = detalle.venta.documento_mostrador
+        empleado = documento.created_by if documento else detalle.venta.created_by
 
         precio_neto_unitario = (detalle.subtotal / detalle.cantidad) if detalle.cantidad else Decimal("0.00")
         importe_neto = (precio_neto_unitario * cantidad_neta).quantize(Decimal("0.01"))

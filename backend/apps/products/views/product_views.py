@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 
 from apps.core.filtros_producto import FiltrosProductoMixin
+from apps.core.navegacion import url_de_regreso
 from apps.products.models import Producto, ProductoPrecio
 from apps.products.forms import ProductForm
 
@@ -31,7 +32,7 @@ class NextUrlMixin:
     de validación."""
 
     def get_next_url(self):
-        return self.request.POST.get("next") or self.request.GET.get("next") or str(self.success_url)
+        return url_de_regreso(self.request, self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -87,8 +88,7 @@ class ProductToggleActivoView(PermissionRequiredMixin, View):
             messages.success(request, f"Producto {producto.nombre} reactivado.")
         else:
             messages.success(request, f"Producto {producto.nombre} desactivado.")
-        next_url = request.POST.get("next") or reverse("products:product-list")
-        return redirect(next_url)
+        return redirect(url_de_regreso(request, reverse("products:product-list")))
 
 
 class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):

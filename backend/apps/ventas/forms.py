@@ -24,7 +24,7 @@ class VentaForm(BaseModelForm):
         # venta de su turno propio y abierto (ver VentaCreateView, que lo
         # asigna directo en form.instance antes de validar).
         fields = [
-            "cliente", "forma_pago", "referencia_pago", "efectivo_recibido", "observaciones",
+            "cliente", "forma_pago", "referencia_pago", "efectivo_recibido", "es_remision", "observaciones",
         ]
         widgets = {
             # Mismo patrón de búsqueda por texto que producto (ver
@@ -62,6 +62,17 @@ class VentaForm(BaseModelForm):
             publico = Cliente.publico_general()
             if publico is not None:
                 self.initial["cliente"] = publico.pk
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("pago_dividido"):
+            # Lo que haya quedado oculto de una sola forma de pago no cuenta
+            # (B24): sin esto, un "recibido" capturado antes de dividir el
+            # cobro fallaría la validación del modelo o calcularía un cambio
+            # que no corresponde. El recibido de cada parte va en VentaPago.
+            cleaned_data["forma_pago"] = None
+            cleaned_data["efectivo_recibido"] = None
+        return cleaned_data
 
 
 class VentaDetalleForm(BaseModelForm):

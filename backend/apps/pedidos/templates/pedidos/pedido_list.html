@@ -1,0 +1,101 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Pedidos{% endblock title %}
+{% block title_layout %}Pedidos{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Pedidos</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  {% include "core/includes/_filtro_fecha.html" %}
+  <select name="estatus" class="input" data-enviar-al-cambiar aria-label="Estatus">
+    {% for valor, etiqueta in estatus_opciones %}
+    <option value="{{ valor }}" {% if valor == estatus_actual %}selected{% endif %}>{{ etiqueta }}</option>
+    {% endfor %}
+    <option value="todos" {% if estatus_actual == "todos" %}selected{% endif %}>Todos</option>
+  </select>
+</form>
+{% if perms.ventas.add_venta %}
+<a href="{% url 'pedidos:pedido-buscar' %}" class="btn-secondary w-full sm:w-auto">Convertir por folio</a>
+{% endif %}
+{% if perms.pedidos.add_pedido %}
+<a href="{% url 'pedidos:pedido-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Nuevo pedido
+</a>
+{% endif %}
+{% endblock table_actions %}
+{% block main_content %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Sucursal</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for pedido in pedidos %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ pedido.numero_documento }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">
+          {{ pedido.cliente.display_name }}
+          {% if pedido.observaciones %}<p class="text-xs font-normal text-gray-400">{{ pedido.observaciones }}</p>{% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ pedido.almacen.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ pedido.fecha_pedido|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ pedido.total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if pedido.estatus == "convertido" %}
+          <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">Convertido</span>
+          {% elif pedido.estatus == "cancelado" %}
+          <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600" {% if pedido.motivo_cancelacion %}title="{{ pedido.motivo_cancelacion }}"{% endif %}>Cancelado</span>
+          {% else %}
+          <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">Abierto · apartado</span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3 whitespace-nowrap">
+          {% if pedido.estatus == "convertido" %}
+          <a href="{% url 'ventas:venta-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Ver venta {{ pedido.venta.folio }}</a>
+          {% elif pedido.estatus == "abierto" %}
+          {% if perms.pedidos.change_pedido %}
+          <a href="{% url 'pedidos:pedido-update' pedido.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
+          {% endif %}
+          {% if perms.ventas.add_venta %}
+          <a href="{% url 'pedidos:pedido-convertir' pedido.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Convertir a venta</a>
+          {% endif %}
+          {% if perms.pedidos.cancelar_pedido %}
+          <a href="{% url 'pedidos:pedido-cancelar' pedido.pk %}" class="text-sm text-red-600 hover:text-red-700 font-medium">Cancelar</a>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-sm text-gray-400">No hay pedidos en este estatus</p>
+            {% if perms.pedidos.add_pedido %}
+            <a href="{% url 'pedidos:pedido-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Levantar un pedido</a>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock main_content %}

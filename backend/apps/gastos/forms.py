@@ -1,12 +1,13 @@
 from django import forms
-from django.db import models
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
+from apps.core.archivos import ComprobanteFormMixin
 from apps.core.forms import BaseModelForm
 from apps.core.scoping import almacenes_visibles
-from apps.products.models import Almacen, Turno
+from apps.products.models import Almacen, PuntoVenta, Turno
 from apps.proveedores.models import Proveedor
-from .models import CategoriaGasto, CentroCosto, Gasto, GastoDistribucion, GrupoGasto, Vehiculo
+from .models import CentroCosto, ConceptoGasto, Gasto, GastoDistribucion, GrupoGasto, Vehiculo
 
 
 def conceptos_agrupados(queryset):
@@ -39,9 +40,9 @@ class CentroCostoForm(BaseModelForm):
         self.fields["descripcion"].required = False
 
 
-class CategoriaGastoForm(BaseModelForm):
+class ConceptoGastoForm(BaseModelForm):
     class Meta:
-        model = CategoriaGasto
+        model = ConceptoGasto
         fields = ["grupo", "nombre", "cuenta_contable", "naturaleza", "descripcion", "ejemplos", "criterio"]
         widgets = {
             "descripcion": forms.Textarea(attrs={"rows": 2}),
@@ -71,11 +72,11 @@ class VehiculoForm(BaseModelForm):
             self.fields[campo].required = False
 
 
-class GastoForm(BaseModelForm):
+class GastoForm(ComprobanteFormMixin, BaseModelForm):
     class Meta:
         model = Gasto
         fields = [
-            "centro_costo", "categoria", "vehiculo", "proveedor", "turno", "concepto", "referencia", "condicion",
+            "centro_costo", "concepto_gasto", "vehiculo", "proveedor", "turno", "descripcion", "referencia", "condicion",
             "responsable", "fecha", "importe", "facturado", "referencia_factura", "comprobante",
             "es_compartido", "observaciones",
         ]
@@ -86,8 +87,20 @@ class GastoForm(BaseModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        centros_costo = CentroCosto.objects.filter(is_active=True)
-        turnos = Turno.objects.filter(estatus=Turno.Estatus.ABIERTO).select_related("punto_venta__almacen")
+        # Al editar, cada select conserva el valor que el gasto ya tenía
+        # aunque hoy no sea elegible (turno ya cerrado, concepto, unidad o
+        # centro desactivado): la factura o el reembolso de un gasto llegan
+        # semanas después de que se cerró su turno, y sin esto el gasto ya
+        # no se podría guardar. `Q(pk=None)` no coincide con nada, así que
+        # en un alta solo quedan las opciones vigentes.
+        actual = self.instance
+        centros_costo = CentroCosto.objects.filter(Q(is_active=True) | Q(pk=actual.centro_costo_id))
+        # Solo turnos de caja: el gasto se paga con el dinero de una caja,
+        # un turno de mostrador (punto de venta tipo Pedido) no maneja
+        # dinero.
+        turnos = Turno.objects.filter(
+            Q(estatus=Turno.Estatus.ABIERTO, punto_venta__tipo=PuntoVenta.Tipo.COBRO) | Q(pk=actual.turno_id)
+        ).select_related("punto_venta__almacen")
         # El origen del gasto (quién lo paga) sí queda acotado a la
         # sucursal del usuario restringido; a diferencia del destino de
         # una distribución (GastoDistribucionForm), que necesita poder
@@ -98,16 +111,10 @@ class GastoForm(BaseModelForm):
                 centros_costo = centros_costo.filter(almacen__in=visibles)
                 turnos = turnos.filter(punto_venta__almacen__in=visibles)
         self.fields["centro_costo"].queryset = centros_costo
-        conceptos = CategoriaGasto.objects.filter(is_active=True)
-        if self.instance.pk and self.instance.categoria_id:
-            # Un gasto viejo con un concepto ya desactivado debe poder
-            # editarse sin que su concepto desaparezca del select.
-            conceptos = CategoriaGasto.objects.filter(
-                models.Q(is_active=True) | models.Q(pk=self.instance.categoria_id)
-            )
-        self.fields["categoria"].queryset = conceptos
-        self.fields["categoria"].choices = conceptos_agrupados(conceptos)
-        self.fields["vehiculo"].queryset = Vehiculo.objects.filter(is_active=True)
+        conceptos = ConceptoGasto.objects.filter(Q(is_active=True) | Q(pk=actual.concepto_gasto_id))
+        self.fields["concepto_gasto"].queryset = conceptos
+        self.fields["concepto_gasto"].choices = conceptos_agrupados(conceptos)
+        self.fields["vehiculo"].queryset = Vehiculo.objects.filter(Q(is_active=True) | Q(pk=actual.vehiculo_id))
         self.fields["vehiculo"].required = False
         self.fields["proveedor"].queryset = Proveedor.objects.filter(is_active=True)
         self.fields["proveedor"].required = False

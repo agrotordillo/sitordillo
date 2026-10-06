@@ -1,5 +1,6 @@
 from django import forms
 
+from apps.core.archivos import MEGABYTE, ComprobanteFormMixin, validar_archivo
 from apps.core.forms import BaseModelForm
 from apps.fiscal.models import FormaPago
 from .models import Banco, Pago
@@ -57,7 +58,7 @@ class GenerarCuentaForm(forms.Form):
             field.widget.attrs["class"] = f"{existing} input".strip()
 
 
-class PagoMultipleForm(forms.Form):
+class PagoMultipleForm(ComprobanteFormMixin, forms.Form):
     """Datos comunes de un pago que liquida varias cuentas por pagar del
     mismo proveedor a la vez (un solo cheque/transferencia/comprobante
     aplicado a cada cuenta seleccionada por su propio monto)."""
@@ -129,7 +130,17 @@ class EnviarComprobanteForm(forms.Form):
     """Correo de notificación de pago: el destinatario/CC son editables y
     los adjuntos siempre se suben en el momento (no se reutiliza el
     comprobante ya guardado del pago, para permitir mandar varios
-    documentos juntos aunque el pago original solo tenga uno o ninguno)."""
+    documentos juntos aunque el pago original solo tenga uno o ninguno).
+
+    El correo sale de la cuenta de la empresa: los adjuntos se limitan a
+    comprobantes (PDF, XML, JPG o PNG, revisados también por contenido),
+    con tope por archivo, en total y en número de destinatarios (B13 en
+    docs/AUDITORIA.md)."""
+
+    MAX_BYTES_POR_ADJUNTO = 10 * MEGABYTE
+    MAX_BYTES_TOTAL = 20 * MEGABYTE
+    MAX_ADJUNTOS = 10
+    MAX_CC = 10
 
     destinatario = forms.EmailField(label="Para")
     cc = forms.CharField(label="CC", required=False, help_text="Correos separados por coma (opcional)")
@@ -158,10 +169,24 @@ class EnviarComprobanteForm(forms.Form):
             except forms.ValidationError:
                 raise forms.ValidationError(f'"{correo}" no es un correo válido.')
             correos.append(correo)
+        if len(correos) > self.MAX_CC:
+            raise forms.ValidationError(f"Máximo {self.MAX_CC} correos en copia.")
         return correos
 
+    def clean_adjuntos(self):
+        adjuntos = self.cleaned_data.get("adjuntos") or []
+        if len(adjuntos) > self.MAX_ADJUNTOS:
+            raise forms.ValidationError(f"Máximo {self.MAX_ADJUNTOS} archivos por correo.")
+        for archivo in adjuntos:
+            validar_archivo(archivo, max_bytes=self.MAX_BYTES_POR_ADJUNTO)
+        if sum(archivo.size for archivo in adjuntos) > self.MAX_BYTES_TOTAL:
+            raise forms.ValidationError(
+                f"Los archivos juntos pesan más de {self.MAX_BYTES_TOTAL // MEGABYTE} MB."
+            )
+        return adjuntos
 
-class PagoForm(BaseModelForm):
+
+class PagoForm(ComprobanteFormMixin, BaseModelForm):
     class Meta:
         model = Pago
         fields = [

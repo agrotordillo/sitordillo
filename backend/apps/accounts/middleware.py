@@ -1,7 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 
-EXEMPT_PATH_PREFIXES = ('/admin/', settings.STATIC_URL, settings.MEDIA_URL)
+# MEDIA_URL no va aquí a propósito: los archivos subidos (comprobantes de
+# pagos, cobros y gastos) exigen sesión y permiso -ver
+# apps.core.views.servir_archivo_protegido-.
+EXEMPT_PATH_PREFIXES = ('/admin/', settings.STATIC_URL)
 EXEMPT_PATHS = frozenset(filter(None, (
     settings.LOGIN_URL,
     '/logout/',
@@ -10,7 +13,7 @@ EXEMPT_PATHS = frozenset(filter(None, (
 
 
 class LoginRequiredMiddleware:
-    """Requires an authenticated session for every view except login/logout/lockout, admin and static/media assets."""
+    """Requires an authenticated session for every view except login/logout/lockout, admin and static assets."""
 
     def __init__(self, get_response):
         self.get_response = get_response

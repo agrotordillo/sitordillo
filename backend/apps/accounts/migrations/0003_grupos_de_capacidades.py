@@ -75,6 +75,25 @@ GRUPOS_PERMISOS = {
 }
 
 
+# Modelos renombrados después de esta migración. En una base ya existente
+# el content type conserva aquí su nombre viejo (lo renombra la migración
+# del renombre); en una instalación nueva, _forzar_creacion_de_permisos()
+# solo crea el del nombre actual, así que hay que buscarlo con ese.
+MODELOS_RENOMBRADOS = {
+    ("gastos", "categoriagasto"): "conceptogasto",  # gastos.0009
+}
+
+
+def _content_type(ContentType, app_label, modelo):
+    try:
+        return ContentType.objects.get(app_label=app_label, model=modelo)
+    except ContentType.DoesNotExist:
+        nombre_actual = MODELOS_RENOMBRADOS.get((app_label, modelo))
+        if nombre_actual is None:
+            raise
+        return ContentType.objects.get(app_label=app_label, model=nombre_actual)
+
+
 def _forzar_creacion_de_permisos(app_labels):
     """En un `migrate` desde cero, los permisos add/change/delete/view de
     un modelo los crea la señal post_migrate, que todavía no ha corrido
@@ -99,10 +118,10 @@ def crear_grupos(apps, schema_editor):
         grupo, _ = Group.objects.get_or_create(name=nombre_grupo)
         permisos = []
         for app_label, modelo, acciones in reglas:
-            content_type = ContentType.objects.get(app_label=app_label, model=modelo)
+            content_type = _content_type(ContentType, app_label, modelo)
             for accion in acciones:
                 permisos.append(
-                    Permission.objects.get(content_type=content_type, codename=f"{accion}_{modelo}")
+                    Permission.objects.get(content_type=content_type, codename=f"{accion}_{content_type.model}")
                 )
         grupo.permissions.set(permisos)
 

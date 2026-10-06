@@ -45,7 +45,24 @@
   </div>
 </div>
 
-<form method="post">
+{# La sugerencia de IVA/IEPS sigue a la cantidad hasta que se edita a mano (ver ReportarMermaForm). #}
+<form method="post" x-data="{
+  cantidad: '{{ form.cantidad.value|default_if_none:''|escapejs }}',
+  iva: '{{ form.iva.value|default_if_none:''|escapejs }}',
+  ieps: '{{ form.ieps.value|default_if_none:''|escapejs }}',
+  ivaEditado: {% if form.iva.value %}true{% else %}false{% endif %},
+  iepsEditado: {% if form.ieps.value %}true{% else %}false{% endif %},
+  sugerir(unitario, maximo) {
+    const cantidad = parseFloat(this.cantidad);
+    if (!(cantidad > 0)) return '';
+    return Math.min(Math.round(cantidad * unitario * 100) / 100, maximo).toFixed(2);
+  },
+  actualizar() {
+    if (!this.ivaEditado) this.iva = this.sugerir({{ form.sugerencia.iva_unitario }}, {{ form.sugerencia.iva_orden }});
+    if (!this.iepsEditado) this.ieps = this.sugerir({{ form.sugerencia.ieps_unitario }}, {{ form.sugerencia.ieps_orden }});
+  },
+  init() { this.actualizar(); this.$watch('cantidad', () => this.actualizar()); },
+}">
   {% csrf_token %}
   {% if form.non_field_errors %}
   <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -59,6 +76,23 @@
       {{ form.cantidad }}
       {% if form.cantidad.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.cantidad.errors.0 }}</p>{% endif %}
     </div>
+    <div class="hidden sm:block"></div>
+    <div>
+      <label for="{{ form.iva.id_for_label }}" class="label">IVA a descontar</label>
+      {{ form.iva }}
+      <p class="mt-1.5 text-xs text-gray-400">IVA de la orden: ${{ form.orden.iva|default:0|moneda }}. Usa el de la nota de crédito del proveedor.</p>
+      {% if form.iva.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.iva.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.ieps.id_for_label }}" class="label">IEPS a descontar</label>
+      {{ form.ieps }}
+      <p class="mt-1.5 text-xs text-gray-400">IEPS de la orden: ${{ form.orden.ieps|default:0|moneda }}.</p>
+      {% if form.ieps.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.ieps.errors.0 }}</p>{% endif %}
+    </div>
+    <p class="sm:col-span-2 -mt-2 text-xs text-gray-400">
+      Se proponen según las tasas del producto y el descuento de la orden; si se dejan en blanco se aplica esa
+      propuesta. Las retenciones de la orden no se ajustan aquí: si cambian, corrígelas en la orden.
+    </p>
     <div class="sm:col-span-2">
       <label for="{{ form.motivo.id_for_label }}" class="label">Motivo <span class="text-gray-400 font-normal">(opcional)</span></label>
       {{ form.motivo }}

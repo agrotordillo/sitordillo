@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
 {% load static %}
 {% block title %}{% if object %}Editar gasto{% else %}Registrar gasto{% endif %}{% endblock title %}
 {% block title_layout %}{% if object %}Editar gasto{% else %}Registrar gasto{% endif %}{% endblock title_layout %}
@@ -18,10 +19,11 @@
     totalFormsSelector: '#id_distribuciones-TOTAL_FORMS',
     importeSelector: '#id_importe',
     compartidoSelector: '#id_es_compartido',
-    conceptoSelector: '#id_categoria',
+    conceptoSelector: '#id_concepto_gasto',
     guiaSelector: '#guia-conceptos',
   })">
   {% csrf_token %}
+  {% token_envio %}
 
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -41,9 +43,9 @@
           {% if form.centro_costo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.centro_costo.errors.0 }}</p>{% endif %}
         </div>
         <div>
-          <label for="{{ form.categoria.id_for_label }}" class="label">Concepto de gasto</label>
-          {{ form.categoria }}
-          {% if form.categoria.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.categoria.errors.0 }}</p>{% endif %}
+          <label for="{{ form.concepto_gasto.id_for_label }}" class="label">Concepto de gasto</label>
+          {{ form.concepto_gasto }}
+          {% if form.concepto_gasto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto_gasto.errors.0 }}</p>{% endif %}
         </div>
         <div class="sm:col-span-2" x-show="guia" x-cloak>
           <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-600 space-y-1">
@@ -73,7 +75,7 @@
           <label for="{{ form.turno.id_for_label }}" class="label">Turno <span class="text-gray-400 font-normal">(solo si el centro de costo es Sucursal)</span></label>
           {{ form.turno }}
           <p class="mt-1 text-xs text-gray-400">
-            Solo aparecen los turnos abiertos ahora mismo.
+            Solo aparecen los turnos de caja abiertos ahora mismo (al editar, también el que ya tenía el gasto).
             <a href="{% url 'products:turno-list' %}" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-700 font-medium">¿No ves el de tu sucursal? Ábrelo aquí</a>.
           </p>
           {% if form.turno.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.turno.errors.0 }}</p>{% endif %}
@@ -89,10 +91,10 @@
           <p class="mt-1 text-xs text-gray-400">Un gasto Cancelado no cuenta en el reporte de punto de equilibrio.</p>
         </div>
         <div class="sm:col-span-2">
-          <label for="{{ form.concepto.id_for_label }}" class="label">Descripción del gasto</label>
-          {{ form.concepto }}
-          <p class="mt-1 text-xs text-gray-400">Lo que dice el vale (p. ej. "Pago de recibo de luz de Lerdo, bimestre 4").</p>
-          {% if form.concepto.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.concepto.errors.0 }}</p>{% endif %}
+          <label for="{{ form.descripcion.id_for_label }}" class="label">{{ form.descripcion.label }}</label>
+          {{ form.descripcion }}
+          <p class="mt-1 text-xs text-gray-400">{{ form.descripcion.help_text }}</p>
+          {% if form.descripcion.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.descripcion.errors.0 }}</p>{% endif %}
         </div>
         <div>
           <label for="{{ form.referencia.id_for_label }}" class="label">Referencia <span class="text-gray-400 font-normal">(opcional)</span></label>

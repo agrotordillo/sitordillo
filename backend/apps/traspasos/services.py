@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.inventario.models import Lote, MovimientoInventario
-from apps.inventario.services import registrar_movimiento, seleccionar_lotes_para_salida
+from apps.inventario.services import bloquear_existencias, registrar_movimiento, seleccionar_lotes_para_salida
 
 from .models import Traspaso, TraspasoLote
 
@@ -30,14 +30,32 @@ def validar_stock_disponible_traspaso(almacen_origen, lineas):
     return errores
 
 
+def bloquear_traspaso(traspaso, estatus_esperado, mensaje):
+    """Relee el traspaso con la fila bloqueada y confirma su estatus: dos
+    envíos o recepciones simultáneas del mismo traspaso (doble clic, dos
+    usuarios) se forman en fila y el segundo lo encuentra ya cambiado, en
+    vez de descontar o dar de alta el inventario dos veces (B14 en
+    docs/AUDITORIA.md). Debe llamarse dentro de una transacción."""
+    bloqueado = Traspaso.objects.select_for_update().get(pk=traspaso.pk)
+    if bloqueado.estatus != estatus_esperado:
+        raise ValueError(f"{mensaje} Este ya está {bloqueado.get_estatus_display().lower()}.")
+    return bloqueado
+
+
 @transaction.atomic
 def enviar_traspaso(traspaso):
-    if traspaso.estatus != Traspaso.Estatus.BORRADOR:
-        raise ValueError("Solo se puede enviar un traspaso en borrador.")
+    traspaso = bloquear_traspaso(traspaso, Traspaso.Estatus.BORRADOR, "Solo se puede enviar un traspaso en borrador.")
 
     detalles = list(traspaso.detalles.select_related("producto"))
     if not detalles:
         raise ValueError("El traspaso no tiene productos que enviar.")
+
+    bloquear_existencias(traspaso.almacen_origen, [detalle.producto for detalle in detalles])
+    errores = validar_stock_disponible_traspaso(
+        traspaso.almacen_origen, [(d.producto, d.cantidad, d.estrategia_salida) for d in detalles]
+    )
+    if errores:
+        raise ValueError(" ".join(errores))
 
     for detalle in detalles:
         plan = seleccionar_lotes_para_salida(
@@ -66,8 +84,7 @@ def enviar_traspaso(traspaso):
 
 @transaction.atomic
 def recibir_traspaso(traspaso):
-    if traspaso.estatus != Traspaso.Estatus.ENVIADO:
-        raise ValueError("Solo se puede recibir un traspaso enviado.")
+    traspaso = bloquear_traspaso(traspaso, Traspaso.Estatus.ENVIADO, "Solo se puede recibir un traspaso enviado.")
 
     pendientes = TraspasoLote.objects.filter(
         detalle__traspaso=traspaso, lote_destino__isnull=True
@@ -105,13 +122,15 @@ def recibir_traspaso(traspaso):
     return traspaso
 
 
+@transaction.atomic
 def cancelar_traspaso(traspaso):
     """Cancela un traspaso que todavía no se envió. Una vez enviado ya no
     se puede cancelar así -el inventario del origen ya se descontó y
     quedó registrado en TraspasoLote-; revertir eso es un caso de
-    corrección de inventario, no una simple cancelación."""
-    if traspaso.estatus != Traspaso.Estatus.BORRADOR:
-        raise ValueError("Solo se puede cancelar un traspaso en borrador.")
+    corrección de inventario, no una simple cancelación. Bloquea la fila
+    igual que enviar/recibir: cancelar y enviar a la vez no puede dejar un
+    traspaso cancelado con su inventario ya descontado."""
+    traspaso = bloquear_traspaso(traspaso, Traspaso.Estatus.BORRADOR, "Solo se puede cancelar un traspaso en borrador.")
     traspaso.estatus = Traspaso.Estatus.CANCELADO
     traspaso.save(update_fields=["estatus", "updated_at", "updated_by"])
     return traspaso

@@ -92,6 +92,7 @@
 {% else %}
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
+  {% token_envio %}
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
     {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}

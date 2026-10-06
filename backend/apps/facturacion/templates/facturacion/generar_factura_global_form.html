@@ -1,0 +1,62 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Generar factura global{% endblock title %}
+{% block title_layout %}Generar factura global{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:turno-list' %}" class="text-gray-400 hover:text-primary-600">Turnos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Factura global</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-700 mb-6">
+  Cierre fiscal del turno <strong>{{ turno.folio }}</strong> ({{ turno.punto_venta.nombre }} · {{ turno.punto_venta.almacen.nombre }}, {{ turno.fecha|date:"d/m/Y" }}). Se concentran en un solo CFDI las ventas a <strong>Público en general</strong> que todavía no tienen factura propia.
+</div>
+
+<div class="relative overflow-x-auto border border-gray-100 rounded-xl mb-4">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-3 py-2.5 font-semibold">Venta</th>
+        <th scope="col" class="px-3 py-2.5 font-semibold">Hora</th>
+        <th scope="col" class="px-3 py-2.5 font-semibold">Forma de pago</th>
+        <th scope="col" class="px-3 py-2.5 font-semibold text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for venta in ventas %}
+      <tr>
+        <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ venta.folio }}</td>
+        <td class="px-3 py-2 text-gray-500">{{ venta.fecha_venta|date:"H:i" }}</td>
+        <td class="px-3 py-2 text-gray-600">{{ venta.forma_pago_texto }}</td>
+        <td class="px-3 py-2 text-right text-gray-700 font-medium">${{ venta.total|moneda }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="border-t border-gray-100">
+        <td colspan="3" class="px-3 py-2.5 text-right font-semibold text-gray-700">Total ({{ ventas|length }} venta{{ ventas|length|pluralize }})</td>
+        <td class="px-3 py-2.5 text-right font-semibold text-gray-800">${{ total|moneda }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div>
+    <label for="observaciones" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
+    <textarea name="observaciones" id="observaciones" rows="2" class="input"></textarea>
+  </div>
+  <p class="mt-3 text-xs text-gray-400">Se genera y se timbra en un solo paso, con método de pago PUE y receptor genérico de Público en general (RFC XAXX010101000). Una vez timbrada, es un documento fiscal ya emitido y no se puede editar.</p>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+    <a href="{% url 'products:turno-list' %}" class="btn-secondary">Más tarde</a>
+    <button type="submit" class="btn-primary">Generar y timbrar factura global</button>
+  </div>
+</form>
+{% endblock main_content %}

@@ -8,7 +8,8 @@ class SuperuserRequiredMixin(UserPassesTestMixin):
     reasignable -a diferencia de un catálogo estructural cualquiera (Marca,
     Almacén, etc.), donde si mañana se decide delegarlo a un grupo, basta
     con otorgar el permiso correspondiente sin tocar código. Un
-    superusuario ya ignora cualquier permiso granular en Django, así que
+    superusuario ya ignora cualquier permiso granular en Django (salvo los
+    de los módulos estrictos, ver apps.core.permisos_estrictos), así que
     esto solo bloquea a quien no lo es."""
 
     def test_func(self):

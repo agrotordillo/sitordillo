@@ -1,0 +1,87 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Factura global {{ factura_global.serie_folio }}{% endblock title %}
+{% block title_layout %}Factura global {{ factura_global.serie_folio }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'facturacion:factura-global-list' %}" class="text-gray-400 hover:text-primary-600">Facturas globales</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{{ factura_global.serie_folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="grid gap-4 sm:grid-cols-2 text-sm">
+  <div>
+    <span class="label">Turno</span>
+    <p class="text-gray-700 py-1">{{ factura_global.turno.folio }} · {{ factura_global.turno.punto_venta.nombre }} ({{ factura_global.turno.punto_venta.almacen.nombre }})</p>
+  </div>
+  <div>
+    <span class="label">Periodo (SAT)</span>
+    <p class="text-gray-700 py-1">Diario · {{ factura_global.periodo_mes }}/{{ factura_global.periodo_anio }}</p>
+  </div>
+  <div>
+    <span class="label">Forma de pago declarada</span>
+    <p class="text-gray-700 py-1">{{ factura_global.forma_pago.descripcion }} <span class="text-gray-400 text-xs">(la de mayor monto en el periodo)</span></p>
+  </div>
+  <div>
+    <span class="label">Total</span>
+    <p class="text-gray-700 py-1 font-medium">${{ factura_global.total|moneda }} ({{ factura_global.ventas.count }} venta{{ factura_global.ventas.count|pluralize }})</p>
+  </div>
+  <div>
+    <span class="label">Estatus</span>
+    <p class="py-1">
+      <span class="inline-flex items-center gap-1.5 text-xs font-medium
+          {% if factura_global.estatus == 'timbrada' %}text-emerald-600
+          {% elif factura_global.estatus == 'cancelada' or factura_global.estatus == 'error' %}text-red-500
+          {% elif factura_global.estatus == 'timbrando' %}text-amber-600
+          {% else %}text-gray-500{% endif %}">
+        <span class="w-1.5 h-1.5 rounded-full
+            {% if factura_global.estatus == 'timbrada' %}bg-emerald-500
+            {% elif factura_global.estatus == 'cancelada' or factura_global.estatus == 'error' %}bg-red-400
+            {% elif factura_global.estatus == 'timbrando' %}bg-amber-400
+            {% else %}bg-gray-400{% endif %}"></span>
+        {{ factura_global.get_estatus_display }}
+      </span>
+    </p>
+  </div>
+  {% if factura_global.uuid_fiscal %}
+  <div class="sm:col-span-2">
+    <span class="label">UUID fiscal</span>
+    <p class="text-gray-500 py-1 font-mono text-xs">{{ factura_global.uuid_fiscal }}</p>
+  </div>
+  {% endif %}
+  {% if factura_global.estatus == 'error' and factura_global.mensaje_error %}
+  <div class="sm:col-span-2">
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ factura_global.mensaje_error }}</div>
+  </div>
+  {% elif factura_global.estatus == 'timbrando' %}
+  <div class="sm:col-span-2">
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      {{ factura_global.mensaje_error|default:"Se está timbrando en este momento." }}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+  <a href="{% url 'products:turno-list' %}" class="btn-secondary">Volver a Turnos</a>
+  {% if factura_global.estatus == 'borrador' or factura_global.estatus == 'error' %}
+  <form method="post" action="{% url 'facturacion:factura-global-timbrar' factura_global.pk %}" x-data="{ enviando: false }" @submit="enviando = true">
+    {% csrf_token %}
+    <button type="submit" class="btn-primary w-full disabled:opacity-50" :disabled="enviando" x-text="enviando ? 'Timbrando…' : 'Reintentar timbrado'">Reintentar timbrado</button>
+  </form>
+  {% elif factura_global.estatus == 'timbrando' and perms.facturacion.delete_facturaglobal %}
+  <form method="post" action="{% url 'facturacion:factura-global-liberar-timbrado' factura_global.pk %}" data-confirmar="¿Ya verificaste en el portal de Facturama que esta factura global NO se timbró? Si se timbró y la liberas, al reintentar se emitiría un CFDI duplicado.">
+    {% csrf_token %}
+    <button type="submit" class="btn-secondary w-full">Liberar para reintentar</button>
+  </form>
+  {% elif factura_global.estatus == 'timbrada' %}
+  <a href="{% url 'facturacion:factura-global-xml' factura_global.pk %}" class="btn-secondary">Descargar XML</a>
+  <a href="{% url 'facturacion:factura-global-pdf' factura_global.pk %}" target="_blank" rel="noopener" class="btn-primary">Ver PDF</a>
+  {% endif %}
+</div>
+{% endblock main_content %}

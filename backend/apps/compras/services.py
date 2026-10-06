@@ -160,7 +160,9 @@ def importar_cfdi_compra(archivo):
         estado_pago=estado_pago,
         forma_pago=forma_pago,
         # El descuento ya viene neteado línea por línea (ver abajo), así que
-        # el % general de la orden se deja en 0 para no restarlo dos veces.
+        # el % adicional de la orden se deja en 0 para no restarlo dos veces;
+        # el % base del proveedor también queda en 0 por tener cfdi_uuid
+        # (ver OrdenCompra._descuento_base_vigente).
         descuento_pct=Decimal("0.00"),
         iva=_sumar_impuestos(root, ns, CLAVE_IVA, "Traslados"),
         ieps=_sumar_impuestos(root, ns, CLAVE_IEPS, "Traslados"),

@@ -12,7 +12,15 @@ SECURE_HSTS_PRELOAD = True
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Desde Django 5.1 STATICFILES_STORAGE ya no existe y se ignoraba sin
+# avisar (B26 en docs/AUDITORIA.md): sin esto WhiteNoise no comprime ni
+# versiona los estáticos, y tras un deploy los navegadores siguen usando JS
+# y CSS viejos. `default` se repite porque definir STORAGES reemplaza
+# también el almacenamiento de archivos subidos.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 LOGGING = {
     "version": 1,

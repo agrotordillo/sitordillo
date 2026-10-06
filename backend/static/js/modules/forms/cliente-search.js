@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!q) {
       resultsEl.classList.add("hidden");
-      resultsEl.innerHTML = "";
+      resultsEl.replaceChildren();
       if (hiddenInput) hiddenInput.value = "";
       return;
     }
@@ -43,15 +43,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Los datos del cliente los captura cualquier usuario: se pintan siempre
+  // con textContent, nunca con innerHTML, para que un nombre con HTML no se
+  // ejecute en el navegador de quien busca (B07 en docs/AUDITORIA.md).
+  function crearMensaje(texto) {
+    const p = document.createElement("p");
+    p.className = "px-3 py-2.5 text-xs text-gray-400";
+    p.textContent = texto;
+    return p;
+  }
+
+  function crearOpcion(principal, secundario) {
+    const contenedor = document.createElement("span");
+    contenedor.className = "min-w-0 flex-1";
+    const linea1 = document.createElement("span");
+    linea1.className = "block truncate text-gray-800";
+    linea1.textContent = principal;
+    const linea2 = document.createElement("span");
+    linea2.className = "block text-xs text-gray-400 font-mono";
+    linea2.textContent = secundario;
+    contenedor.append(linea1, linea2);
+    return contenedor;
+  }
+
   function mostrarCargando(resultsEl) {
-    resultsEl.innerHTML = '<p class="px-3 py-2.5 text-xs text-gray-400">Buscando…</p>';
+    resultsEl.replaceChildren(crearMensaje("Buscando…"));
     resultsEl.classList.remove("hidden");
   }
 
   function mostrarResultados(items, input, hiddenInput, resultsEl) {
-    resultsEl.innerHTML = "";
+    resultsEl.replaceChildren();
     if (!items.length) {
-      resultsEl.innerHTML = '<p class="px-3 py-2.5 text-xs text-gray-400">Sin resultados</p>';
+      resultsEl.replaceChildren(crearMensaje("Sin resultados"));
       resultsEl.classList.remove("hidden");
       return;
     }
@@ -59,11 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "flex w-full items-center gap-2 text-left px-3 py-2.5 text-sm hover:bg-primary-50 transition-colors";
-      btn.innerHTML = `
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-gray-800">${item.nombre}</span>
-          <span class="block text-xs text-gray-400 font-mono">${item.rfc || "Sin RFC"}</span>
-        </span>`;
+      btn.append(crearOpcion(item.nombre, item.rfc || "Sin RFC"));
       btn.addEventListener("click", () => {
         hiddenInput.value = item.id;
         hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));

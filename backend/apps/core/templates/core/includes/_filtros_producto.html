@@ -41,7 +41,7 @@ static/js/vendor/alpine.min.js en su bloque extra_js.
     child: '#id_subcategoria_filtro',
     url: '{% url 'api:subcategories-by-category' %}',
     param: 'category',
-    initial: '{{ subcategoria_id }}',
+    initial: '{{ subcategoria_id|escapejs }}',
     placeholder: 'Elige categoría primero'
   })"
 >

@@ -60,8 +60,16 @@ def generar_cuenta_por_cobrar(venta, fecha_emision=None):
     return cuenta
 
 
+def bloquear_cuenta_por_cobrar(pk):
+    """Relee con la fila bloqueada la cuenta por cobrar (dentro de una
+    transacción): el saldo se valida y se mueve con ella bloqueada, para
+    que dos cobros simultáneos no lo rebasen (B16 en docs/AUDITORIA.md)."""
+    return CuentaPorCobrar.objects.select_for_update().get(pk=pk)
+
+
 @transaction.atomic
 def registrar_cobro(cuenta, fecha_cobro, monto_cobrado, forma_pago, banco=None, numero_referencia="", comprobante=None, observaciones=""):
+    cuenta = bloquear_cuenta_por_cobrar(cuenta.pk)
     cobro = Cobro(
         cuenta_por_cobrar=cuenta,
         fecha_cobro=fecha_cobro,

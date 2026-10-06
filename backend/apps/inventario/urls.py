@@ -15,6 +15,14 @@ from .views.conversion_views import (
     crear_conversion_view,
 )
 from .views.ensamble_views import EnsamblePaqueteListView, crear_ensamble_view
+from .views.movimiento_almacen_views import (
+    MovimientoAlmacenCreateView,
+    MovimientoAlmacenDetailView,
+    MovimientoAlmacenListView,
+    MovimientoAlmacenUpdateView,
+    movimiento_almacen_aplicar_view,
+    movimiento_almacen_cancelar_view,
+)
 
 app_name = "inventario"
 
@@ -39,4 +47,22 @@ urlpatterns = [
     ),
     path("ensambles/", EnsamblePaqueteListView.as_view(), name="ensamble-list"),
     path("ensambles/crear/", crear_ensamble_view, name="ensamble-create"),
+    path("movimientos-almacen/", MovimientoAlmacenListView.as_view(), name="movimiento-almacen-list"),
+    path("movimientos-almacen/crear/", MovimientoAlmacenCreateView.as_view(), name="movimiento-almacen-create"),
+    path("movimientos-almacen/<int:pk>/", MovimientoAlmacenDetailView.as_view(), name="movimiento-almacen-detail"),
+    path(
+        "movimientos-almacen/<int:pk>/editar/",
+        MovimientoAlmacenUpdateView.as_view(),
+        name="movimiento-almacen-update",
+    ),
+    path(
+        "movimientos-almacen/<int:pk>/aplicar/",
+        movimiento_almacen_aplicar_view,
+        name="movimiento-almacen-aplicar",
+    ),
+    path(
+        "movimientos-almacen/<int:pk>/cancelar/",
+        movimiento_almacen_cancelar_view,
+        name="movimiento-almacen-cancelar",
+    ),
 ]

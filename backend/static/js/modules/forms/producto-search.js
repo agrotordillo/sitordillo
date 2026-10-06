@@ -108,10 +108,30 @@ document.addEventListener("DOMContentLoaded", () => {
     resultsEl.style.width = `${rect.width}px`;
   }
 
-  function mostrarMensaje(resultsEl, input, html) {
-    resultsEl.innerHTML = html;
+  // Nombre, SKU y almacén los captura un usuario: los resultados y los
+  // mensajes se pintan siempre con textContent, nunca con innerHTML, para
+  // que un nombre con HTML no se ejecute en el navegador de quien busca (B07
+  // en docs/AUDITORIA.md).
+  function mostrarMensaje(resultsEl, input, texto, color = "text-gray-400") {
+    const p = document.createElement("p");
+    p.className = `px-3 py-2.5 text-xs ${color}`;
+    p.textContent = texto;
+    resultsEl.replaceChildren(p);
     posicionarPanel(input, resultsEl);
     resultsEl.classList.remove("hidden");
+  }
+
+  function crearOpcion(principal, secundario) {
+    const contenedor = document.createElement("span");
+    contenedor.className = "min-w-0 flex-1";
+    const linea1 = document.createElement("span");
+    linea1.className = "block truncate text-gray-800";
+    linea1.textContent = principal;
+    const linea2 = document.createElement("span");
+    linea2.className = "block text-xs text-gray-400 font-mono";
+    linea2.textContent = secundario;
+    contenedor.append(linea1, linea2);
+    return contenedor;
   }
 
   function limpiarPrecio(hiddenInput) {
@@ -139,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!q) {
       resultsEl.classList.add("hidden");
-      resultsEl.innerHTML = "";
+      resultsEl.replaceChildren();
       if (hiddenInput) {
         hiddenInput.value = "";
         limpiarPrecio(hiddenInput);
@@ -156,18 +176,18 @@ document.addEventListener("DOMContentLoaded", () => {
       almacenValue = almacenField ? almacenField.value : "";
       if (!almacenValue) {
         const almacenLabel = wrapper.dataset.productoSearchAlmacenLabel || "el almacén origen";
-        mostrarMensaje(resultsEl, input, `<p class="px-3 py-2.5 text-xs text-amber-600">Selecciona primero ${almacenLabel}.</p>`);
+        mostrarMensaje(resultsEl, input, `Selecciona primero ${almacenLabel}.`, "text-amber-600");
         return;
       }
     }
 
     if (q.length < MIN_CHARS) {
       resultsEl.classList.add("hidden");
-      resultsEl.innerHTML = "";
+      resultsEl.replaceChildren();
       return;
     }
 
-    mostrarMensaje(resultsEl, input, '<p class="px-3 py-2.5 text-xs text-gray-400">Buscando…</p>');
+    mostrarMensaje(resultsEl, input, "Buscando…");
 
     try {
       const params = new URLSearchParams({ q });
@@ -195,21 +215,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const mensaje = filtradoPorAlmacen
         ? `Sin existencia de este producto en ${almacenLabel}`
         : "Sin resultados";
-      mostrarMensaje(resultsEl, input, `<p class="px-3 py-2.5 text-xs text-gray-400">${mensaje}</p>`);
+      mostrarMensaje(resultsEl, input, mensaje);
       return;
     }
 
-    resultsEl.innerHTML = "";
+    resultsEl.replaceChildren();
     items.forEach((item) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "flex w-full items-center gap-2 text-left px-3 py-2.5 text-sm hover:bg-primary-50 transition-colors";
       const disponible = item.disponible !== undefined ? ` · disponible: ${item.disponible}` : "";
-      btn.innerHTML = `
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-gray-800">${item.nombre}</span>
-          <span class="block text-xs text-gray-400 font-mono">${item.folio} · ${item.sku}${disponible}</span>
-        </span>`;
+      btn.append(crearOpcion(item.nombre, `${item.folio} · ${item.sku}${disponible}`));
       btn.addEventListener("click", () => {
         hiddenInput.value = item.id;
         hiddenInput.dataset.precioCosto = item.precio_costo;

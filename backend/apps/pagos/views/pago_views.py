@@ -10,9 +10,15 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 
+from apps.core.envio_unico import EnvioDuplicado, envio_ya_procesado, reservar_envio, respuesta_envio_duplicado
+from apps.core.errores import errores_al_formulario
+from apps.core.navegacion import url_de_regreso
+from apps.core.parametros import ids_validos
 from apps.pagos.forms import EnviarComprobanteForm, PagoEditForm, PagoForm, PagoMultipleForm
 from apps.pagos.models import CuentaPorPagar, Pago
 from apps.pagos.services import (
+    bloquear_cuenta_por_pagar,
+    bloquear_cuentas_por_pagar,
     calcular_datos_comprobante,
     construir_texto_whatsapp,
     construir_texto_whatsapp_pago,
@@ -30,6 +36,9 @@ def registrar_pago_view(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
     sin_saldo = cuenta.estatus in (CuentaPorPagar.Estatus.PAGADA, CuentaPorPagar.Estatus.CANCELADA)
 
+    if request.method == "POST" and (url := envio_ya_procesado(request)):
+        return respuesta_envio_duplicado(request, url)
+
     if request.method == "POST" and sin_saldo:
         messages.info(request, "Esta cuenta por pagar ya no tiene saldo pendiente.")
         return redirect("pagos:cuenta-list")
@@ -38,15 +47,15 @@ def registrar_pago_view(request, pk):
         form = PagoForm(request.POST, request.FILES)
         if form.is_valid():
             pago = form.save(commit=False)
-            pago.cuenta_por_pagar = cuenta
             try:
-                pago.full_clean()
-            except ValidationError as e:
-                for field, errores in e.message_dict.items():
-                    for mensaje in errores:
-                        form.add_error(None if field == "__all__" else field, mensaje)
-            else:
                 with transaction.atomic():
+                    envio = reservar_envio(request)
+                    # El saldo se valida con la cuenta bloqueada: dos pagos
+                    # registrados a la vez no pueden rebasarlo (B16 en
+                    # docs/AUDITORIA.md).
+                    cuenta = bloquear_cuenta_por_pagar(cuenta.pk)
+                    pago.cuenta_por_pagar = cuenta
+                    pago.full_clean()
                     recibo = crear_recibo_pago(
                         proveedor=cuenta.proveedor,
                         fecha_pago=pago.fecha_pago,
@@ -57,6 +66,12 @@ def registrar_pago_view(request, pk):
                     pago.recibo = recibo
                     pago.save()
                     cuenta.actualizar_estatus()
+                    envio.completar(reverse("pagos:cuenta-list"))
+            except EnvioDuplicado as duplicado:
+                return respuesta_envio_duplicado(request, duplicado.url_resultado, "pagos:cuenta-list")
+            except ValidationError as e:
+                errores_al_formulario(form, e)
+            else:
                 messages.success(request, f"Pago registrado correctamente (recibo {recibo.numero}).")
                 return redirect("pagos:cuenta-list")
     else:
@@ -90,7 +105,8 @@ def _cuentas_seleccionadas_validas(request):
     (cuentas, error) donde `cuentas` viene ordenada por fecha_vencimiento
     (más antigua primero, orden por default del modelo) y `error` es un
     mensaje a mostrar si la selección ya no es válida."""
-    cuenta_ids = request.POST.getlist("cuenta_ids")
+    enviados = request.POST.getlist("cuenta_ids")
+    cuenta_ids = ids_validos(enviados)
     if len(cuenta_ids) < 2:
         return None, "Selecciona al menos dos cuentas para pagarlas juntas."
 
@@ -98,7 +114,7 @@ def _cuentas_seleccionadas_validas(request):
         CuentaPorPagar.objects.filter(pk__in=cuenta_ids, estatus__in=CUENTAS_PAGABLES)
         .select_related("orden_compra", "orden_compra__proveedor")
     )
-    if len(cuentas) != len(set(cuenta_ids)):
+    if len(cuentas) != len(set(enviados)):
         return None, "Alguna de las cuentas seleccionadas ya no está disponible para pago."
 
     if len({c.orden_compra.proveedor_id for c in cuentas}) > 1:
@@ -136,6 +152,11 @@ def registrar_pago_multiple_view(request):
     if request.method != "POST":
         return redirect("pagos:cuenta-list")
 
+    # Antes de revisar las cuentas: si este envío ya se registró, sus cuentas
+    # ya quedaron pagadas y la revisión lo rechazaría con un error confuso.
+    if url := envio_ya_procesado(request):
+        return respuesta_envio_duplicado(request, url)
+
     cuentas, error = _cuentas_seleccionadas_validas(request)
     if error:
         messages.error(request, error)
@@ -152,7 +173,8 @@ def registrar_pago_multiple_view(request):
             monto = Decimal(crudo) if crudo else Decimal("0.00")
         except InvalidOperation:
             monto = None
-        if monto is None or monto < 0 or monto > cuenta.saldo_pendiente:
+        # "NaN" o "Infinity" son Decimal válidos, pero compararlos truena.
+        if monto is None or not monto.is_finite() or monto < 0 or monto > cuenta.saldo_pendiente:
             error_montos = "Revisa los montos capturados: no pueden ser negativos ni exceder el saldo pendiente de cada cuenta."
             monto = Decimal("0.00")
         montos[cuenta.pk] = monto
@@ -167,6 +189,11 @@ def registrar_pago_multiple_view(request):
         comprobante = form.cleaned_data.get("comprobante")
         try:
             with transaction.atomic():
+                envio = reservar_envio(request)
+                # Saldos validados con las cuentas bloqueadas (ver
+                # registrar_pago_view): el saldo que se revisó arriba pudo
+                # cambiar mientras se capturaba.
+                bloqueadas = bloquear_cuentas_por_pagar([c.pk for c in cuentas])
                 # Un solo recibo (evento de pago) agrupa los pagos de todas
                 # las cuentas seleccionadas -así se ven juntos después en
                 # el listado de Pagos, en vez de como N registros sueltos-.
@@ -183,6 +210,7 @@ def registrar_pago_multiple_view(request):
                     monto = montos[cuenta.pk]
                     if monto <= 0:
                         continue
+                    cuenta = bloqueadas[cuenta.pk]
                     if comprobante:
                         comprobante.seek(0)
                     pago = Pago(
@@ -200,14 +228,16 @@ def registrar_pago_multiple_view(request):
                     pago.save()
                     cuenta.actualizar_estatus()
                     pago_ids.append(pago.pk)
+                url_confirmacion = f"{reverse('pagos:pago-multiple-confirmacion')}?ids={','.join(map(str, pago_ids))}"
+                envio.completar(url_confirmacion)
+        except EnvioDuplicado as duplicado:
+            return respuesta_envio_duplicado(request, duplicado.url_resultado, "pagos:cuenta-list")
         except ValidationError as e:
-            for errores in e.message_dict.values():
-                for mensaje in errores:
-                    form.add_error(None, mensaje)
+            for mensaje in e.messages:
+                form.add_error(None, mensaje)
         else:
             messages.success(request, f"Se registraron {len(pago_ids)} pagos correctamente (recibo {recibo.numero}).")
-            ids_qs = ",".join(str(pk) for pk in pago_ids)
-            return redirect(f"{reverse('pagos:pago-multiple-confirmacion')}?ids={ids_qs}")
+            return redirect(url_confirmacion)
 
     return render(
         request,
@@ -224,8 +254,7 @@ def registrar_pago_multiple_view(request):
 
 @permission_required("pagos.view_pago", raise_exception=True)
 def pago_multiple_confirmacion_view(request):
-    ids_qs = request.GET.get("ids", "")
-    pago_ids = [pk for pk in ids_qs.split(",") if pk]
+    pago_ids = ids_validos(request.GET.get("ids", ""))
     pagos = list(
         Pago.objects.filter(pk__in=pago_ids)
         .select_related("cuenta_por_pagar__orden_compra__proveedor", "banco", "forma_pago")
@@ -262,22 +291,25 @@ def editar_pago_view(request, pk):
     conversación de diseño: reemplaza al botón simple de Desactivar)."""
     pago = get_object_or_404(Pago, pk=pk)
     cuenta = pago.cuenta_por_pagar
-    next_url = request.POST.get("next") or request.GET.get("next") or reverse("pagos:pago-registrar", args=[cuenta.pk])
+    next_url = url_de_regreso(request, reverse("pagos:pago-registrar", args=[cuenta.pk]))
 
     if request.method == "POST":
         form = PagoEditForm(request.POST, request.FILES, instance=pago)
         if form.is_valid():
             pago = form.save(commit=False)
             try:
-                pago.full_clean()
-            except ValidationError as e:
-                for field, errores in e.message_dict.items():
-                    for mensaje in errores:
-                        form.add_error(None if field == "__all__" else field, mensaje)
-            else:
                 with transaction.atomic():
+                    # Mismo bloqueo que al registrar (B16 en docs/AUDITORIA.md):
+                    # reactivar o subir el monto de un pago se valida contra
+                    # el saldo con la cuenta bloqueada.
+                    cuenta = bloquear_cuenta_por_pagar(cuenta.pk)
+                    pago.cuenta_por_pagar = cuenta
+                    pago.full_clean()
                     pago.save()
                     cuenta.actualizar_estatus()
+            except ValidationError as e:
+                errores_al_formulario(form, e)
+            else:
                 messages.success(request, f"Pago {pago.folio} actualizado correctamente.")
                 return redirect(next_url)
     else:
@@ -290,19 +322,22 @@ def editar_pago_view(request, pk):
     )
 
 
-@permission_required("pagos.view_pago", raise_exception=True)
+# Manda un correo desde la cuenta de la empresa con archivos que sube el
+# usuario: exige poder registrar pagos, no solo verlos (B13 en
+# docs/AUDITORIA.md).
+@permission_required("pagos.add_pago", raise_exception=True)
 def enviar_comprobante_view(request):
     if request.method != "POST":
         return redirect("pagos:cuenta-list")
 
-    next_url = request.POST.get("next") or reverse("pagos:cuenta-list")
-    pago_ids = request.POST.getlist("pago_ids")
+    next_url = url_de_regreso(request, reverse("pagos:cuenta-list"))
+    enviados = request.POST.getlist("pago_ids")
     pagos = list(
-        Pago.objects.filter(pk__in=pago_ids).select_related(
+        Pago.objects.filter(pk__in=ids_validos(enviados)).select_related(
             "cuenta_por_pagar__orden_compra__proveedor", "banco", "forma_pago"
         )
     )
-    if not pagos or len(pagos) != len(set(pago_ids)):
+    if not pagos or len(pagos) != len(set(enviados)):
         messages.error(request, "No se encontraron los pagos a notificar.")
         return redirect(next_url)
 

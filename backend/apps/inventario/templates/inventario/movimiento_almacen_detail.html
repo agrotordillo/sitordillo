@@ -1,0 +1,174 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Movimiento {{ movimiento.folio }}{% endblock title %}
+{% block title_layout %}Movimiento {{ movimiento.folio }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'inventario:movimiento-almacen-list' %}" class="text-gray-400 hover:text-primary-600">Movimientos de almacén</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">{{ movimiento.folio }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<div class="grid gap-8">
+
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-700">Datos generales</h3>
+      {% include "inventario/includes/_movimiento_almacen_estado.html" %}
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 text-sm">
+      <div>
+        <span class="block text-xs text-gray-400">Concepto</span>
+        <span class="font-medium {% if movimiento.es_entrada %}text-emerald-700{% else %}text-red-700{% endif %}">{{ movimiento.get_concepto_display }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Fecha</span>
+        <span class="text-gray-700">{{ movimiento.fecha|date:"d/m/Y" }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">{% if movimiento.es_devolucion_movil %}Almacén móvil{% else %}Almacén{% endif %}</span>
+        <span class="text-gray-700">{{ movimiento.almacen.nombre }}</span>
+      </div>
+      {% if movimiento.almacen_destino %}
+      <div>
+        <span class="block text-xs text-gray-400">Regresa a</span>
+        <span class="text-gray-700">{{ movimiento.almacen_destino.nombre }}</span>
+      </div>
+      {% endif %}
+      {% if movimiento.proveedor %}
+      <div>
+        <span class="block text-xs text-gray-400">Proveedor</span>
+        <span class="text-gray-700">{{ movimiento.proveedor }}</span>
+      </div>
+      {% endif %}
+      <div>
+        <span class="block text-xs text-gray-400">Documento de referencia</span>
+        <span class="text-gray-700">{{ movimiento.documento_referencia|default:"—" }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Movimiento que lo antecede</span>
+        {% if movimiento.movimiento_relacionado %}
+        <a href="{% url 'inventario:movimiento-almacen-detail' movimiento.movimiento_relacionado.pk %}" class="text-primary-600 hover:text-primary-700">
+          <span class="font-mono">{{ movimiento.movimiento_relacionado.folio }}</span> · {{ movimiento.movimiento_relacionado.get_concepto_display }}
+        </a>
+        {% else %}
+        <span class="text-gray-700">—</span>
+        {% endif %}
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Orden de compra relacionada</span>
+        <span class="font-mono text-gray-700">{{ movimiento.orden_compra.folio|default:"—" }}</span>
+      </div>
+      {% with derivados=movimiento.movimientos_derivados.all %}
+      {% if derivados %}
+      <div class="sm:col-span-2">
+        <span class="block text-xs text-gray-400">Movimientos que hacen referencia a este</span>
+        <div class="flex flex-wrap gap-2 mt-1">
+          {% for derivado in derivados %}
+          <a href="{% url 'inventario:movimiento-almacen-detail' derivado.pk %}" class="text-xs border border-gray-100 rounded-lg px-2.5 py-1 text-primary-600 hover:text-primary-700">
+            <span class="font-mono">{{ derivado.folio }}</span> · {{ derivado.get_concepto_display }} · {{ derivado.get_estado_display }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+      <div>
+        <span class="block text-xs text-gray-400">Creado por</span>
+        <span class="text-gray-700">{{ movimiento.created_by.get_full_name|default:movimiento.created_by.username|default:"—" }}</span>
+      </div>
+      <div>
+        <span class="block text-xs text-gray-400">Aplicado</span>
+        <span class="text-gray-700">{{ movimiento.fecha_aplicacion|date:"d/m/Y H:i"|default:"Pendiente" }}</span>
+      </div>
+      {% if movimiento.estado == 'cancelado' %}
+      <div class="sm:col-span-2">
+        <span class="block text-xs text-gray-400">Cancelado</span>
+        <span class="text-gray-700">{{ movimiento.fecha_cancelacion|date:"d/m/Y H:i" }}{% if movimiento.motivo_cancelacion %} · {{ movimiento.motivo_cancelacion }}{% endif %}</span>
+      </div>
+      {% endif %}
+      {% if movimiento.observaciones %}
+      <div class="sm:col-span-2">
+        <span class="block text-xs text-gray-400">Observaciones</span>
+        <span class="text-gray-700">{{ movimiento.observaciones }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Productos</h3>
+    <div class="relative overflow-x-auto border border-gray-100 rounded-xl">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold text-right">Cantidad</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold text-right">Costo unitario</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold text-right">Importe</th>
+            <th scope="col" class="px-3 py-2.5 font-semibold">Lotes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for detalle in movimiento.detalles.all %}
+          <tr class="align-top">
+            <td class="px-3 py-2.5 font-medium text-gray-800">{{ detalle.producto.nombre }}</td>
+            <td class="px-3 py-2.5 text-right">{{ detalle.cantidad }}</td>
+            <td class="px-3 py-2.5 text-right">{% if detalle.costo_unitario is not None %}${{ detalle.costo_unitario|moneda }}{% else %}<span class="text-xs text-gray-400">Al aplicar</span>{% endif %}</td>
+            <td class="px-3 py-2.5 text-right font-medium">{% if detalle.importe is not None %}${{ detalle.importe|moneda }}{% endif %}</td>
+            <td class="px-3 py-2.5">
+              {% if detalle.lotes.all %}
+              <div class="grid gap-1.5">
+                {% for ml in detalle.lotes.all %}
+                <div class="text-xs text-gray-500 border border-gray-100 rounded-lg px-2.5 py-1.5">
+                  <span class="text-gray-700 font-medium">{{ ml.cantidad }}</span>
+                  {% if movimiento.es_entrada %}en lote nuevo{% else %}de lote{% endif %}
+                  <span class="font-mono">{{ ml.lote.numero_lote|default:ml.lote.folio }}</span>
+                  {% if ml.lote_destino %}
+                  <span class="text-emerald-600">→ lote <span class="font-mono">{{ ml.lote_destino.numero_lote|default:ml.lote_destino.folio }}</span> en {{ movimiento.almacen_destino.nombre }}</span>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="text-xs text-gray-400">Sin aplicar (no ha afectado existencias)</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-3 py-8 text-center text-sm text-gray-400">Este movimiento no tiene productos.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:items-end gap-2 mt-6">
+  <a href="{% url 'inventario:movimiento-almacen-list' %}" class="btn-secondary">Volver</a>
+  {% if perms.inventario.change_movimientoalmacen and movimiento.estado != 'cancelado' %}
+  <form method="post" action="{% url 'inventario:movimiento-almacen-cancelar' movimiento.pk %}" class="flex flex-col sm:flex-row gap-2"
+        data-confirmar="{% if movimiento.estado == 'aplicado' %}Se registrará el movimiento contrario sobre los mismos lotes. ¿Cancelar {{ movimiento.folio }}?{% else %}¿Cancelar el borrador {{ movimiento.folio }}?{% endif %}">
+    {% csrf_token %}
+    <input type="text" name="motivo" maxlength="255" class="input sm:w-64" placeholder="Motivo de cancelación (opcional)">
+    <button type="submit" class="btn-secondary text-red-600">Cancelar movimiento</button>
+  </form>
+  {% endif %}
+  {% if perms.inventario.change_movimientoalmacen and movimiento.estado == 'borrador' %}
+  <a href="{% url 'inventario:movimiento-almacen-update' movimiento.pk %}" class="btn-secondary">Editar</a>
+  <form method="post" action="{% url 'inventario:movimiento-almacen-aplicar' movimiento.pk %}"
+        data-confirmar="Al aplicar se afectan las existencias de {{ movimiento.almacen.nombre }}. ¿Continuar?">
+    {% csrf_token %}
+    <button type="submit" class="btn-primary w-full">Aplicar</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock main_content %}

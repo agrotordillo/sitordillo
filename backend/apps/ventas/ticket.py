@@ -79,6 +79,9 @@ def construir_ticket(venta, empresa=None):
         partes.append(almacen.direccion + "\n")
     partes.append(almacen.nombre + "\n")
 
+    if venta.es_remision:
+        partes.append(_NEGRITA_ON + "NOTA DE REMISION (sin factura)" + "\n" + _NEGRITA_OFF)
+
     partes.append(_ALINEAR_IZQUIERDA)
     partes.append(separador)
     if venta.turno:
@@ -86,9 +89,9 @@ def construir_ticket(venta, empresa=None):
         partes.append(f"Turno: {venta.turno.fecha:%d/%m/%Y}  Apertura: {apertura_local:%H:%M}\n")
         partes.append(f"Punto de venta: {venta.turno.punto_venta.codigo} {venta.turno.punto_venta.nombre}\n")
         partes.append(f"Cajero: {_nombre_usuario(venta.turno.usuario)}\n")
-    cotizacion_origen = getattr(venta, "cotizacion_origen", None)
-    if cotizacion_origen and cotizacion_origen.created_by_id:
-        partes.append(f"Vendedor (mostrador): {_nombre_usuario(cotizacion_origen.created_by)}\n")
+    vendedor = venta.vendedor_mostrador
+    if vendedor:
+        partes.append(f"Vendedor (mostrador): {_nombre_usuario(vendedor)}\n")
     partes.append(separador)
     partes.append(f"Folio: {venta.folio}-{venta.veces_impreso}\n")
     fecha_local = timezone.localtime(venta.fecha_venta)

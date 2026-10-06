@@ -5,6 +5,7 @@ from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.views.generic import ListView
 
+from apps.core.parametros import filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
 from apps.products.models import Almacen, ProductoStockSucursal
@@ -56,9 +57,7 @@ class SurtimientoListView(PermissionRequiredMixin, ListView):
         if buscar:
             qs = qs.filter(Q(producto__nombre__icontains=buscar) | Q(producto__sku__icontains=buscar))
 
-        almacen_id = self.request.GET.get("almacen", "").strip()
-        if almacen_id:
-            qs = qs.filter(almacen_id=almacen_id)
+        qs = filtrar_por_id(qs, "almacen_id", self.request.GET.get("almacen"))
 
         return qs.order_by("almacen__nombre", "producto__nombre")
 

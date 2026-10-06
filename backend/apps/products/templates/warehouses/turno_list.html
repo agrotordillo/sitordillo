@@ -17,9 +17,9 @@
 <form method="post" action="{% url 'products:turno-abrir' %}" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
   {% csrf_token %}
   <select name="punto_venta" class="input w-full sm:w-auto" required>
-    <option value="">Selecciona la caja...</option>
+    <option value="">Selecciona el punto de venta...</option>
     {% for punto_venta in puntos_venta %}
-    <option value="{{ punto_venta.pk }}">{{ punto_venta.nombre }} · {{ punto_venta.almacen.nombre }}</option>
+    <option value="{{ punto_venta.pk }}">{{ punto_venta.nombre }} · {{ punto_venta.almacen.nombre }} ({% if punto_venta.tipo == "pedido" %}mostrador: cotizaciones y pedidos{% else %}caja: cobro{% endif %})</option>
     {% endfor %}
   </select>
   <button type="submit" class="btn-primary w-full sm:w-auto">Abrir turno</button>
@@ -44,7 +44,7 @@
       {% for turno in turnos %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ turno.folio }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ turno.punto_venta.nombre }} <span class="text-gray-400 font-normal">· {{ turno.almacen.nombre }}</span></td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ turno.punto_venta.nombre }} <span class="text-gray-400 font-normal">· {{ turno.almacen.nombre }} · {% if turno.punto_venta.tipo == "pedido" %}Mostrador{% else %}Caja{% endif %}</span></td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden sm:table-cell text-gray-500">{{ turno.usuario.get_full_name|default:turno.usuario.username }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_apertura|date:"d/m/Y H:i" }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 hidden md:table-cell text-gray-500">{{ turno.hora_cierre|date:"d/m/Y H:i"|default:"-" }}</td>
@@ -59,12 +59,19 @@
           </span>
           {% endif %}
         </td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
+          <a href="{% url 'products:turno-corte' turno.pk %}" class="text-sm text-gray-500 hover:text-gray-700 font-medium">Corte</a>
           {% if turno.esta_abierto %}
           <form method="post" action="{% url 'products:turno-cerrar' turno.pk %}" class="inline">
             {% csrf_token %}
             <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cerrar</button>
           </form>
+          {% elif turno.punto_venta.tipo == "cobro" %}
+            {% if turno.factura_global %}
+            <a href="{% url 'facturacion:factura-global-detalle' turno.factura_global.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Factura global</a>
+            {% else %}
+            <a href="{% url 'facturacion:factura-global-generar' turno.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Generar factura global</a>
+            {% endif %}
           {% endif %}
         </td>
       </tr>

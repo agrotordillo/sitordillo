@@ -101,3 +101,27 @@ class BaseAbstractModel(models.Model):
 
     def __str__(self):
         return f"{self.__class__.__name__} ({self.folio})"
+
+
+class EnvioUnico(models.Model):
+    """Token de un solo uso de un formulario que crea una operación (venta,
+    pago, recepción...). Se reserva en la misma transacción que guarda la
+    operación, así que un segundo envío del mismo formulario -doble clic,
+    recargar, dos pestañas-, aunque llegue al mismo tiempo, choca con la
+    llave primaria y no vuelve a guardar nada (ver apps.core.envio_unico).
+    Si el guardado falla, la reserva se revierte con él y el token sirve
+    para reintentar. Es un registro técnico: se depura con el comando
+    `depurar_envios_unicos`."""
+
+    token = models.UUIDField(primary_key=True)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    ruta = models.CharField(max_length=255)
+    url_resultado = models.CharField(max_length=500, blank=True)
+    creado = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Envío único de formulario"
+        verbose_name_plural = "Envíos únicos de formulario"
+
+    def __str__(self):
+        return f"{self.token} · {self.ruta}"

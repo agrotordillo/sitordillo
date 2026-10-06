@@ -2,11 +2,11 @@ from decimal import Decimal
 
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Count, Q
-from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import ListView
 
+from apps.core.parametros import fecha, filtrar_por_id, ids_validos
 from apps.fiscal.models import FormaPago
 from apps.pagos.models import Banco, ReciboPago
 
@@ -47,20 +47,18 @@ class ReciboPagoListView(PermissionRequiredMixin, ListView):
                 pagos__cuenta_por_pagar__orden_compra__documento__icontains=documento
             ).distinct()
 
-        fecha_desde = parse_date(self.request.GET.get("fecha_desde", ""))
+        fecha_desde = fecha(self.request.GET.get("fecha_desde"))
         if fecha_desde:
             queryset = queryset.filter(fecha_pago__gte=fecha_desde)
-        fecha_hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+        fecha_hasta = fecha(self.request.GET.get("fecha_hasta"))
         if fecha_hasta:
             queryset = queryset.filter(fecha_pago__lte=fecha_hasta)
 
         forma_pago_ids = [v for v in self.request.GET.getlist("forma_pago") if v.strip()]
         if forma_pago_ids:
-            queryset = queryset.filter(forma_pago_id__in=forma_pago_ids)
+            queryset = queryset.filter(forma_pago_id__in=ids_validos(forma_pago_ids))
 
-        banco_id = self.request.GET.get("banco", "").strip()
-        if banco_id:
-            queryset = queryset.filter(banco_id=banco_id)
+        queryset = filtrar_por_id(queryset, "banco_id", self.request.GET.get("banco"))
 
         if self.request.GET.get("solo_activos") == "1":
             # "Realmente ya pagado": ningún pago del recibo está Inactivo

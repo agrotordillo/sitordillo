@@ -38,12 +38,14 @@
         <td class="px-3 py-2 font-mono text-xs">{{ r.clave }}</td>
         <td class="px-3 py-2">{{ r.etiqueta }}</td>
         <td class="px-3 py-2 text-right">
+          {% if puede_agregar %}
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="clave" value="{{ r.clave }}">
             <input type="hidden" name="etiqueta" value="{{ r.etiqueta }}">
             <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Agregar</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

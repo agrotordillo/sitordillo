@@ -6,10 +6,10 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 
-from apps.core.scoping import almacenes_visibles
+from apps.core.envio_unico import EnvioDuplicado, EnvioUnicoMixin, reservar_envio, respuesta_envio_duplicado
 from apps.gastos.forms import GastoDistribucionFormSet, GastoForm
 from apps.gastos.models import Gasto
-from apps.gastos.services import validar_distribucion
+from apps.gastos.services import gastos_visibles, validar_centros_del_concepto, validar_distribucion
 
 
 class GastoListView(PermissionRequiredMixin, ListView):
@@ -21,17 +21,12 @@ class GastoListView(PermissionRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("centro_costo", "categoria", "proveedor", "vehiculo")
-        visibles = almacenes_visibles(self.request.user)
-        if visibles is not None:
-            # Excluye de paso los centros de costo sin almacén (proyectos,
-            # unidades de negocio, administración, personal): un usuario restringido a
-            # sucursal no debe ver ese gasto corporativo/personal.
-            queryset = queryset.filter(centro_costo__almacen__in=visibles)
-        return queryset
+        return gastos_visibles(self.request.user).select_related(
+            "centro_costo", "concepto_gasto", "proveedor", "vehiculo"
+        )
 
 
-class _GastoDistribucionFormValidMixin:
+class _GastoDistribucionFormValidMixin(EnvioUnicoMixin):
     """Comparte entre alta y edición de Gasto la lógica de validar/guardar
     el formset de distribución (`es_compartido`), incluida la limpieza de
     las distribuciones ya guardadas si, al editar, se desmarca
@@ -51,7 +46,7 @@ class _GastoDistribucionFormValidMixin:
                 "criterio": c.criterio,
                 "cuentaEnResultados": c.grupo.cuenta_en_resultados,
             }
-            for c in data["form"].fields["categoria"].queryset.select_related("grupo")
+            for c in data["form"].fields["concepto_gasto"].queryset.select_related("grupo")
         }
         if "formset" not in data:
             if self.request.method == "POST":
@@ -68,24 +63,31 @@ class _GastoDistribucionFormValidMixin:
             if not formset.is_valid():
                 return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
-            montos = [
-                cd["monto"]
-                for f in formset
+            filas = [
+                cd for f in formset
                 if (cd := f.cleaned_data) and cd.get("centro_costo") and not cd.get("DELETE")
             ]
-            errores = validar_distribucion(form.cleaned_data["importe"], montos)
+            errores = validar_distribucion(form.cleaned_data["importe"], [cd["monto"] for cd in filas])
+            errores += validar_centros_del_concepto(
+                form.cleaned_data.get("concepto_gasto"), [cd["centro_costo"] for cd in filas]
+            )
             if errores:
                 for error in errores:
                     form.add_error(None, error)
                 return self.render_to_response(self.get_context_data(form=form, formset=formset))
 
-        with transaction.atomic():
-            self.object = form.save()
-            if es_compartido:
-                formset.instance = self.object
-                formset.save()
-            elif self.object.pk and self.object.distribuciones.exists():
-                self.object.distribuciones.all().delete()
+        try:
+            with transaction.atomic():
+                envio = reservar_envio(self.request)
+                self.object = form.save()
+                if es_compartido:
+                    formset.instance = self.object
+                    formset.save()
+                elif self.object.pk and self.object.distribuciones.exists():
+                    self.object.distribuciones.all().delete()
+                envio.completar(self.get_success_url())
+        except EnvioDuplicado as duplicado:
+            return respuesta_envio_duplicado(self.request, duplicado.url_resultado, self.success_url)
 
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
@@ -118,6 +120,9 @@ class GastoUpdateView(_GastoDistribucionFormValidMixin, PermissionRequiredMixin,
     success_url = reverse_lazy("gastos:gasto-list")
     success_message = "Gasto actualizado correctamente."
     extra_context = {"active_module": "expenses"}
+
+    def get_queryset(self):
+        return gastos_visibles(self.request.user)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

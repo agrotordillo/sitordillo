@@ -1,8 +1,10 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 
+from apps.core.archivos import RutaAleatoria
 from apps.core.models import BaseAbstractModel
 
 
@@ -106,6 +108,12 @@ class GrupoGasto(BaseAbstractModel):
         help_text="Solo lo clasificado como Gasto de operación cuenta en el reporte de punto de equilibrio.",
     )
     orden = models.PositiveSmallIntegerField(default=0, verbose_name="Orden")
+    exclusivo_personal = models.BooleanField(
+        default=False,
+        verbose_name="Solo para centros de costo de tipo Personal",
+        help_text="Sus conceptos (p. ej. gastos médicos o colegiaturas de los dueños) no se pueden cargar a una "
+        "sucursal, proyecto o unidad de negocio.",
+    )
 
     class Meta:
         verbose_name = "Grupo de gasto"
@@ -130,14 +138,14 @@ class GrupoGasto(BaseAbstractModel):
         return self.clasificacion == self.Clasificacion.GASTO
 
 
-class CategoriaGasto(BaseAbstractModel):
+class ConceptoGasto(BaseAbstractModel):
     """Concepto de gasto: el nivel en el que se clasifica cada gasto
     capturado (Agua, Mantenimiento eléctrico, Peajes de caseta...). Viene
     del catálogo con guía contabilizadora que definió el negocio; cada
     concepto guarda la cuenta del plan de cuentas contable a la que se
     envía (varios conceptos pueden compartir cuenta) y la guía de qué sí y
-    qué no se registra en él, para mostrarla al capturar. En la interfaz se
-    llama "Concepto de gasto"; el modelo conserva su nombre original."""
+    qué no se registra en él, para mostrarla al capturar. Es catálogo de
+    contabilidad: lo mantiene el Administrador, quien captura solo lo usa."""
 
     class Naturaleza(models.TextChoices):
         FIJO = "fijo", "Fijo"
@@ -189,6 +197,20 @@ class CategoriaGasto(BaseAbstractModel):
     @property
     def display_name(self):
         return self.nombre.strip()
+
+    def admite_centro(self, centro_costo):
+        """Un concepto de un grupo exclusivo de gasto personal solo se carga
+        a centros de tipo Personal (ver GrupoGasto.exclusivo_personal): así
+        un gasto médico de los dueños no termina en el punto de equilibrio
+        de una sucursal."""
+        return not self.grupo.exclusivo_personal or centro_costo.tipo == CentroCosto.Tipo.PERSONAL
+
+
+def mensaje_solo_personal(concepto):
+    return (
+        f"«{concepto.nombre}» es un gasto personal de los dueños: solo se carga a un centro de costo de tipo "
+        "Personal."
+    )
 
 
 class Vehiculo(BaseAbstractModel):
@@ -262,10 +284,11 @@ class Gasto(BaseAbstractModel):
         on_delete=models.PROTECT,
         related_name="gastos",
         verbose_name="Centro de costo de origen",
-        help_text="Quién generó/pagó el gasto. Si es compartido, aquí se registra el centro de origen (p. ej. Administración) y el detalle real por sucursal va en la distribución.",
+        help_text="Quién generó/pagó el gasto. Si es compartido, aquí se registra el centro de origen (p. ej. "
+        "Administración) y el detalle real por centro de costo va en la distribución.",
     )
-    categoria = models.ForeignKey(
-        CategoriaGasto,
+    concepto_gasto = models.ForeignKey(
+        ConceptoGasto,
         on_delete=models.PROTECT,
         related_name="gastos",
         verbose_name="Concepto de gasto",
@@ -297,7 +320,11 @@ class Gasto(BaseAbstractModel):
         help_text="Obligatorio cuando el centro de costo es de tipo Sucursal: el turno abierto de esa sucursal en "
         "el que se aplicó el gasto.",
     )
-    concepto = models.CharField(max_length=255, verbose_name="Concepto")
+    descripcion = models.CharField(
+        max_length=255,
+        verbose_name="Descripción del gasto",
+        help_text="Lo que dice el vale (p. ej. \"Pago de recibo de luz de Lerdo, bimestre 4\").",
+    )
     referencia = models.CharField(
         max_length=100,
         blank=True,
@@ -329,7 +356,7 @@ class Gasto(BaseAbstractModel):
         help_text="Folio o UUID fiscal, cuando el gasto está facturado.",
     )
     comprobante = models.FileField(
-        upload_to="gastos/comprobantes/",
+        upload_to=RutaAleatoria("gastos/comprobantes"),
         null=True,
         blank=True,
         verbose_name="Comprobante",
@@ -351,14 +378,14 @@ class Gasto(BaseAbstractModel):
         ]
         indexes = [
             models.Index(fields=["centro_costo"]),
-            models.Index(fields=["categoria"]),
+            models.Index(fields=["concepto_gasto"]),
             models.Index(fields=["fecha"]),
             models.Index(fields=["turno"]),
             models.Index(fields=["condicion"]),
         ]
 
     def __str__(self):
-        return f"{self.folio} · {self.concepto}"
+        return f"{self.folio} · {self.descripcion}"
 
     def get_folio_prefix(self):
         return "GTO"
@@ -413,6 +440,14 @@ class Gasto(BaseAbstractModel):
                 raise ValidationError({"turno": "El turno elegido no corresponde a la sucursal de este gasto."})
         elif self.turno_id:
             raise ValidationError({"turno": "Solo aplica cuando el centro de costo es de tipo Sucursal."})
+        # Si es compartido, el centro de origen solo es quien pagó: el cargo
+        # real va en la distribución, que se valida aparte
+        # (services.validar_centros_del_concepto).
+        if (
+            self.concepto_gasto_id and self.centro_costo_id and not self.es_compartido
+            and not self.concepto_gasto.admite_centro(self.centro_costo)
+        ):
+            raise ValidationError({"centro_costo": mensaje_solo_personal(self.concepto_gasto)})
 
 
 class GastoDistribucion(BaseAbstractModel):
@@ -464,3 +499,73 @@ class GastoDistribucion(BaseAbstractModel):
         super().clean()
         if self.monto is not None and self.monto <= 0:
             raise ValidationError({"monto": "El monto asignado debe ser mayor a cero."})
+
+
+class BitacoraAccesoGastos(models.Model):
+    """Quién dio o quitó una capacidad de Gastos, a quién y cuándo. Gastos
+    es un módulo confidencial: ni el Administrador entra sin la capacidad
+    asignada, y solo puede asignarla quien ya la tiene (ver
+    apps.core.permissions), así que cada cambio queda registrado. No
+    hereda de BaseAbstractModel porque es un registro histórico, no un
+    catálogo: no se edita ni se desactiva."""
+
+    class Accion(models.TextChoices):
+        OTORGADA = "otorgada", "Otorgada"
+        RETIRADA = "retirada", "Retirada"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="bitacora_acceso_gastos",
+        verbose_name="Usuario",
+    )
+    grupo = models.ForeignKey(
+        "auth.Group",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="+",
+        verbose_name="Capacidad",
+    )
+    grupo_nombre = models.CharField(
+        max_length=150,
+        verbose_name="Nombre de la capacidad",
+        help_text="Copia del nombre al momento del cambio, por si el grupo se renombra o se borra.",
+    )
+    accion = models.CharField(max_length=10, choices=Accion.choices, verbose_name="Acción")
+    realizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Realizado por",
+        help_text="Vacío cuando el cambio se hizo desde el servidor (migración o comando), no desde el sistema.",
+    )
+    nota = models.CharField(max_length=255, blank=True, verbose_name="Nota")
+    fecha = models.DateTimeField(auto_now_add=True, verbose_name="Fecha")
+
+    class Meta:
+        verbose_name = "Registro de acceso a Gastos"
+        verbose_name_plural = "Bitácora de acceso a Gastos"
+        ordering = ["-fecha", "-pk"]
+        indexes = [
+            models.Index(fields=["usuario"]),
+            models.Index(fields=["fecha"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_accion_display()} {self.grupo_nombre} a {self.usuario}"
+
+    @classmethod
+    def registrar_cambios(cls, usuario, antes, despues, realizado_por=None, nota=""):
+        """Registra la diferencia entre las capacidades protegidas que
+        `usuario` tenía (`antes`) y las que quedó teniendo (`despues`)."""
+        antes, despues = set(antes), set(despues)
+        cls.objects.bulk_create(
+            [
+                cls(usuario=usuario, grupo=grupo, grupo_nombre=grupo.name, accion=accion,
+                    realizado_por=realizado_por, nota=nota)
+                for accion, grupos in ((cls.Accion.OTORGADA, despues - antes), (cls.Accion.RETIRADA, antes - despues))
+                for grupo in sorted(grupos, key=lambda g: g.name)
+            ]
+        )

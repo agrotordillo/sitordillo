@@ -1,0 +1,69 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% block title %}Bitácora de acceso a Gastos{% endblock title %}
+{% block title_layout %}Bitácora de acceso a Gastos{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'gastos:gasto-list' %}" class="text-gray-400 hover:text-primary-600">Gastos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Bitácora de acceso</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+<p class="px-4 sm:px-6 pt-4 text-xs text-gray-400">
+  Gastos es un módulo confidencial: nadie entra sin su capacidad asignada, ni siquiera un Administrador, y solo
+  puede darla quien ya la tiene. Aquí queda cada vez que se dio o se quitó.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Fecha</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Usuario</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Capacidad</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Acción</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Realizado por</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Nota</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for registro in registros %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 whitespace-nowrap">{{ registro.fecha|date:"d/m/Y H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ registro.usuario.get_username }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-600">{{ registro.grupo_nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4">
+          {% if registro.accion == "otorgada" %}
+          <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Otorgada</span>
+          {% else %}
+          <span class="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Retirada</span>
+          {% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">
+          {% if registro.realizado_por %}{{ registro.realizado_por.get_username }}{% else %}<span class="text-gray-400">Servidor</span>{% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ registro.nota|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-4 sm:px-6 py-12 text-center text-sm text-gray-400">Todavía no hay cambios de acceso registrados</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100 text-sm text-gray-500">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}" class="text-primary-600 hover:text-primary-700 font-medium">Anterior</a>
+  {% else %}<span></span>{% endif %}
+  <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}" class="text-primary-600 hover:text-primary-700 font-medium">Siguiente</a>
+  {% else %}<span></span>{% endif %}
+</div>
+{% endif %}
+{% endblock main_content %}

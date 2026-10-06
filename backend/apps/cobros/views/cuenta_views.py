@@ -4,10 +4,10 @@ from decimal import Decimal
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from apps.cobros.models import CuentaPorCobrar
+from apps.core.parametros import fecha
 
 
 class CuentaPorCobrarListView(PermissionRequiredMixin, ListView):
@@ -60,8 +60,8 @@ class CuentaPorCobrarListView(PermissionRequiredMixin, ListView):
             return desde, desde + timedelta(days=6)
 
         if periodo == "rango":
-            desde = parse_date(self.request.GET.get("fecha_desde", ""))
-            hasta = parse_date(self.request.GET.get("fecha_hasta", ""))
+            desde = fecha(self.request.GET.get("fecha_desde"))
+            hasta = fecha(self.request.GET.get("fecha_hasta"))
             return desde, hasta
 
         return None, None

@@ -7,6 +7,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, ListView, UpdateView
 
+from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.forms import ConversionForm, RecetaConversionForm
 from apps.inventario.models import Conversion, RecetaConversion
@@ -87,8 +88,9 @@ def crear_conversion_view(request):
                     fecha=form.cleaned_data["fecha"],
                     observaciones=form.cleaned_data["observaciones"],
                 )
-            except ValueError as e:
-                form.add_error(None, str(e))
+            except ERRORES_DE_NEGOCIO as e:
+                for mensaje in mensajes_de_error(e):
+                    form.add_error(None, mensaje)
             else:
                 messages.success(
                     request,

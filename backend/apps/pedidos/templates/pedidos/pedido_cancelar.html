@@ -1,0 +1,39 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Cancelar pedido{% endblock title %}
+{% block title_layout %}Cancelar pedido {{ pedido.numero_documento }}{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'pedidos:pedido-list' %}" class="text-gray-400 hover:text-primary-600">Pedidos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Cancelar {{ pedido.numero_documento }}</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block primary_container_class %}container-primary max-w-lg{% endblock primary_container_class %}
+{% block main_content %}
+<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-4">
+  Al cancelar el pedido de <strong>{{ pedido.cliente.display_name }}</strong>, la mercancía apartada regresa al inventario de {{ pedido.almacen.nombre }}. Esta acción no se puede deshacer.
+</div>
+
+<ul class="mb-4 divide-y divide-gray-100 rounded-lg border border-gray-100 text-sm text-gray-600">
+  {% for detalle in detalles %}
+  <li class="flex justify-between px-3 py-2"><span>{{ detalle.producto.nombre }}</span><span class="text-gray-400">x{{ detalle.cantidad }}</span></li>
+  {% endfor %}
+</ul>
+
+<form method="post" class="grid gap-4">
+  {% csrf_token %}
+  <div>
+    <label for="{{ form.motivo.id_for_label }}" class="label">{{ form.motivo.label }} <span class="text-gray-400 font-normal">(opcional)</span></label>
+    {{ form.motivo }}
+  </div>
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+    <a href="{% url 'pedidos:pedido-list' %}" class="btn-secondary">Regresar</a>
+    <button type="submit" class="btn-primary !bg-red-600 hover:!bg-red-700">Cancelar pedido</button>
+  </div>
+</form>
+{% endblock main_content %}

@@ -13,14 +13,20 @@
 {% endblock breadcrumbs %}
 {% block table_actions %}
 <a href="{% url 'gastos:reporte' %}" class="btn-secondary w-full sm:w-auto">Punto de equilibrio</a>
-<a href="{% url 'gastos:categoria-list' %}" class="btn-secondary w-full sm:w-auto">Conceptos</a>
+{% if perms.gastos.view_conceptogasto %}
+<a href="{% url 'gastos:concepto-list' %}" class="btn-secondary w-full sm:w-auto">Conceptos</a>
+{% endif %}
+{% if perms.gastos.view_centrocosto %}
 <a href="{% url 'gastos:centro-costo-list' %}" class="btn-secondary w-full sm:w-auto">Centros de costo</a>
+{% endif %}
+{% if perms.gastos.add_gasto %}
 <a href="{% url 'gastos:gasto-create' %}" class="btn-primary w-full sm:w-auto">
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
   </svg>
   Nuevo gasto
 </a>
+{% endif %}
 {% endblock table_actions %}
 {% block main_content %}
 <div class="relative overflow-x-auto">
@@ -45,7 +51,7 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.numero }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-400">{{ gasto.folio }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">
-          {{ gasto.concepto }}
+          {{ gasto.descripcion }}
           {% if gasto.es_compartido %}
           <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ms-1.5" title="Se distribuye entre varios centros de costo">
             Compartido
@@ -54,7 +60,7 @@
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.centro_costo.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">
-          {{ gasto.categoria.nombre }}
+          {{ gasto.concepto_gasto.nombre }}
           {% if gasto.vehiculo %}<p class="text-xs text-gray-400">{{ gasto.vehiculo.nombre }}</p>{% endif %}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">{{ gasto.responsable|default:"—" }}</td>
@@ -75,8 +81,14 @@
           </span>
           {% endif %}
         </td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right whitespace-nowrap">
+          {# La descarga pasa por la revisión de permiso y sucursal (ver gastos.apps). #}
+          {% if gasto.comprobante %}
+          <a href="{{ gasto.comprobante.url }}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium mr-3">Comprobante</a>
+          {% endif %}
+          {% if perms.gastos.change_gasto %}
           <a href="{% url 'gastos:gasto-update' gasto.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
@@ -84,7 +96,9 @@
         <td colspan="10" class="px-4 sm:px-6 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
             <p class="text-sm text-gray-400">No hay gastos registrados</p>
+            {% if perms.gastos.add_gasto %}
             <a href="{% url 'gastos:gasto-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Registrar el primero</a>
+            {% endif %}
           </div>
         </td>
       </tr>

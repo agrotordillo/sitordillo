@@ -4,9 +4,9 @@
     {% include "products/includes/_producto_search_field.html" %}
     {% if form.instance.pk and form.instance.cantidad_recibida > 0 %}
     <p class="mt-1 text-xs text-amber-600">
-      ⚠ Ya se recibieron {{ form.instance.cantidad_recibida }} de esta línea. Cambiar producto, cantidad o
-      precio aquí no ajusta el inventario ya registrado (lotes/movimientos); si te equivocaste de producto,
-      corrige el inventario aparte.
+      ⚠ Ya se recibieron {{ form.instance.cantidad_recibida }} de esta línea: el producto no se puede cambiar,
+      la línea no se puede quitar y la cantidad no puede quedar por debajo de lo recibido. Si llegó otro
+      producto, corrígelo en Lotes con "Corregir"; si llegó dañada, con "Reportar merma".
     </p>
     {% endif %}
     {% if form.instance.pk and form.instance.cantidad_merma > 0 %}
@@ -24,15 +24,19 @@
     {% if form.precio_unitario.errors %}<p class="mt-1 text-xs text-red-600">{{ form.precio_unitario.errors.0 }}</p>{% endif %}
     <p class="fs-precio-neto mt-1 text-xs text-gray-400"></p>
     <p class="promo-hint hidden mt-1 text-xs text-emerald-600"></p>
+    {% if perms.products.change_producto %}
     <button type="button" class="actualizar-costo-btn hidden mt-1 text-xs font-medium text-primary-600 hover:text-primary-700" data-url="{% url 'api:producto-actualizar-costo' %}">Actualizar precio de costo</button>
+    {% endif %}
   </td>
   <td class="px-3 py-2 w-28 text-right font-medium text-gray-700 fs-row-total">0.00</td>
   <td class="px-3 py-2 w-12 text-right">
     <div class="hidden">{{ form.DELETE }}</div>
+    {% if not form.recibida %}
     <button type="button" class="btn-icon-outline" @click="removeRow($event.currentTarget)" aria-label="Quitar línea" title="Quitar línea">
       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
       </svg>
     </button>
+    {% endif %}
   </td>
 </tr>

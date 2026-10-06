@@ -190,6 +190,18 @@ class OrdenCompra(BaseAbstractModel):
         verbose_name="Descuento proveedor (%)",
         help_text="Descuento general que el proveedor aplica sobre el subtotal de la orden.",
     )
+    descuento_base_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        editable=False,
+        verbose_name="Descuento base del proveedor (%)",
+        help_text=(
+            "El % base del proveedor (Proveedor.descuento) congelado al registrar la orden -o al cambiarle "
+            "el proveedor-, para que editar después el descuento del proveedor no reescriba órdenes ya "
+            "capturadas. Siempre 0 en una orden cargada desde un CFDI: su precio ya viene neto."
+        ),
+    )
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IVA")
     ieps = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="IEPS")
     flete = models.DecimalField(
@@ -220,6 +232,10 @@ class OrdenCompra(BaseAbstractModel):
             models.CheckConstraint(
                 condition=models.Q(descuento_pct__gte=0) & models.Q(descuento_pct__lte=100),
                 name="oc_descuento_pct_rango_valido",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(descuento_base_pct__gte=0) & models.Q(descuento_base_pct__lte=100),
+                name="oc_descuento_base_pct_rango_valido",
             ),
             models.CheckConstraint(condition=models.Q(iva__gte=0), name="oc_iva_no_negativo"),
             models.CheckConstraint(condition=models.Q(ieps__gte=0), name="oc_ieps_no_negativo"),
@@ -254,13 +270,13 @@ class OrdenCompra(BaseAbstractModel):
     @property
     def descuento_pct_total(self):
         """% combinado que realmente se descuenta del subtotal: el % base
-        del proveedor (Proveedor.descuento, siempre el mismo) más el %
-        adicional capturado en esta orden (descuento_pct, variable según
-        consumo/negociación de esa compra en particular — 0 si no aplica).
-        No hay que sumarlos a mano al capturar: descuento_pct es solo el
-        adicional, el base se suma aquí automáticamente."""
-        base = self.proveedor.descuento if self.proveedor_id else Decimal("0.00")
-        return base + (self.descuento_pct or Decimal("0.00"))
+        del proveedor congelado en esta orden (descuento_base_pct, ver
+        _descuento_base_vigente) más el % adicional capturado en ella
+        (descuento_pct, variable según consumo/negociación de esa compra en
+        particular — 0 si no aplica). No hay que sumarlos a mano al
+        capturar: descuento_pct es solo el adicional, el base se suma aquí
+        automáticamente."""
+        return (self.descuento_base_pct or Decimal("0.00")) + (self.descuento_pct or Decimal("0.00"))
 
     @property
     def descuento_monto(self):
@@ -278,6 +294,65 @@ class OrdenCompra(BaseAbstractModel):
     @property
     def total(self):
         return self.subtotal - self.descuento_monto + self.iva + self.ieps - self.retencion_iva - self.retencion_isr
+
+    def _descuento_base_vigente(self):
+        """El % base que le corresponde a esta orden en este momento: el
+        actual de su proveedor, salvo en una orden cargada desde un CFDI
+        (ver apps.compras.services.importar_cfdi_compra), cuyo precio ya
+        viene neto línea por línea y no admite ningún descuento base."""
+        if self.cfdi_uuid or not self.proveedor_id:
+            return Decimal("0.00")
+        return self.proveedor.descuento
+
+    def _debe_congelar_descuento_base(self, update_fields):
+        """Se congela al registrar la orden y cada vez que le cambian el
+        proveedor; en cualquier otra edición se respeta el ya guardado."""
+        if self._state.adding:
+            return True
+        if update_fields is not None and "proveedor" not in update_fields:
+            return False
+        proveedor_guardado = (
+            OrdenCompra.objects.filter(pk=self.pk).values_list("proveedor_id", flat=True).first()
+        )
+        return proveedor_guardado != self.proveedor_id
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self._debe_congelar_descuento_base(update_fields):
+            self.descuento_base_pct = self._descuento_base_vigente()
+            if update_fields is not None and "descuento_base_pct" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "descuento_base_pct"]
+        super().save(*args, **kwargs)
+
+    @property
+    def admite_recepcion(self):
+        """Solo se recibe mercancía de una orden ya Enviada al proveedor (o
+        con algo recibido): un borrador todavía puede cambiar de proveedor,
+        productos y cantidades, y una cancelada ya no aplica (B23 en
+        docs/AUDITORIA.md). Que quede algo pendiente se revisa aparte."""
+        return self.estatus in (self.Estatus.ENVIADA, self.Estatus.PARCIAL, self.Estatus.RECIBIDA)
+
+    def actualizar_estatus_por_recepcion(self):
+        """Recibida si todas sus líneas ya llegaron completas; Parcial si al
+        menos una tiene algo recibido; Enviada si ya no tiene nada recibido
+        pero lo tuvo (una corrección se lo quitó todo); si no, se queda como
+        estaba. Una orden cancelada nunca cambia por aquí. Úsese después de
+        cualquier cambio a cantidad_recibida o a la cantidad pedida de una
+        orden con recepciones (recepción, corrección, edición)."""
+        if self.estatus == self.Estatus.CANCELADA:
+            return
+        detalles = list(self.detalles.all())
+        if detalles and all(d.cantidad_recibida >= d.cantidad for d in detalles):
+            nuevo = self.Estatus.RECIBIDA
+        elif any(d.cantidad_recibida > 0 for d in detalles):
+            nuevo = self.Estatus.PARCIAL
+        elif self.estatus in (self.Estatus.PARCIAL, self.Estatus.RECIBIDA):
+            nuevo = self.Estatus.ENVIADA
+        else:
+            return
+        if nuevo != self.estatus:
+            self.estatus = nuevo
+            self.save(update_fields=["estatus", "updated_at", "updated_by"])
 
     def clean(self):
         super().clean()
@@ -377,9 +452,10 @@ class OrdenCompraDetalle(BaseAbstractModel):
     def precio_neto(self):
         """Precio de referencia para costeo: precio_unitario (capturado tal
         cual viene en la factura, bruto) menos SOLO el % de descuento base
-        del proveedor (Proveedor.descuento) — nunca el % combinado de la
-        orden (OrdenCompra.descuento_pct, que puede traer un adicional
-        variable según consumo/negociación de esa compra).
+        del proveedor congelado en la orden (OrdenCompra.descuento_base_pct)
+        — nunca el % combinado de la orden (OrdenCompra.descuento_pct, que
+        puede traer un adicional variable según consumo/negociación de esa
+        compra).
 
         El adicional variable sí reduce lo que se paga en la orden (ver
         OrdenCompra.descuento_monto/total), pero no debe mover el costo de
@@ -393,15 +469,11 @@ class OrdenCompraDetalle(BaseAbstractModel):
         precio = self.precio_unitario or Decimal("0.00")
         if not self.orden_compra_id:
             return precio
-        orden = self.orden_compra
-        if orden.cfdi_uuid:
-            # Órdenes cargadas desde el XML del CFDI (ver
-            # apps.compras.services.importar_cfdi_compra) ya guardan aquí el
-            # precio real neto, calculado línea por línea con el
-            # Importe/Descuento que declara la factura — no hay nada más
-            # que restarle, y hacerlo lo descontaría dos veces.
-            return precio
-        pct = orden.proveedor.descuento
+        # En una orden cargada desde el XML del CFDI (ver
+        # apps.compras.services.importar_cfdi_compra) el base congelado es 0:
+        # el precio ya viene neto línea por línea con el Importe/Descuento
+        # que declara la factura, y restarle algo lo descontaría dos veces.
+        pct = self.orden_compra.descuento_base_pct
         if not pct:
             return precio
         neto = precio * (Decimal("1") - pct / Decimal("100"))

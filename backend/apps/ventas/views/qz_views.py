@@ -17,30 +17,42 @@ necesite, nunca se regeneran por separado.
 """
 
 import base64
+import re
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import permission_required
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 
 _QZ_DIR = settings.BASE_DIR / ".env" / "qz"
 _CERT_PATH = _QZ_DIR / "qz-certificate.pem"
 _PRIVATE_KEY_PATH = _QZ_DIR / "qz-private-key.pem"
 
+# QZ Tray (2.1 en adelante, el proyecto usa 2.2.6) no pide firmar la
+# solicitud en sí sino su hash SHA-256 en hexadecimal. Solo se firma algo
+# con esa forma (B32 en docs/AUDITORIA.md): la llave del servidor no debe
+# servir para firmar cualquier texto que alguien mande.
+_HASH_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
-@login_required
+# Mismo permiso que la pantalla del ticket, que es la única que imprime.
+PERMISO_IMPRIMIR_TICKET = "ventas.view_venta"
+
+
+@permission_required(PERMISO_IMPRIMIR_TICKET, raise_exception=True)
 def qz_certificado_view(request):
     if not _CERT_PATH.exists():
         return HttpResponseNotFound("No está configurado el certificado de QZ Tray.")
     return HttpResponse(_CERT_PATH.read_text(), content_type="text/plain")
 
 
-@login_required
+@permission_required(PERMISO_IMPRIMIR_TICKET, raise_exception=True)
 def qz_firmar_view(request):
     mensaje = request.GET.get("request", "")
     if not mensaje:
         return HttpResponseBadRequest("Falta el parámetro 'request'.")
+    if not _HASH_SHA256_HEX.fullmatch(mensaje):
+        return HttpResponseBadRequest("Solo se firman solicitudes de QZ Tray.")
     if not _PRIVATE_KEY_PATH.exists():
         return HttpResponseNotFound("No está configurada la llave privada de QZ Tray.")
 
