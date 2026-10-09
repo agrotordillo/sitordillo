@@ -19,7 +19,7 @@
   el inventario se descuenta de cada componente (FIFO/FEFO), no del paquete en sí.
 </p>
 
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_componentes-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_componentes-TOTAL_FORMS' })">
   {% csrf_token %}
   {{ formset.management_form }}
   {% if formset.non_form_errors %}

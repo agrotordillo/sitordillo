@@ -90,7 +90,7 @@
   Esta cuenta por pagar ya no tiene saldo pendiente. Aquí puedes consultar sus pagos y reenviar el comprobante.
 </div>
 {% else %}
-<form method="post" enctype="multipart/form-data">
+<form data-borrador method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {% token_envio %}
   {% if form.non_field_errors %}

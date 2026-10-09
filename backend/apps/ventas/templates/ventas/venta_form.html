@@ -25,7 +25,7 @@
   </form>
 </div>
 
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
   {% token_envio %}
 

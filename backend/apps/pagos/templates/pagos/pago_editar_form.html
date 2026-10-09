@@ -25,7 +25,7 @@
   de crédito que faltaba aplicar). No se elimina el pago, solo se ajusta.
 </div>
 
-<form method="post" enctype="multipart/form-data">
+<form data-borrador method="post" enctype="multipart/form-data">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next_url }}">
   {% if form.non_field_errors %}

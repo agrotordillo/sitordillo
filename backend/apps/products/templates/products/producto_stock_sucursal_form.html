@@ -21,7 +21,7 @@
   No hace falta capturarlo para todos los productos, solo los que quieras monitorear.
 </p>
 
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_stock-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_stock-TOTAL_FORMS' })">
   {% csrf_token %}
   {{ formset.management_form }}
   {% if formset.non_form_errors %}

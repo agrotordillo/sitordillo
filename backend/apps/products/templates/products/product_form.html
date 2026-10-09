@@ -15,7 +15,7 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
-<form method="post"
+<form data-borrador method="post"
       {% if object %}data-costo-original="{{ object.precio_costo|stringformat:'f' }}"{% endif %}
       x-data="dependentSelect({
         parent: '#id_categoria',

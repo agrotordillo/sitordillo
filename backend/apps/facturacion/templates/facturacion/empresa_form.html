@@ -12,7 +12,7 @@
 {% endblock breadcrumbs %}
 {% block main_content %}
 <p class="text-sm text-gray-500 mb-4">Estos son los datos fiscales que se usan como Emisor en cada CFDI.</p>
-<form method="post">
+<form data-borrador method="post">
   {% csrf_token %}
   {% if form.non_field_errors %}
   <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

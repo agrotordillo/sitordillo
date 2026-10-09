@@ -16,7 +16,7 @@
 {% block main_content %}
 <p class="text-sm text-gray-500 mb-4">Proveedor: <span class="font-medium text-gray-700">{{ orden.proveedor.display_name }}</span></p>
 
-<form method="post">
+<form data-borrador method="post">
   {% csrf_token %}
   {% token_envio %}
   {{ formset.management_form }}

@@ -19,7 +19,7 @@
   Datos traídos de la cotización <strong>{{ cotizacion.numero_documento }}</strong> ({{ cotizacion.cliente.display_name }}). Puedes editarlos antes de confirmar la venta.
 </div>
 
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
   {% token_envio %}
 

@@ -23,6 +23,8 @@ document.addEventListener("alpine:init", () => {
       this._rows = this.$refs.rows;
       this._emptyTemplate = this.$refs.emptyRow;
       this._totalFormsInput = document.querySelector(config.totalFormsSelector);
+      // Para recuperar un borrador con renglones agregados (borrador-formulario.js).
+      if (this._totalFormsInput) this._totalFormsInput.agregarRenglon = () => this.addRow();
       this._importeInput = document.querySelector(config.importeSelector);
       this._compartidoInput = document.querySelector(config.compartidoSelector);
 

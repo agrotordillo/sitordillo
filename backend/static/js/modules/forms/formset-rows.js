@@ -8,6 +8,8 @@ document.addEventListener("alpine:init", () => {
       this._rows = this.$refs.rows;
       this._emptyTemplate = this.$refs.emptyRow;
       this._totalFormsInput = document.querySelector(config.totalFormsSelector);
+      // Para recuperar un borrador con renglones agregados (borrador-formulario.js).
+      if (this._totalFormsInput) this._totalFormsInput.agregarRenglon = () => this.addRow();
 
       this._rows.querySelectorAll(".formset-row").forEach((row) => this._bindRow(row));
       document.querySelectorAll(".fs-impuesto-suma, .fs-impuesto-resta, .fs-descuento-general").forEach((el) => {

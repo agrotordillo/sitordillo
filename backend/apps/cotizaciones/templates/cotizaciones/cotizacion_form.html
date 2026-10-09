@@ -14,7 +14,7 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block main_content %}
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
 
   {% if form.non_field_errors %}

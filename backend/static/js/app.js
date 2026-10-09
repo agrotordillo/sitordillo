@@ -6,6 +6,8 @@ import * as sidebar from "./modules/ui/sidebar.js";
 // deshabilitar los botones.
 import "./modules/ui/acciones.js";
 import "./modules/ui/envio-unico.js";
+// Borradores de formularios de captura (form[data-borrador]).
+import "./modules/forms/borrador-formulario.js";
 
 const isDev = window.location.hostname === "localhost";
 

@@ -46,7 +46,7 @@
 </div>
 
 {# La sugerencia de IVA/IEPS sigue a la cantidad hasta que se edita a mano (ver ReportarMermaForm). #}
-<form method="post" x-data="{
+<form data-borrador method="post" x-data="{
   cantidad: '{{ form.cantidad.value|default_if_none:''|escapejs }}',
   iva: '{{ form.iva.value|default_if_none:''|escapejs }}',
   ieps: '{{ form.ieps.value|default_if_none:''|escapejs }}',

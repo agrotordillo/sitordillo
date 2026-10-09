@@ -20,7 +20,7 @@
   prioridad sobre el general de la misma lista). El precio se captura con impuesto incluido.
 </p>
 
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_precios-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_precios-TOTAL_FORMS' })">
   {% csrf_token %}
   {{ formset.management_form }}
   {% if formset.non_form_errors %}

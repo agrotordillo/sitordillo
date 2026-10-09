@@ -20,7 +20,7 @@
   <p class="text-xs text-gray-400">El monto a aplicar de cada cuenta viene precargado con su saldo pendiente (liquidación total). Puedes editarlo si solo quieres abonar una parte.</p>
 </div>
 
-<form method="post" action="{% url 'pagos:pago-multiple-registrar' %}" enctype="multipart/form-data">
+<form data-borrador method="post" action="{% url 'pagos:pago-multiple-registrar' %}" enctype="multipart/form-data">
   {% csrf_token %}
   {% token_envio %}
   {% for cuenta in cuentas %}<input type="hidden" name="cuenta_ids" value="{{ cuenta.pk }}">{% endfor %}

@@ -18,7 +18,7 @@
   Pedido <strong>{{ pedido.numero_documento }}</strong> ({{ pedido.cliente.display_name }}). La mercancía ya está apartada; se cobra tal cual, sin agregar ni quitar productos. Si el cliente quiere cambiar algo, cancela el pedido y levanta uno nuevo.
 </div>
 
-<form method="post">
+<form data-borrador method="post">
   {% csrf_token %}
   {% token_envio %}
 

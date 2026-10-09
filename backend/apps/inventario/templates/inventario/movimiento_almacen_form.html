@@ -17,7 +17,7 @@
 {{ conceptos_con_proveedor|json_script:"conceptos-con-proveedor" }}
 {# El valor enviado nunca se pega dentro del código de x-data (B32): llega como JSON. #}
 {{ form.concepto.value|default:""|json_script:"concepto-inicial" }}
-<form method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
+<form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_detalles-TOTAL_FORMS' })">
   {% csrf_token %}
 
   {% if form.non_field_errors %}
