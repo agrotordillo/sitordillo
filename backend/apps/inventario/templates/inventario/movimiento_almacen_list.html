@@ -67,7 +67,7 @@
     </select>
   </div>
   <div class="sm:col-span-2 flex gap-2 sm:justify-end">
-    <a href="{% url 'inventario:movimiento-almacen-list' %}" class="btn-secondary flex-1 sm:flex-none">Limpiar</a>
+    <a href="{% url 'inventario:movimiento-almacen-list' %}?limpiar_filtros=1" class="btn-secondary flex-1 sm:flex-none">Limpiar</a>
     <button type="submit" class="btn-primary flex-1 sm:flex-none">Buscar</button>
   </div>
 </form>

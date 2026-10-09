@@ -641,3 +641,45 @@ class EstaticosDeProduccionTests(TestCase):
                 self.assertFalse(Path(destino, "src", "input.css").exists())
         finally:
             shutil.rmtree(destino, ignore_errors=True)
+
+
+class FiltrosRecordadosTests(TestCase):
+    """Decisión del usuario: los filtros de un listado se conservan al volver
+    a la pantalla (apps.core.filtros_recordados)."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser(username="admin", password="S3guridad!2026"))
+        self.url = reverse("products:product-list")
+
+    def test_volver_sin_filtros_reaplica_los_ultimos_y_avisa(self):
+        self.client.get(self.url, {"q": "croqueta", "marca": "", "page": "3"})
+
+        respuesta = self.client.get(self.url)
+        self.assertRedirects(respuesta, f"{self.url}?q=croqueta", fetch_redirect_response=False)
+
+        restaurada = self.client.get(f"{self.url}?q=croqueta")
+        self.assertContains(restaurada, "Se aplicaron los filtros que usaste la última vez.")
+        self.assertContains(restaurada, f"{self.url}?limpiar_filtros=1")
+        # El aviso solo sale en la vuelta que restauró los filtros.
+        self.assertNotContains(self.client.get(f"{self.url}?q=croqueta"), "Se aplicaron los filtros")
+
+    def test_limpiar_filtros_los_borra(self):
+        self.client.get(self.url, {"q": "croqueta"})
+        respuesta = self.client.get(self.url, {"limpiar_filtros": "1"})
+        self.assertRedirects(respuesta, self.url, fetch_redirect_response=False)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_enviar_el_formulario_vacio_tambien_limpia(self):
+        self.client.get(self.url, {"q": "croqueta"})
+        self.client.get(self.url, {"q": "", "marca": ""})
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_cada_pantalla_guarda_sus_propios_filtros(self):
+        self.client.get(self.url, {"q": "croqueta"})
+        url_proveedores = reverse("proveedores:supplier-list")
+        self.assertEqual(self.client.get(url_proveedores).status_code, 200)
+
+    def test_ventas_no_recuerda_el_dia_para_abrir_siempre_en_hoy(self):
+        url = reverse("ventas:venta-list")
+        self.client.get(url, {"fecha": "2026-01-15"})
+        self.assertEqual(self.client.get(url).status_code, 200)

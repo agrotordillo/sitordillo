@@ -78,6 +78,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.core.middleware.CurrentUserMiddleware',
     'apps.accounts.middleware.LoginRequiredMiddleware',
+    'apps.core.filtros_recordados.FiltrosRecordadosMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'apps.core.middleware.PermisoDenegadoMiddleware',
 

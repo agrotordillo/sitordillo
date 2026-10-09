@@ -1,0 +1,10 @@
+{% comment %}
+Aviso cuando la pantalla se abrió con los últimos filtros guardados del
+usuario (ver apps.core.filtros_recordados).
+{% endcomment %}
+{% if request.filtros_restaurados %}
+<div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-primary-100 bg-primary-50 px-4 py-2.5 text-sm text-primary-800">
+  <span>Se aplicaron los filtros que usaste la última vez.</span>
+  <a href="{{ request.path }}?limpiar_filtros=1" class="font-medium underline hover:text-primary-900">Limpiar filtros</a>
+</div>
+{% endif %}

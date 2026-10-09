@@ -20,7 +20,7 @@
       </svg>
     </button>
     {% if q %}
-    <a href="{% url 'clientes:cliente-list' %}" class="btn-icon-outline" aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
+    <a href="{% url 'clientes:cliente-list' %}?limpiar_filtros=1" class="btn-icon-outline" aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
         <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
       </svg>
@@ -96,7 +96,7 @@
             </svg>
             {% if q %}
             <p class="text-sm text-gray-400">No hay clientes que coincidan con "{{ q }}"</p>
-            <a href="{% url 'clientes:cliente-list' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar búsqueda</a>
+            <a href="{% url 'clientes:cliente-list' %}?limpiar_filtros=1" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Limpiar búsqueda</a>
             {% else %}
             <p class="text-sm text-gray-400">No hay clientes registrados</p>
             <a href="{% url 'clientes:cliente-create' %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Crear el primero</a>
