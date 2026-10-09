@@ -5,7 +5,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from apps.core.forms import BaseModelForm
 from .models import (
     Producto, Categoria, Subcategoria, Marca, Linea, Clase, Almacen, PaqueteComponente,
-    PRECIO_POSICIONES, PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
+    ALMACEN_CEDIS, PRECIO_POSICIONES, PuntoVenta, UnidadMedida, ProductoPrecio, ProductoStockSucursal,
 )
 
 
@@ -208,6 +208,8 @@ class ProductoPrecioBaseFormSet(BaseInlineFormSet):
             condicion = {"lista_precio__nombre": nombre_lista}
             if nombre_almacen is None:
                 condicion["almacen__isnull"] = True
+            elif nombre_almacen == ALMACEN_CEDIS:
+                condicion["almacen__tipo"] = Almacen.Tipo.CEDIS
             else:
                 condicion["almacen__nombre"] = nombre_almacen
             whens.append(When(**condicion, then=Value(posicion)))

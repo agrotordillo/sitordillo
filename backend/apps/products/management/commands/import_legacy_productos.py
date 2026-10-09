@@ -26,7 +26,8 @@ migración de datos de apps.products):
       1 PUBLICO (general), 2 MEDIO MAYOREO (general), 3 MAYOREO (general),
       4 SUB DISTRIBUIDOR (general), 5 PROMOCION (general),
       6 PUBLICO override IQUINUAPA, 7 PUBLICO override HUIMANGUILLO,
-      8 PUBLICO override BODEGA SUR (CEDIS), 9 MAYOREO override BODEGA SUR,
+      8 PUBLICO override CEDIS, 9 MAYOREO override CEDIS (el almacén de tipo
+        CEDIS, que en el legado se llamaba BODEGA SUR -ver ALMACEN_CEDIS-),
       10 (N/A) se descarta.
   - clave_prod_serv_sat / clave_unidad_sat se dejan sin asignar: el catálogo
     oficial del SAT (fiscal.ClaveProdServSAT / ClaveUnidadSAT) todavía está
@@ -62,6 +63,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.products.models import (
+    ALMACEN_CEDIS,
     Almacen,
     Categoria,
     Clase,
@@ -318,14 +320,20 @@ class Command(BaseCommand):
         )
         if created:
             stats["almacenes_creados"] += 1
-        bodega_sur = Almacen.objects.filter(nombre__iexact="BODEGA SUR").first()
-        if bodega_sur is None:
-            raise CommandError("No encuentro el almacén 'BODEGA SUR' (tipo CEDIS); revisa el catálogo Almacen.")
+        # Las posiciones 8 y 9 del legado son del CEDIS: se busca por tipo,
+        # no por nombre (antes se llamaba "BODEGA SUR" y hoy ese nombre es
+        # de una sucursal distinta, ver apps.products.models.ALMACEN_CEDIS).
+        cedis = list(Almacen.objects.filter(tipo=Almacen.Tipo.CEDIS)[:2])
+        if len(cedis) != 1:
+            raise CommandError(
+                "Se espera exactamente un almacén de tipo CEDIS para los precios de CEDIS del sistema "
+                f"anterior y hay {len(cedis)}; revisa el catálogo Almacen."
+            )
 
         almacen_por_nombre = {
             "IQUINUAPA": iquinuapa,
             "HUIMANGUILLO": huimanguillo,
-            "BODEGA SUR": bodega_sur,
+            ALMACEN_CEDIS: cedis[0],
         }
 
         # --- ListaPrecio ---

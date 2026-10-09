@@ -488,6 +488,13 @@ class ListaPrecio(BaseAbstractModel):
 # pantalla de Precios de un producto igual que se veía en el sistema
 # anterior, en vez de un orden arbitrario cuando dos filas comparten la
 # misma lista de precios).
+#
+# Las posiciones 8 y 9 (en el sistema anterior "CEDIS" y "MAYOREO
+# BODEGA") son del almacén CEDIS, que se identifica por su tipo y no por
+# su nombre (ALMACEN_CEDIS): se llamaba "BODEGA SUR", se renombró a
+# "CEDIS BODEGA SUR" y luego se dio de alta una sucursal nueva llamada
+# "BODEGA SUR", así que buscarlo por nombre apuntaba a la sucursal.
+ALMACEN_CEDIS = "CEDIS"
 LISTA_PRECIO_NOMBRES_GENERALES = ["PUBLICO", "MEDIO MAYOREO", "MAYOREO", "SUB DISTRIBUIDOR", "PROMOCION"]
 PRECIO_POSICIONES = [
     (1, "PUBLICO", None),
@@ -497,8 +504,8 @@ PRECIO_POSICIONES = [
     (5, "PROMOCION", None),
     (6, "PUBLICO", "IQUINUAPA"),
     (7, "PUBLICO", "HUIMANGUILLO"),
-    (8, "PUBLICO", "BODEGA SUR"),
-    (9, "MAYOREO", "BODEGA SUR"),
+    (8, "PUBLICO", ALMACEN_CEDIS),
+    (9, "MAYOREO", ALMACEN_CEDIS),
 ]
 
 

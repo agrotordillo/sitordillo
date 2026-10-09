@@ -197,3 +197,46 @@ class ConfirmarActualizarPreciosListaTests(TestCase):
         self.assertEqual(respuesta.status_code, 302)
         self.producto.refresh_from_db()
         self.assertEqual(self.producto.precio_venta, Decimal("175.00"))
+
+
+class OrdenListaPreciosTests(TestCase):
+    """La pantalla de Precios de un producto siempre muestra las listas en el
+    orden del sistema anterior: las 5 generales, Público Iquinuapa, Público
+    Huimanguillo y luego Público y Mayoreo del CEDIS (identificado por su
+    tipo, no por su nombre). Cualquier otra combinación va al final."""
+
+    def test_orden_canonico_aunque_se_hayan_guardado_revueltas(self):
+        from apps.products.forms import ProductoPrecioFormSet
+
+        listas = {
+            nombre: ListaPrecio.objects.get_or_create(nombre=nombre, defaults={"orden": orden})[0]
+            for orden, nombre in enumerate(["PUBLICO", "MEDIO MAYOREO", "MAYOREO", "SUB DISTRIBUIDOR", "PROMOCION"], 1)
+        }
+        iquinuapa = Almacen.objects.create(nombre="IQUINUAPA", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        huimanguillo = Almacen.objects.create(nombre="HUIMANGUILLO", tipo=Almacen.Tipo.SUCURSAL, numero=2)
+        cedis = Almacen.objects.create(nombre="CEDIS BODEGA SUR", tipo=Almacen.Tipo.CEDIS, numero=3)
+        bodega_sur = Almacen.objects.create(nombre="BODEGA SUR", tipo=Almacen.Tipo.SUCURSAL, numero=4)
+        producto = Producto.objects.create(nombre="Sulfa", sku="3S100")
+
+        revueltas = [
+            ("MAYOREO", bodega_sur), ("MAYOREO", cedis), ("PUBLICO", bodega_sur), ("PROMOCION", None),
+            ("PUBLICO", cedis), ("PUBLICO", huimanguillo), ("PUBLICO", None), ("SUB DISTRIBUIDOR", None),
+            ("PUBLICO", iquinuapa), ("MAYOREO", None), ("MEDIO MAYOREO", None),
+        ]
+        for lista, almacen in revueltas:
+            ProductoPrecio.objects.create(
+                producto=producto, lista_precio=listas[lista], almacen=almacen, precio_con_impuesto=Decimal("10"),
+            )
+
+        formset = ProductoPrecioFormSet(instance=producto, prefix="precios")
+        orden = [
+            (f.instance.lista_precio.nombre, f.instance.almacen.nombre if f.instance.almacen_id else None)
+            for f in formset.forms if f.instance.pk
+        ]
+        self.assertEqual(orden, [
+            ("PUBLICO", None), ("MEDIO MAYOREO", None), ("MAYOREO", None), ("SUB DISTRIBUIDOR", None),
+            ("PROMOCION", None), ("PUBLICO", "IQUINUAPA"), ("PUBLICO", "HUIMANGUILLO"),
+            ("PUBLICO", "CEDIS BODEGA SUR"), ("MAYOREO", "CEDIS BODEGA SUR"),
+            # Fuera de la tabla del sistema anterior: al final.
+            ("PUBLICO", "BODEGA SUR"), ("MAYOREO", "BODEGA SUR"),
+        ])
