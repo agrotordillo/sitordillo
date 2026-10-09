@@ -31,6 +31,16 @@
   </div>
   {% endif %}
 
+  {% if object.importado %}
+  <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+    <p class="font-medium text-gray-700">Gasto importado del sistema anterior</p>
+    <p class="mt-1">
+      No necesita turno de este sistema. Turno anterior: {{ object.turno_anterior|default:"—" }} ·
+      Factura de caja: {{ object.factura_caja_anterior|default:"—" }} · Origen: {{ object.clave_importacion }}
+    </p>
+  </div>
+  {% endif %}
+
   <div class="grid gap-8">
 
     <div>

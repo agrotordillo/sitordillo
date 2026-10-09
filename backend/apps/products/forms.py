@@ -10,6 +10,13 @@ from .models import (
 
 
 class ProductForm(BaseModelForm):
+    # No es campo del modelo: respuesta a "¿actualizar también los precios
+    # de lista?" cuando se cambia el costo al editar (ver
+    # producto-costo-confirmar.js y ProductUpdateView.form_valid). Por
+    # default "True", igual que el recálculo automático de siempre: solo
+    # el "No" explícito del modal lo apaga.
+    actualizar_precios_lista = forms.BooleanField(required=False, initial=True, widget=forms.HiddenInput)
+
     class Meta:
         model = Producto
         fields = [

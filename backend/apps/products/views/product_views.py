@@ -66,6 +66,40 @@ class ProductUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextUrlMix
     success_message = "Producto actualizado correctamente."
     extra_context = {"active_module": "products"}
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Para la confirmación al cambiar el costo (producto-costo-confirmar.js):
+        # qué listas se recalcularían y con qué % de utilidad, para mostrar
+        # el antes/después antes de guardar, y el precio general de Público
+        # (por si está capturado a mano: aun así es el que toma el precio
+        # de venta, ver Producto.sincronizar_precio_venta_con_publico).
+        precios = (
+            ProductoPrecio.objects.filter(producto=self.object)
+            .select_related("lista_precio", "almacen")
+            .order_by("lista_precio__orden", "almacen__nombre")
+        )
+        filas = []
+        publico_general = None
+        for precio in precios:
+            es_publico_general = precio.lista_precio.nombre == "PUBLICO" and not precio.almacen_id
+            if es_publico_general:
+                publico_general = str(precio.precio_con_impuesto)
+            if precio.utilidad_pct is None:
+                continue
+            filas.append({
+                "lista": precio.lista_precio.nombre,
+                "sucursal": precio.almacen.nombre if precio.almacen_id else "",
+                "utilidad_pct": str(precio.utilidad_pct),
+                "precio_actual": str(precio.precio_con_impuesto),
+                "es_publico_general": es_publico_general,
+            })
+        context["precios_con_utilidad"] = {"filas": filas, "publico_general": publico_general}
+        return context
+
+    def form_valid(self, form):
+        form.instance.recalcular_precios_lista = form.cleaned_data["actualizar_precios_lista"]
+        return super().form_valid(form)
+
     def form_invalid(self, form):
         messages.error(self.request, "No fue posible guardar el producto. Revisa los campos.")
         return super().form_invalid(form)

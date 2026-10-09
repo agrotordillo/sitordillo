@@ -3,19 +3,23 @@ import tempfile
 from datetime import date
 from decimal import Decimal
 from io import StringIO
+from pathlib import Path
+
+import openpyxl
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.accounts.models import AsignacionSucursal
 from apps.products.models import Almacen, PuntoVenta, Turno
 
+from apps.gastos import importacion
 from apps.gastos.models import BitacoraAccesoGastos, CentroCosto, ConceptoGasto, Gasto
 from apps.gastos.services import gasto_directo_por_centro
 
@@ -287,3 +291,129 @@ class AlcancePorSucursalTests(TestCase):
         gasto = self._gasto(self.administracion, "Bono confidencial")
         self.client.force_login(User.objects.create_superuser(username="admin", password="S3guridad!2026"))
         self.assertEqual(self.client.get(gasto.comprobante.url).status_code, 404)
+
+
+class ImportacionValesTests(TestCase):
+    """Importación en dos pasos de los vales del Excel de pólizas: propuesta
+    en un Excel de revisión y, ya revisado, importación de lo marcado."""
+
+    @classmethod
+    def setUpTestData(cls):
+        for numero, (nombre, codigo) in enumerate((("BODEGA SUR", "BSU"), ("LERDO", "LER")), start=1):
+            almacen = Almacen.objects.create(nombre=nombre, tipo=Almacen.Tipo.SUCURSAL, numero=numero)
+            CentroCosto.objects.create(
+                codigo=codigo, nombre=nombre.title(), tipo=CentroCosto.Tipo.SUCURSAL, almacen=almacen,
+            )
+
+    def setUp(self):
+        self.carpeta = tempfile.TemporaryDirectory()
+        self.addCleanup(self.carpeta.cleanup)
+        self.polizas = Path(self.carpeta.name) / "polizas.xlsx"
+        self.revision = Path(self.carpeta.name) / "revision.xlsx"
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.title = "GASTOS SF SUCURSALES"
+        encabezado = ["VALE", "CONCEPTO", "CENTRO DE COSTO", "IMPORTE", "CONDICION", "TURNO",
+                      "FACTURA DONDE SALE EL GASTO"]
+        for fila in [
+            ["GASTOS DE SUCURSALES SIN FACTURA MES DE NOVIEMBRE 2025"],
+            encabezado,
+            [100, "PAGO DE POLICIA LERDO", "LERDO", 50, "BODEGA SUR 28/11/2026", 1, "F1"],
+            ["GASTOS DE SUCURSALES SIN FACTURA MES DE ENERO 2026"],
+            encabezado,
+            [101, "PAGO DE POLICIA BODEGA SUR Y LERDO", "BODEGA-LERDO", 100, "BODEGA SUR 05/01/2026", 49001, "0201F1"],
+            [102, "VIATICO A DON MARTIN AL BANCO", "LKERDO", 40, "BODEGA SUR 06/01/2026", 49002, "0201F2"],
+            [103, "PAGO DE AGUA GARRAFON", "BODEGA SUR", 60, "BODEGA SUR 07/01/2026", 49003, "0201F3"],
+            [103, "PAGO DE AGUA GARRAFON", "BODEGA SUR", 60, "BODEGA SUR 07/01/2026", 49003, "0201F3"],
+            [104, "PAGO DE LUZ", "BODEGA SUR", 300, "BODEGA SUR 08/01/2026", 49004, "0201F4"],
+            [104, "PAGO DE LUZ", "BODEGA SUR", 120, "BODEGA SUR 08/01/2026", 49004, "0201F4"],
+            [105, "COMPRA DE ACCESORIOS PARA MASCOTA VTA SUCURSALES", "SUCURSALES", 309, "BODEGA SUR 09/01/2026", 49005, "0201F5"],
+            [106, "COMPRA DE REFRESCO PARA VENTA", "BODEGA SUR", 900, "BODEGA SUR 09/01/2026", 49005, "0201F5"],
+            [107, "ALGO SIN REGLA", "BODEGA SUR", 10, "BODEGA SUR 10/01/2026", 49006, "0201F6"],
+            [None, None, None, 1839, None, None, None],
+        ]:
+            hoja.append(fila)
+        fiscal = libro.create_sheet("GASTOS FISCALES")
+        fiscal.append(["GASTOS CON FACTURAS SUCURSALES FEBRERO 2026"])
+        fiscal.append(encabezado)
+        fiscal.append([200, "COMPRA DE PAPELERIA", "LERDO", 250, "BODEGA SUR 03/02/2026", 49100, "0201F9"])
+        libro.save(self.polizas)
+
+    def _generar(self):
+        call_command(
+            "generar_revision_gastos", excel=str(self.polizas), anio=2026, salida=str(self.revision),
+            fecha_corte="2026-08-26", stdout=StringIO(),
+        )
+        return {fila["clave"]: fila for fila in importacion.leer_revision(self.revision)}
+
+    def _guardar_revision(self, cambios):
+        """`cambios`: {clave: {columna: valor}} sobre el archivo generado."""
+        libro = importacion.abrir_libro(self.revision)
+        hoja = libro["Vales"]
+        titulos = [importacion.normalizar(c.value) for c in hoja[1]]
+        columna = {clave: titulos.index(importacion.normalizar(titulo)) for clave, titulo, _ in importacion.COLUMNAS}
+        for fila in hoja.iter_rows(min_row=2):
+            for nombre, valor in cambios.get(fila[0].value, {}).items():
+                fila[columna[nombre]].value = valor
+        libro.save(self.revision)
+
+    def test_propuesta_aplica_las_reglas_acordadas(self):
+        filas = self._generar()
+        hoja = "GASTOS SF SUCURSALES"
+
+        self.assertNotIn(f"{hoja}!3", filas)  # 28/11/2026 en sección de 2025: el año se corrige a 2025
+        self.assertEqual(filas[f"{hoja}!6"]["accion"], "IMPORTAR")
+        self.assertTrue(filas[f"{hoja}!6"]["centro"].startswith("BSU"))
+        self.assertEqual(filas[f"{hoja}!6"]["concepto"], "Servicio de Vigilancia")
+        self.assertTrue(filas[f"{hoja}!7"]["centro"].startswith("LER"))
+        self.assertEqual(filas[f"{hoja}!8"]["accion"], "IMPORTAR")
+        self.assertEqual(filas[f"{hoja}!9"]["accion"], "OMITIR")  # duplicado exacto
+        self.assertEqual(filas[f"{hoja}!10"]["accion"], "REVISAR")  # mismo vale, importes distintos
+        self.assertEqual(filas[f"{hoja}!11"]["accion"], "REVISAR")
+        self.assertEqual(filas[f"{hoja}!12"]["accion"], "OMITIR")  # mercancía para venta (y sin sucursal)
+        self.assertEqual(filas[f"{hoja}!13"]["accion"], "OMITIR")
+        self.assertEqual(filas[f"{hoja}!14"]["accion"], "REVISAR")  # sin concepto
+        self.assertEqual(filas["GASTOS FISCALES!3"]["facturado"], "SI")
+        self.assertEqual(filas["GASTOS FISCALES!3"]["referencia_factura"], importacion.FOLIO_PENDIENTE)
+        self.assertEqual(filas[f"{hoja}!6"]["facturado"], "NO")
+
+    def test_importa_lo_revisado_una_sola_vez(self):
+        self._generar()
+        self._guardar_revision({
+            "GASTOS SF SUCURSALES!14": {"accion": "IMPORTAR", "concepto": "Artículos de Limpieza"},
+        })
+
+        call_command("importar_gastos_revisados", str(self.revision), stdout=StringIO())
+        self.assertEqual(Gasto.objects.count(), 0)  # sin --aplicar solo valida
+
+        call_command("importar_gastos_revisados", str(self.revision), aplicar=True, stdout=StringIO())
+        call_command("importar_gastos_revisados", str(self.revision), aplicar=True, stdout=StringIO())
+
+        self.assertEqual(Gasto.objects.count(), 5)
+        policia = Gasto.objects.get(clave_importacion="GASTOS SF SUCURSALES!6")
+        self.assertTrue(policia.importado)
+        self.assertIsNone(policia.turno)
+        self.assertEqual(policia.turno_anterior, "49001")
+        self.assertEqual(policia.factura_caja_anterior, "0201F1")
+        self.assertEqual(policia.condicion, Gasto.Condicion.PAGADO)
+        self.assertEqual(policia.centro_costo.codigo, "BSU")
+        papeleria = Gasto.objects.get(clave_importacion="GASTOS FISCALES!3")
+        self.assertTrue(papeleria.facturado)
+        self.assertEqual(papeleria.referencia_factura, importacion.FOLIO_PENDIENTE)
+
+    def test_con_una_fila_con_error_no_importa_nada(self):
+        self._generar()
+        self._guardar_revision({"GASTOS SF SUCURSALES!7": {"centro": "XXX - No existe"}})
+
+        with self.assertRaises(CommandError):
+            call_command("importar_gastos_revisados", str(self.revision), aplicar=True, stdout=StringIO())
+
+        self.assertEqual(Gasto.objects.count(), 0)
+
+    def test_gasto_importado_se_edita_sin_turno(self):
+        self._generar()
+        call_command("importar_gastos_revisados", str(self.revision), aplicar=True, stdout=StringIO())
+        gasto = Gasto.objects.get(clave_importacion="GASTOS SF SUCURSALES!6")
+
+        gasto.descripcion = "Policía de enero"
+        gasto.full_clean()

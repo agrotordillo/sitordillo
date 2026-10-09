@@ -318,7 +318,7 @@ class Gasto(BaseAbstractModel):
         related_name="gastos",
         verbose_name="Turno",
         help_text="Obligatorio cuando el centro de costo es de tipo Sucursal: el turno abierto de esa sucursal en "
-        "el que se aplicó el gasto.",
+        "el que se aplicó el gasto (salvo en los gastos importados del sistema anterior).",
     )
     descripcion = models.CharField(
         max_length=255,
@@ -368,6 +368,35 @@ class Gasto(BaseAbstractModel):
         "que se reparte entre Transporte, Administración y Personal) y necesites repartirlo con montos exactos.",
     )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+    # Vales históricos traídos del Excel de pólizas (comando
+    # importar_gastos_revisados). Se pagaron con cajas y turnos del sistema
+    # anterior, que no existen aquí, así que no exigen turno; lo que el vale
+    # traía del sistema anterior se conserva para poder rastrearlo.
+    importado = models.BooleanField(
+        default=False,
+        editable=False,
+        verbose_name="Importado del sistema anterior",
+    )
+    turno_anterior = models.CharField(
+        max_length=20, blank=True, editable=False, verbose_name="Turno en el sistema anterior",
+    )
+    factura_caja_anterior = models.CharField(
+        max_length=30,
+        blank=True,
+        editable=False,
+        verbose_name="Factura de caja en el sistema anterior",
+        help_text="La factura de venta del turno de la que salió el efectivo (columna \"Factura donde sale el "
+        "gasto\" del Excel), no la factura del proveedor.",
+    )
+    clave_importacion = models.CharField(
+        max_length=80,
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Origen en el Excel",
+        help_text="Hoja y fila del Excel de pólizas de donde salió; evita importar dos veces el mismo vale.",
+    )
 
     class Meta:
         verbose_name = "Gasto"
@@ -435,8 +464,9 @@ class Gasto(BaseAbstractModel):
             raise ValidationError({"referencia_factura": "Solo aplica cuando el gasto está facturado."})
         if self.centro_costo_id and self.centro_costo.tipo == CentroCosto.Tipo.SUCURSAL:
             if not self.turno_id:
-                raise ValidationError({"turno": "Indica el turno de la sucursal en el que se aplicó el gasto."})
-            if self.turno.punto_venta.almacen_id != self.centro_costo.almacen_id:
+                if not self.importado:
+                    raise ValidationError({"turno": "Indica el turno de la sucursal en el que se aplicó el gasto."})
+            elif self.turno.punto_venta.almacen_id != self.centro_costo.almacen_id:
                 raise ValidationError({"turno": "El turno elegido no corresponde a la sucursal de este gasto."})
         elif self.turno_id:
             raise ValidationError({"turno": "Solo aplica cuando el centro de costo es de tipo Sucursal."})

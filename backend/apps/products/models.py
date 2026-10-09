@@ -758,6 +758,13 @@ class Producto(BaseAbstractModel):
         elif self.tasa_ieps:
             raise ValidationError({"aplica_ieps": "Activa 'Aplica IEPS' antes de definir su tasa."})
 
+    # No es un campo: decide si al guardar un costo distinto se recalculan
+    # las listas de precio con % de utilidad. Por default sí (botón
+    # "Actualizar precio de costo" de compras, importador --sync); la
+    # edición del producto lo apaga cuando el usuario responde "No" en la
+    # confirmación (ver ProductUpdateView.form_valid).
+    recalcular_precios_lista = True
+
     def save(self, *args, **kwargs):
         costo_anterior = None
         if self.pk:
@@ -765,7 +772,7 @@ class Producto(BaseAbstractModel):
                 Producto.objects.filter(pk=self.pk).values_list("precio_costo", flat=True).first()
             )
         super().save(*args, **kwargs)
-        if costo_anterior is not None and costo_anterior != self.precio_costo:
+        if self.recalcular_precios_lista and costo_anterior is not None and costo_anterior != self.precio_costo:
             self._recalcular_precios_por_utilidad()
 
     def _recalcular_precios_por_utilidad(self):
@@ -773,13 +780,33 @@ class Producto(BaseAbstractModel):
         lista que tenga un % de utilidad guardado (precio_sin_impuesto =
         costo * (1 + utilidad% / 100)), redondeado hacia arriba al múltiplo
         de $0.50 más cercano (ver redondear_precio_venta). Las filas sin %
-        de utilidad son precio manual y no se tocan."""
+        de utilidad son precio manual y no se tocan. Al final, el precio de
+        venta general del producto toma el de Público (ver
+        sincronizar_precio_venta_con_publico)."""
         for precio in self.precios.filter(utilidad_pct__isnull=False):
             precio.producto = self
             factor = (Decimal("1") + precio._tasa_ieps) * (Decimal("1") + precio._tasa_iva)
             precio_sin_impuesto = self.precio_costo * (Decimal("1") + precio.utilidad_pct / Decimal("100"))
             precio.precio_con_impuesto = redondear_precio_venta(precio_sin_impuesto * factor)
             precio.save(update_fields=["precio_con_impuesto"])
+        self.sincronizar_precio_venta_con_publico()
+
+    def sincronizar_precio_venta_con_publico(self):
+        """Iguala Producto.precio_venta (el precio de venta general, respaldo
+        cuando un cliente no tiene precio en su lista) al precio general de
+        la lista Público, si el producto lo tiene. Se llama cada vez que se
+        actualizan los precios de lista: al recalcularlos por cambio de
+        costo y al guardar la pantalla de Precios. Usa update() para no
+        volver a disparar save() (y con él, otro recálculo)."""
+        publico = (
+            self.precios.filter(lista_precio__nombre="PUBLICO", almacen__isnull=True)
+            .values_list("precio_con_impuesto", flat=True)
+            .first()
+        )
+        if publico is None or publico == self.precio_venta:
+            return
+        Producto.objects.filter(pk=self.pk).update(precio_venta=publico)
+        self.precio_venta = publico
 
 
 class PaqueteComponente(BaseAbstractModel):

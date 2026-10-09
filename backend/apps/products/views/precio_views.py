@@ -17,6 +17,7 @@ def producto_precios_view(request, pk):
             try:
                 with transaction.atomic():
                     formset.save()
+                    producto.sincronizar_precio_venta_con_publico()
             except IntegrityError:
                 messages.error(
                     request,

@@ -16,6 +16,7 @@
 {% endblock breadcrumbs %}
 {% block main_content %}
 <form method="post"
+      {% if object %}data-costo-original="{{ object.precio_costo|stringformat:'f' }}"{% endif %}
       x-data="dependentSelect({
         parent: '#id_categoria',
         child: '#id_subcategoria',
@@ -388,10 +389,18 @@
               <div>
                 <label for="{{ form.precio_costo.id_for_label }}" class="label">Precio de costo</label>
                 {{ form.precio_costo }}
+                {{ form.actualizar_precios_lista }}
+                {% if object %}
+                <div id="confirmar-precios-lista" class="mt-2 flex flex-wrap items-center gap-2" hidden>
+                  <button type="button" class="btn-secondary" data-confirmar-precios-lista>Actualizar también precios de lista</button>
+                  <span class="text-xs text-gray-400" data-confirmar-precios-lista-estado>Si no lo confirmas, solo se guarda el costo.</span>
+                </div>
+                {% endif %}
               </div>
               <div>
                 <label for="{{ form.precio_venta.id_for_label }}" class="label">Precio de venta</label>
                 {{ form.precio_venta }}
+                <p class="mt-1.5 text-xs text-gray-400">Al actualizar los precios de lista toma el precio de Público en general.</p>
               </div>
             </div>
               </div>
@@ -502,8 +511,12 @@
     </div>
   </div>
 </form>
+{% if object %}
+{{ precios_con_utilidad|json_script:"precios-con-utilidad" }}
+{% endif %}
 {% endblock main_content %}
 {% block extra_js %}
+<script src="{% static 'js/modules/forms/producto-costo-confirmar.js' %}"></script>
 <script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
 <script src="{% static 'js/modules/forms/quick-create.js' %}"></script>
 <script src="{% static 'js/modules/forms/clave-prod-serv-search.js' %}"></script>

@@ -57,6 +57,11 @@
             Compartido
           </span>
           {% endif %}
+          {% if gasto.importado %}
+          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 ms-1.5" title="Importado del Excel de pólizas del sistema anterior">
+            Importado
+          </span>
+          {% endif %}
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ gasto.centro_costo.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">
