@@ -5,6 +5,7 @@ from django.views.generic import ListView
 from apps.core.parametros import id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
+from apps.products.busqueda import buscar_productos
 from apps.products.models import Almacen, Producto
 
 
@@ -91,7 +92,7 @@ class CosteoProductoListView(PermissionRequiredMixin, ListView):
 
         buscar = self.request.GET.get("q", "").strip()
         if buscar:
-            qs = qs.filter(Q(nombre__icontains=buscar) | Q(sku__icontains=buscar) | Q(folio__icontains=buscar))
+            qs = buscar_productos(qs, buscar)
 
         return qs.order_by("nombre")
 

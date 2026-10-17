@@ -1,12 +1,13 @@
 from django.contrib.auth.decorators import permission_required
 from django.core.paginator import Paginator
-from django.db.models import Max, OuterRef, Q, Subquery, Sum
+from django.db.models import Max, OuterRef, Subquery, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
 from apps.core.parametros import entero, filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote, MovimientoInventario
+from apps.products.busqueda import buscar_productos
 from apps.products.models import Almacen
 
 # Movimientos que meten stock físico por reabastecimiento -compra directa
@@ -74,7 +75,7 @@ def existencia_sin_movimiento_view(request):
 
     buscar = request.GET.get("q", "").strip()
     if buscar:
-        qs = qs.filter(Q(producto__nombre__icontains=buscar) | Q(producto__sku__icontains=buscar))
+        qs = buscar_productos(qs, buscar, "producto__")
 
     dias_minimos = entero(request.GET.get("dias_minimos"), maximo=100_000)
     if dias_minimos is None:

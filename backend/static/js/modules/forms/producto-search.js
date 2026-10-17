@@ -1,5 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const MIN_CHARS = 3;
+  // Desde 1 carácter: con 1-2 solo se encuentra el SKU/código exacto (hay
+  // SKUs como "E" o "CM"); desde 3 también por nombre, palabra por palabra
+  // (ver apps.products.busqueda).
+  const MIN_CHARS = 1;
+  const MIN_CHARS_NOMBRE = 3;
 
   // Debounce independiente por campo: con varias líneas de producto en la
   // misma página (ej. formulario de orden de compra), un timer compartido
@@ -153,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const clienteFieldId = wrapper.dataset.productoSearchClienteField;
     const precioAlmacenFieldId = wrapper.dataset.productoSearchPrecioAlmacenField;
     const precioCampo = wrapper.dataset.productoSearchPrecioCampo || "costo";
+    const tipo = wrapper.dataset.productoSearchTipo || "";
     const resultsEl = wrapper.querySelector(".producto-search-results");
     const hiddenInput = wrapper.querySelector('input[type="hidden"]');
     const q = input.value.trim();
@@ -192,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const params = new URLSearchParams({ q });
       if (almacenValue) params.set("almacen", almacenValue);
+      if (tipo) params.set("tipo", tipo);
       if (clienteFieldId) {
         const clienteValue = document.getElementById(clienteFieldId)?.value;
         if (clienteValue) params.set("cliente", clienteValue);
@@ -204,17 +210,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) return;
       const items = await res.json();
       const almacenLabel = wrapper.dataset.productoSearchAlmacenLabel || "el almacén origen";
-      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue), precioCampo, almacenLabel);
+      mostrarResultados(items, input, hiddenInput, resultsEl, Boolean(almacenValue), precioCampo, almacenLabel, q.length < MIN_CHARS_NOMBRE);
     } catch (err) {
       if (window.App?.isDev) console.error("[producto-search]", err);
     }
   }
 
-  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen, precioCampo, almacenLabel) {
+  function mostrarResultados(items, input, hiddenInput, resultsEl, filtradoPorAlmacen, precioCampo, almacenLabel, textoCorto) {
     if (!items.length) {
-      const mensaje = filtradoPorAlmacen
-        ? `Sin existencia de este producto en ${almacenLabel}`
-        : "Sin resultados";
+      const mensaje = textoCorto
+        ? "Ningún SKU es igual. Escribe 3 letras o más para buscar por nombre."
+        : filtradoPorAlmacen
+          ? `Sin existencia de este producto en ${almacenLabel}`
+          : "Sin resultados";
       mostrarMensaje(resultsEl, input, mensaje);
       return;
     }

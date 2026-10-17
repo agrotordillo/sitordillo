@@ -1,5 +1,4 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
@@ -10,6 +9,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from apps.core.filtros_producto import FiltrosProductoMixin
 from apps.core.navegacion import url_de_regreso
 from apps.products import columnas_listado
+from apps.products.busqueda import buscar_productos
 from apps.products.models import Producto, ProductoPrecio
 from apps.products.forms import ProductForm
 
@@ -117,9 +117,7 @@ class ProductToggleActivoView(PermissionRequiredMixin, View):
 
 
 def filtrar_busqueda_producto(queryset, q):
-    if q:
-        queryset = queryset.filter(Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q))
-    return queryset
+    return buscar_productos(queryset, q)
 
 
 class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):

@@ -155,6 +155,8 @@ class PaqueteComponenteForm(BaseModelForm):
     class Meta:
         model = PaqueteComponente
         fields = ["producto_componente", "cantidad"]
+        # Se elige con el buscador por nombre o SKU (_producto_search_field.html).
+        widgets = {"producto_componente": forms.HiddenInput}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

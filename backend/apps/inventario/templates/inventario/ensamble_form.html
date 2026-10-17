@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
 {% block title %}Armar paquete{% endblock title %}
 {% block title_layout %}Armar paquete{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -27,14 +28,13 @@
       {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
     </div>
     <div>
-      <label for="{{ form.paquete.id_for_label }}" class="label">Paquete a armar</label>
-      {{ form.paquete }}
+      <label class="label">Paquete a armar</label>
+      {% include "products/includes/_producto_search_widget.html" with campo=form.paquete tipo="paquete" %}
       {% if not form.paquete.field.queryset.exists %}
       <p class="mt-1.5 text-xs text-amber-600">
         No hay productos de tipo Paquete/Combo todavía. <a href="{% url 'products:product-create' %}" class="underline">Crea uno primero</a>.
       </p>
       {% endif %}
-      {% if form.paquete.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.paquete.errors.0 }}</p>{% endif %}
     </div>
     <div>
       <label for="{{ form.cantidad.id_for_label }}" class="label">Cantidad a armar</label>
@@ -58,3 +58,6 @@
   </div>
 </form>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+{% endblock extra_js %}

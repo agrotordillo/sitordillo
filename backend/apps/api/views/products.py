@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.clientes.models import Cliente
+from apps.products.busqueda import buscar_productos, ordenar_por_coincidencia
 from apps.products.forms import BrandForm, ClaseForm, LineaForm, UnitMeasureForm
 from apps.products.models import Producto, Subcategoria
 from apps.core.parametros import id_valido, ids_validos
@@ -69,7 +70,9 @@ class ClaseQuickCreateView(APIView):
 
 
 class ProductoBuscarView(APIView):
-    """Busca productos por folio, SKU, código de barras o nombre. Pensado
+    """Busca productos por nombre, SKU, folio o código de barras (reglas en
+    apps.products.busqueda: palabra por palabra, y con 1-2 caracteres solo
+    el SKU/código exacto), con el SKU exacto primero. Pensado
     para reemplazar un <select> en catálogos grandes (~300 mil productos),
     donde renderizar todas las opciones no es viable.
 
@@ -90,15 +93,19 @@ class ProductoBuscarView(APIView):
 
     def get(self, request):
         q = request.query_params.get("q", "").strip()
-        if len(q) < 3:
+        if not q:
             return Response([])
 
-        productos = Producto.objects.filter(is_active=True).filter(
-            Q(folio__icontains=q)
-            | Q(sku__icontains=q)
-            | Q(codigo_barras__icontains=q)
-            | Q(nombre__icontains=q)
-        )
+        productos = buscar_productos(Producto.objects.filter(is_active=True), q)
+
+        # ?tipo=paquete solo paquetes (armar paquete); ?tipo=sin_paquete los
+        # excluye (componentes, recetas de conversión: un paquete no tiene
+        # lote propio). El formulario igual lo valida con su queryset.
+        tipo = request.query_params.get("tipo", "")
+        if tipo == "paquete":
+            productos = productos.filter(tipo=Producto.TipoProducto.PAQUETE)
+        elif tipo == "sin_paquete":
+            productos = productos.exclude(tipo=Producto.TipoProducto.PAQUETE)
 
         almacen_crudo = request.query_params.get("almacen", "").strip()
         almacen_id = id_valido(almacen_crudo)
@@ -127,7 +134,7 @@ class ProductoBuscarView(APIView):
             cliente = Cliente.objects.filter(pk=cliente_id).select_related("lista_precio").first() if cliente_id else None
             lista_precio = resolver_lista_precio_cliente(cliente)
 
-        productos = productos.order_by("nombre")[:20]
+        productos = ordenar_por_coincidencia(productos, q)[:20]
         data = []
         for p in productos:
             precio_venta = (

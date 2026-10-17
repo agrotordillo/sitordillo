@@ -639,3 +639,35 @@ class MermaDeRecepcionTests(TestCase):
 
         self.assertRedirects(respuesta, reverse("inventario:lote-list"), fetch_redirect_response=False)
         self.assertEqual(OrdenCompra.objects.get(pk=orden.pk).iva, Decimal("12.80"))
+
+
+class BusquedaExistenciasTests(TestCase):
+    """Existencias y Lotes se buscan por nombre o SKU (código), con la misma
+    regla que el resto de los buscadores (apps.products.busqueda)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        almacen = Almacen.objects.create(nombre="CENTRO", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        for nombre, sku in (("3 SULFA INYECTABLE 100ML", "3S100"), ("EJE SOLO", "E"), ("CEPILLO", "CEP")):
+            Lote.objects.create(
+                producto=Producto.objects.create(nombre=nombre, sku=sku), almacen=almacen, fecha_ingreso=date(2026, 1, 1),
+                costo_unitario=Decimal("10"), cantidad_inicial=Decimal("5"), cantidad_disponible=Decimal("5"),
+            )
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def test_existencias(self):
+        url = reverse("inventario:existencia-list")
+        skus = lambda q: [fila["producto__sku"] for fila in self.client.get(url, {"q": q}).context["existencias"]]
+        self.assertEqual(skus("sulfa 100"), ["3S100"])
+        self.assertEqual(skus("e"), ["E"])
+        self.assertEqual(sorted(skus("")), ["3S100", "CEP", "E"])
+        self.assertContains(self.client.get(url, {"q": "nada"}), 'que coincidan con "nada"')
+
+    def test_lotes(self):
+        url = reverse("inventario:lote-list")
+        respuesta = self.client.get(url, {"q": "cep"})
+        self.assertEqual([lote.producto.sku for lote in respuesta.context["lotes"]], ["CEP"])
+        self.assertContains(respuesta, 'name="q" value="cep"')

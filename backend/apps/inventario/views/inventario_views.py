@@ -7,6 +7,7 @@ from apps.core.filtros_producto import FiltrosProductoMixin
 from apps.core.parametros import fecha, filtrar_por_id, id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
+from apps.products.busqueda import buscar_productos
 
 
 class LoteListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
@@ -29,10 +30,12 @@ class LoteListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
+        queryset = buscar_productos(queryset, self.request.GET.get("q", ""), "producto__")
         return filtrar_por_id(queryset, "orden_compra_detalle__orden_compra_id", self.request.GET.get("orden"))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["q"] = self.request.GET.get("q", "").strip()
         orden_id = id_valido(self.request.GET.get("orden"))
         if orden_id:
             context["orden"] = OrdenCompra.objects.filter(pk=orden_id).first()
@@ -58,6 +61,7 @@ class ExistenciaListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView
         # agrupar, un .filter() ya actuaría como HAVING sobre lo agregado,
         # no como filtro de qué lotes entran al agrupamiento.
         queryset = self.aplicar_filtros_producto(queryset)
+        queryset = buscar_productos(queryset, self.request.GET.get("q", ""), "producto__")
 
         # Fecha de ingreso del lote: cuándo entró esa mercancía, no cuándo
         # se registró en el sistema (created_at es solo auditoría).
@@ -76,6 +80,7 @@ class ExistenciaListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["q"] = self.request.GET.get("q", "").strip()
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
         return context

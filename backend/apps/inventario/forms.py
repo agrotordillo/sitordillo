@@ -142,6 +142,8 @@ class RecetaConversionForm(BaseModelForm):
     class Meta:
         model = RecetaConversion
         fields = ["producto_origen", "producto_destino", "cantidad_origen", "cantidad_destino", "limite_diario_origen"]
+        # Se eligen con el buscador por nombre o SKU (_producto_search_field.html).
+        widgets = {"producto_origen": forms.HiddenInput, "producto_destino": forms.HiddenInput}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -191,6 +193,7 @@ class EnsamblePaqueteForm(forms.Form):
     paquete = forms.ModelChoiceField(
         queryset=Producto.objects.filter(is_active=True, tipo=Producto.TipoProducto.PAQUETE),
         label="Paquete a armar",
+        widget=forms.HiddenInput,
     )
     cantidad = forms.DecimalField(
         max_digits=12, decimal_places=2, min_value=Decimal("0.01"), label="Cantidad a armar"

@@ -390,11 +390,11 @@ class ListadoPersonalizableTests(TestCase):
         self.client.post(self.url_preferencias, {
             "accion": "agrupar", "modo": "dinamico", "agrupar": ["linea", "marca", "inventado"],
         })
-        respuesta = self.client.get(self.url, {"q": "croqueta 0"})
+        respuesta = self.client.get(self.url, {"q": "croqueta"})
         filas = respuesta.context["filas"]
         self.assertEqual([a.clave for a in respuesta.context["agrupar"]], ["linea", "marca"])
         linea, marca = filas[0], filas[1]
-        self.assertEqual((linea["valor"], linea["nivel"], linea["conteo"]), ("PERROS", 0, 10))
+        self.assertEqual((linea["valor"], linea["nivel"], linea["conteo"]), ("PERROS", 0, 30))
         self.assertEqual((marca["valor"], marca["nivel"], marca["grupos"]), ("NUPEC", 1, linea["id"]))
         self.assertEqual(filas[2]["grupos"], f'{linea["id"]} {marca["id"]}')
 
@@ -405,10 +405,65 @@ class ListadoPersonalizableTests(TestCase):
 
         self.client.post(self.url_preferencias, {"accion": "columnas", "columnas": ["sku", "nombre"]})
         self.client.post(self.url_preferencias, {"accion": "agrupar", "modo": "estatico", "agrupar_estatico": "linea"})
-        respuesta = self.client.get(reverse("products:product-exportar"), {"q": "a"})
+        respuesta = self.client.get(reverse("products:product-exportar"))
         hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
         filas = [tuple(celda.value for celda in fila) for fila in hoja.iter_rows()]
         self.assertEqual(filas[0], ("Código", "Nombre", "Costo"))
         self.assertEqual(filas[1][0], "Línea: GATOS (1)")
         self.assertEqual(filas[2], ("ARN", "Arena", 0.0))
         self.assertEqual(filas[3][0], "Línea: PERROS (30)")
+
+
+class BusquedaProductoTests(TestCase):
+    """Todos los buscadores de producto buscan por nombre y SKU (código):
+    palabra por palabra, con el SKU exacto primero, y con 1-2 caracteres
+    solo el SKU exacto (hay SKUs de una o dos letras)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        cls.sulfa = Producto.objects.create(nombre="3 SULFA INYECTABLE 100ML", sku="3S100")
+        cls.cm = Producto.objects.create(nombre="CADENA METALICA", sku="CM")
+        cls.cm_largo = Producto.objects.create(nombre="ACM CEPILLO", sku="ACM1")
+        cls.paquete = Producto.objects.create(nombre="COMBO SULFA", sku="CMB1", tipo=Producto.TipoProducto.PAQUETE)
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def buscar(self, q, **extra):
+        respuesta = self.client.get(reverse("api:producto-buscar"), {"q": q, **extra})
+        return [item["sku"] for item in respuesta.json()]
+
+    def test_por_palabras_en_cualquier_orden(self):
+        self.assertEqual(self.buscar("sulfa 100"), ["3S100"])
+        self.assertEqual(self.buscar("100ml inyectable"), ["3S100"])
+        self.assertEqual(self.buscar("sulfa 250"), [])
+
+    def test_sku_corto_solo_exacto_y_exacto_primero(self):
+        self.assertEqual(self.buscar("cm"), ["CM"])
+        self.assertEqual(self.buscar("c"), [])
+        # Con 3+ caracteres también por nombre/SKU parcial, el exacto primero.
+        self.assertEqual(self.buscar("acm1")[0], "ACM1")
+        self.assertEqual(self.buscar("3s100"), ["3S100"])
+
+    def test_filtro_por_tipo(self):
+        self.assertEqual(self.buscar("sulfa"), ["3S100", "CMB1"])
+        self.assertEqual(self.buscar("sulfa", tipo="paquete"), ["CMB1"])
+        self.assertEqual(self.buscar("sulfa", tipo="sin_paquete"), ["3S100"])
+
+    def test_listado_usa_la_misma_busqueda(self):
+        respuesta = self.client.get(reverse("products:product-list"), {"q": "inyectable sulfa"})
+        self.assertEqual([p.sku for p in respuesta.context["products"]], ["3S100"])
+
+    def test_formularios_sin_select_de_productos(self):
+        paginas = [
+            reverse("inventario:receta-conversion-create"),
+            reverse("inventario:ensamble-create"),
+            reverse("products:paquete-componentes", args=[self.paquete.pk]),
+        ]
+        for url in paginas:
+            with self.subTest(url=url):
+                respuesta = self.client.get(url)
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertContains(respuesta, "producto-search-input")
+                self.assertNotContains(respuesta, "CADENA METALICA</option>")

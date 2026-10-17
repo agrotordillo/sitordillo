@@ -7,6 +7,7 @@ from django.views.generic import ListView, TemplateView
 from apps.compras.models import OrdenCompra, OrdenCompraDetalle
 from apps.core.parametros import entero, fecha, filtrar_por_id
 from apps.core.scoping import almacenes_visibles
+from apps.products.busqueda import q_busqueda_producto
 from apps.products.models import Almacen
 
 # Órdenes que no representan una compra: nunca se confirmó o no se concretó.
@@ -43,8 +44,7 @@ class AnalisisCompraProductoListView(PermissionRequiredMixin, ListView):
         buscar = self.request.GET.get("q", "").strip()
         if buscar:
             qs = qs.filter(
-                Q(producto__nombre__icontains=buscar)
-                | Q(producto__sku__icontains=buscar)
+                q_busqueda_producto(buscar, "producto__")
                 | Q(orden_compra__proveedor__nombre_comercial__icontains=buscar)
                 | Q(orden_compra__proveedor__nombre_fiscal__icontains=buscar)
                 | Q(orden_compra__proveedor__rfc__icontains=buscar)

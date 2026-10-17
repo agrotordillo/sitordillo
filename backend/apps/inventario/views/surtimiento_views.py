@@ -1,13 +1,14 @@
 from decimal import Decimal
 
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum
+from django.db.models import DecimalField, F, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.views.generic import ListView
 
 from apps.core.parametros import filtrar_por_id
 from apps.core.scoping import almacenes_visibles
 from apps.inventario.models import Lote
+from apps.products.busqueda import buscar_productos
 from apps.products.models import Almacen, ProductoStockSucursal
 
 
@@ -55,7 +56,7 @@ class SurtimientoListView(PermissionRequiredMixin, ListView):
 
         buscar = self.request.GET.get("q", "").strip()
         if buscar:
-            qs = qs.filter(Q(producto__nombre__icontains=buscar) | Q(producto__sku__icontains=buscar))
+            qs = buscar_productos(qs, buscar, "producto__")
 
         qs = filtrar_por_id(qs, "almacen_id", self.request.GET.get("almacen"))
 

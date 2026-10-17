@@ -1,4 +1,5 @@
 {% extends "core/layouts/_main_form_layout.html" %}
+{% load static %}
 {% block title %}{% if object %}Editar receta{% else %}Nueva receta{% endif %}{% endblock title %}
 {% block title_layout %}{% if object %}Editar receta{% else %}Nueva receta{% endif %}{% endblock title_layout %}
 {% block breadcrumbs %}
@@ -22,16 +23,14 @@
   {% endif %}
   <div class="grid gap-4 sm:grid-cols-2">
     <div>
-      <label for="{{ form.producto_origen.id_for_label }}" class="label">Producto origen</label>
-      {{ form.producto_origen }}
+      <label class="label">Producto origen</label>
+      {% include "products/includes/_producto_search_widget.html" with campo=form.producto_origen tipo="sin_paquete" %}
       <p class="mt-1 text-xs text-gray-400">La presentación grande (ej. saco de 40kg).</p>
-      {% if form.producto_origen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto_origen.errors.0 }}</p>{% endif %}
     </div>
     <div>
-      <label for="{{ form.producto_destino.id_for_label }}" class="label">Producto destino</label>
-      {{ form.producto_destino }}
+      <label class="label">Producto destino</label>
+      {% include "products/includes/_producto_search_widget.html" with campo=form.producto_destino tipo="sin_paquete" %}
       <p class="mt-1 text-xs text-gray-400">La presentación chica (ej. bolsa de 2kg).</p>
-      {% if form.producto_destino.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.producto_destino.errors.0 }}</p>{% endif %}
     </div>
     <div>
       <label for="{{ form.cantidad_origen.id_for_label }}" class="label">Cantidad origen</label>
@@ -61,3 +60,6 @@
   </div>
 </form>
 {% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+{% endblock extra_js %}

@@ -13,10 +13,14 @@
 {% endblock breadcrumbs %}
 {% block table_actions %}
 <form method="get" class="grid gap-2 sm:grid-cols-3 lg:grid-cols-6 items-end w-full">
+  <div class="sm:col-span-2 lg:col-span-1">
+    <label class="label">Buscar</label>
+    <input type="text" name="q" value="{{ q }}" placeholder="Nombre o SKU (código)..." class="input w-full">
+  </div>
   {% include "core/includes/_filtros_producto.html" %}
   <div class="flex items-center gap-2 sm:col-span-3 lg:col-span-6 lg:justify-end">
     <button type="submit" class="btn-primary">Filtrar</button>
-    {% if hay_filtros_producto %}
+    {% if q or hay_filtros_producto %}
     <a href="{% url 'inventario:lote-list' %}?limpiar_filtros=1" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
         <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
@@ -78,7 +82,7 @@
       <tr>
         <td colspan="7" class="px-4 sm:px-6 py-12 text-center">
           <p class="text-sm text-gray-400">
-            {% if orden %}Esta orden no tiene lotes con existencia disponible (puede que ya se hayan corregido o consumido).{% else %}No hay lotes con existencia disponible{% endif %}
+            {% if orden %}Esta orden no tiene lotes con existencia disponible (puede que ya se hayan corregido o consumido).{% elif q %}No hay lotes con existencia de productos que coincidan con "{{ q }}"{% else %}No hay lotes con existencia disponible{% endif %}
           </p>
         </td>
       </tr>
