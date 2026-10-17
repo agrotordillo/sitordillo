@@ -45,6 +45,50 @@ def validar_efectivo_recibido(venta):
         )
 
 
+def desglose_cobro(venta):
+    """{FormaPago: monto} de lo que se cobró en `venta`: una sola entrada
+    con el total, o una por cada VentaPago si el cobro se dividió (ahí
+    Venta.forma_pago queda vacío). Espera `forma_pago` y
+    `pagos__forma_pago` ya cargados para no consultar fila por fila."""
+    if venta.pago_dividido:
+        desglose = {}
+        for pago in venta.pagos.all():
+            desglose[pago.forma_pago] = desglose.get(pago.forma_pago, Decimal("0.00")) + pago.monto
+        return desglose
+    return {venta.forma_pago: venta.total}
+
+
+def reporte_ventas_por_cobro(ventas, forma_pago=None):
+    """Listado de ventas filtrado por forma de cobro, con su total y un
+    resumen por cada forma de cobro del conjunto. Con `forma_pago`, una
+    venta de cobro dividido entra si una de sus partes fue con esa forma,
+    y cuenta solo esa parte (Venta.monto_cobro) -no el total de la venta-,
+    para que el total cuadre con lo que de verdad entró por ese concepto.
+    Sin `forma_pago`, monto_cobro es el total de cada venta."""
+    resumen = {}
+    filas = []
+    total = Decimal("0.00")
+    for venta in ventas:
+        desglose = desglose_cobro(venta)
+        for fp, monto in desglose.items():
+            renglon = resumen.setdefault(fp.pk, {"forma_pago": fp, "monto": Decimal("0.00"), "ventas": 0})
+            renglon["monto"] += monto
+            renglon["ventas"] += 1
+        if forma_pago is None:
+            venta.monto_cobro = venta.total
+        elif forma_pago in desglose:
+            venta.monto_cobro = desglose[forma_pago]
+        else:
+            continue
+        filas.append(venta)
+        total += venta.monto_cobro
+    return {
+        "ventas": filas,
+        "total_cobro": total,
+        "resumen_cobro": sorted(resumen.values(), key=lambda r: r["forma_pago"].clave),
+    }
+
+
 def resumen_turno(turno):
     """Corte de caja de un turno: total vendido y desglose por forma de
     pago -incluyendo el de cada venta con cobro dividido, que no tiene
@@ -59,13 +103,9 @@ def resumen_turno(turno):
 
     por_forma_pago = {}
     for venta in ventas:
-        if venta.pago_dividido:
-            for pago in venta.pagos.all():
-                clave = pago.forma_pago.descripcion
-                por_forma_pago[clave] = por_forma_pago.get(clave, Decimal("0.00")) + pago.monto
-        else:
-            clave = venta.forma_pago.descripcion
-            por_forma_pago[clave] = por_forma_pago.get(clave, Decimal("0.00")) + venta.total
+        for forma_pago, monto in desglose_cobro(venta).items():
+            clave = forma_pago.descripcion
+            por_forma_pago[clave] = por_forma_pago.get(clave, Decimal("0.00")) + monto
 
     publico = Cliente.publico_general()
     pendientes_global = [
@@ -74,12 +114,47 @@ def resumen_turno(turno):
         and not hasattr(v, "factura") and v.factura_global_id is None
     ]
 
+    retiros = list(turno.retiros.order_by("fecha"))
+    retiros_por_tipo = {}
+    for retiro in retiros:
+        clave = retiro.get_tipo_display()
+        retiros_por_tipo[clave] = retiros_por_tipo.get(clave, Decimal("0.00")) + retiro.monto
+
     return {
         "ventas": ventas,
         "total_ventas": len(ventas),
         "total_vendido": sum((v.total for v in ventas), Decimal("0.00")),
         "por_forma_pago": por_forma_pago,
         "pendientes_factura_global": pendientes_global,
+        "retiros": retiros,
+        "retiros_por_tipo": retiros_por_tipo,
+        **efectivo_del_turno(turno, ventas=ventas, retiros=retiros),
+    }
+
+
+def efectivo_del_turno(turno, ventas=None, retiros=None):
+    """Efectivo cobrado en el turno (clave SAT "01", incluida la parte en
+    efectivo de un cobro dividido), lo que se retiró de la caja (ver
+    RetiroEfectivo) y lo que debería quedar en ella. No hay fondo inicial
+    de caja (ver products.Turno), así que "esperado" es solo lo cobrado
+    menos lo retirado."""
+    from .models import Venta
+
+    if ventas is None:
+        ventas = turno.ventas.select_related("forma_pago").prefetch_related("pagos__forma_pago")
+    if retiros is None:
+        retiros = turno.retiros.all()
+
+    cobrado = Decimal("0.00")
+    for venta in ventas:
+        for forma_pago, monto in desglose_cobro(venta).items():
+            if forma_pago is not None and forma_pago.clave == Venta.CLAVE_EFECTIVO:
+                cobrado += monto
+    retirado = sum((r.monto for r in retiros), Decimal("0.00"))
+    return {
+        "efectivo_cobrado": cobrado,
+        "total_retiros": retirado,
+        "efectivo_esperado": cobrado - retirado,
     }
 
 

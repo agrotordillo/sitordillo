@@ -6,7 +6,7 @@ from apps.clientes.models import Cliente
 from apps.fiscal.models import FormaPago
 from apps.pagos.forms import FormaPagoSelect
 from apps.products.models import Producto
-from .models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle, VentaPago
+from .models import DevolucionCliente, DevolucionClienteDetalle, RetiroEfectivo, Venta, VentaDetalle, VentaPago
 
 
 class VentaForm(BaseModelForm):
@@ -188,3 +188,22 @@ class DevolucionLineaForm(forms.Form):
 
 
 DevolucionFormSet = forms.formset_factory(DevolucionLineaForm, extra=0)
+
+
+class RetiroEfectivoForm(BaseModelForm):
+    class Meta:
+        model = RetiroEfectivo
+        # turno no se captura: es el turno propio y abierto del cajero (ver
+        # retiro_efectivo_create_view); fecha toma el default del modelo.
+        fields = ["tipo", "monto", "descripcion", "entregado_a"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["monto"].widget.attrs.update({"step": "0.01", "min": "0.01", "inputmode": "decimal"})
+        self.fields["descripcion"].widget.attrs["placeholder"] = "Ej. pago de garrafones de agua"
+
+    def clean_monto(self):
+        monto = self.cleaned_data["monto"]
+        if monto is not None and monto <= 0:
+            raise forms.ValidationError("El monto del retiro debe ser mayor a cero.")
+        return monto

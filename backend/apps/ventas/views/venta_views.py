@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction
 from django.db.models import F, Q
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
@@ -12,8 +12,10 @@ from django.views.generic.edit import CreateView
 from apps.core.envio_unico import EnvioDuplicado, EnvioUnicoMixin, reservar_envio, respuesta_envio_duplicado
 from apps.core.errores import ERRORES_DE_NEGOCIO, mensajes_de_error
 from apps.core.filtros_fecha import FiltroFechaMixin
+from apps.core.parametros import id_valido
 from apps.core.scoping import almacenes_visibles
 from apps.cotizaciones.models import Cotizacion
+from apps.fiscal.models import FormaPago
 from apps.pedidos.models import Pedido
 from apps.products.services import fijar_precios_autorizados, turno_abierto_de
 from apps.ventas.models import Venta, VentaDetalle
@@ -21,6 +23,7 @@ from apps.ventas.forms import VentaForm, VentaDetalleFormSet, VentaPagoFormSet
 from apps.cobros.services import generar_cuenta_por_cobrar
 from apps.ventas.services import (
     procesar_lineas_venta,
+    reporte_ventas_por_cobro,
     validar_efectivo_recibido,
     validar_pago_dividido,
     validar_stock_disponible,
@@ -29,6 +32,10 @@ from apps.ventas.services import (
 
 
 class VentaListView(FiltroFechaMixin, PermissionRequiredMixin, ListView):
+    """Ventas del día (ver FiltroFechaMixin), filtrables además por forma
+    de cobro con su total -ver ventas.services.reporte_ventas_por_cobro,
+    que también arma el PDF de VentaReportePDFView con lo mismo-."""
+
     permission_required = "ventas.view_venta"
     model = Venta
     template_name = "ventas/venta_list.html"
@@ -36,15 +43,54 @@ class VentaListView(FiltroFechaMixin, PermissionRequiredMixin, ListView):
     extra_context = {"active_module": "sales"}
     filtro_fecha_campo = "fecha_venta"
 
+    def get_forma_pago_filtro(self):
+        pk = id_valido(self.request.GET.get("forma_pago"))
+        return FormaPago.objects.filter(pk=pk).first() if pk else None
+
     def get_queryset(self):
         queryset = (
-            super().get_queryset().select_related("cliente", "almacen", "factura").prefetch_related("detalles")
+            super()
+            .get_queryset()
+            .select_related("cliente", "almacen", "factura", "forma_pago")
+            .prefetch_related("detalles", "pagos__forma_pago")
         )
         queryset = self.aplicar_filtro_fecha(queryset)
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:
             queryset = queryset.filter(almacen__in=visibles)
         return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        forma_pago = self.get_forma_pago_filtro()
+        context.update(reporte_ventas_por_cobro(context["object_list"], forma_pago))
+        opciones = [r["forma_pago"] for r in context["resumen_cobro"]]
+        if forma_pago is not None and forma_pago not in opciones:
+            opciones.append(forma_pago)
+        context["forma_pago_filtro"] = forma_pago
+        context["formas_pago_opciones"] = opciones
+        return context
+
+
+class VentaReportePDFView(VentaListView):
+    """Mismo listado (fecha + forma de cobro) que VentaListView, en PDF."""
+
+    def render_to_response(self, context, **response_kwargs):
+        from apps.facturacion.models import Empresa
+        from apps.ventas.pdf import generar_pdf_reporte_ventas
+
+        pdf = generar_pdf_reporte_ventas({
+            "empresa": Empresa.objects.first(),
+            "usuario": self.request.user,
+            "fecha": context["fecha_filtro"],
+            "forma_pago": context["forma_pago_filtro"],
+            "ventas": context["ventas"],
+            "total_cobro": context["total_cobro"],
+            "resumen_cobro": context["resumen_cobro"],
+        })
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="ventas-{context["fecha_filtro"]:%Y-%m-%d}.pdf"'
+        return response
 
 
 class VentaTicketView(PermissionRequiredMixin, DetailView):

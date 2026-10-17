@@ -148,3 +148,50 @@ def construir_ticket(venta, empresa=None):
     partes.append(_CORTE_PAPEL)
 
     return "".join(partes).encode(_CODIFICACION, errors="replace")
+
+
+def construir_ticket_retiro(retiro, empresa=None):
+    """Comprobante de un `RetiroEfectivo` como bytes ESC/POS, con el mismo
+    contenido que `ventas/retiro_ticket.html` y una línea de firma para
+    quien recibe el efectivo, en la impresora de la sucursal del turno."""
+    turno = retiro.turno
+    almacen = turno.punto_venta.almacen
+    ancho = almacen.impresora_ancho_columnas
+    separador = "=" * ancho + "\n"
+
+    partes = [_INIT, _CODEPAGE_CP850, _ALINEAR_CENTRO]
+    partes.append(_NEGRITA_ON + "Agroveterinaria el Tordillo" + "\n" + _NEGRITA_OFF)
+    if empresa and empresa.rfc:
+        partes.append(f"RFC: {empresa.rfc}\n")
+    partes.append(almacen.nombre + "\n")
+    partes.append(_NEGRITA_ON + "RETIRO DE EFECTIVO" + "\n" + _NEGRITA_OFF)
+
+    partes.append(_ALINEAR_IZQUIERDA)
+    partes.append(separador)
+    apertura_local = timezone.localtime(turno.hora_apertura)
+    partes.append(f"Turno: {turno.fecha:%d/%m/%Y}  Apertura: {apertura_local:%H:%M}\n")
+    partes.append(f"Punto de venta: {turno.punto_venta.codigo} {turno.punto_venta.nombre}\n")
+    partes.append(f"Cajero: {_nombre_usuario(turno.usuario)}\n")
+    partes.append(separador)
+    partes.append(f"Folio: {retiro.folio}-{retiro.veces_impreso}\n")
+    fecha_local = timezone.localtime(retiro.fecha)
+    partes.append(f"Fecha: {fecha_local:%d/%m/%Y}  Hora: {fecha_local:%H:%M}\n")
+    partes.append(f"Tipo: {retiro.get_tipo_display()}\n")
+    for renglon in wrap(f"Concepto: {retiro.descripcion}", ancho) or [retiro.descripcion]:
+        partes.append(renglon + "\n")
+    if retiro.entregado_a:
+        partes.append(f"Entregado a: {retiro.entregado_a}\n")
+    partes.append(separador)
+    partes.append(_NEGRITA_ON)
+    partes.append(_fila("MONTO RETIRADO:", f"${moneda(retiro.monto)}", ancho))
+    partes.append(_NEGRITA_OFF)
+    partes.append(separador)
+
+    partes.append("\n\n\n")
+    partes.append(_ALINEAR_CENTRO)
+    partes.append("_" * min(ancho, 32) + "\n")
+    partes.append("Firma de quien recibe\n")
+    partes.append("\n\n\n\n\n")
+    partes.append(_CORTE_PAPEL)
+
+    return "".join(partes).encode(_CODIFICACION, errors="replace")

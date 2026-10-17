@@ -1,0 +1,106 @@
+{% load static core_extras %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Retiro {{ retiro.folio }}</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #e5e7eb;
+    font-family: "Courier New", Courier, monospace;
+    color: #111827;
+  }
+  .ticket {
+    width: 80mm;
+    margin: 12px auto;
+    background: #fff;
+    padding: 8px 6px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: 700; }
+  .nombre-negocio { font-size: 14px; font-weight: 700; }
+  .muted { color: #4b5563; }
+  .sep { border: none; border-top: 1px dashed #6b7280; margin: 6px 0; }
+  .monto { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 700; }
+  .firma { margin-top: 40px; text-align: center; font-size: 10.5px; }
+  .firma hr { border: none; border-top: 1px solid #111827; width: 70%; margin: 0 auto 2px; }
+  .acciones { width: 80mm; margin: 0 auto 16px; text-align: center; }
+  .btn-imprimir {
+    background: #308e3f;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn-volver {
+    display: inline-block;
+    margin-left: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  @media print {
+    html, body { background: #fff; }
+    .no-print { display: none !important; }
+    .ticket { margin: 0 auto; box-shadow: none; }
+    @page { size: 80mm auto; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ticket">
+  <div class="center">
+    <div class="nombre-negocio">Agropecuaria el Tordillo</div>
+    {% if empresa and empresa.rfc %}<div class="muted">RFC: {{ empresa.rfc }}</div>{% endif %}
+    <div class="muted">{{ retiro.turno.punto_venta.almacen.nombre }}</div>
+    <div class="bold" style="margin-top:4px;">RETIRO DE EFECTIVO</div>
+  </div>
+
+  <hr class="sep">
+
+  <div class="muted">Turno: {{ retiro.turno.fecha|date:"d/m/Y" }} · Apertura: {{ retiro.turno.hora_apertura|date:"H:i" }}</div>
+  <div class="muted">Punto de venta: {{ retiro.turno.punto_venta.codigo }} {{ retiro.turno.punto_venta.nombre }}</div>
+  <div class="muted">Cajero: {{ retiro.turno.usuario.get_full_name|default:retiro.turno.usuario.get_username }}</div>
+
+  <hr class="sep">
+
+  <div>Folio: <span class="bold">{{ retiro.folio }}-{{ retiro.veces_impreso }}</span></div>
+  <div>Fecha: {{ retiro.fecha|date:"d/m/Y" }} &nbsp; Hora: {{ retiro.fecha|date:"H:i" }}</div>
+  <div>Tipo: {{ retiro.get_tipo_display }}</div>
+  <div>Concepto: {{ retiro.descripcion }}</div>
+  {% if retiro.entregado_a %}<div>Entregado a: {{ retiro.entregado_a }}</div>{% endif %}
+
+  <hr class="sep">
+  <div class="monto"><span>MONTO RETIRADO:</span><span>${{ retiro.monto|moneda }}</span></div>
+  <hr class="sep">
+
+  <div class="firma">
+    <hr>
+    Firma de quien recibe
+  </div>
+</div>
+
+<div class="acciones no-print">
+  <button type="button" id="btn-imprimir-ticket" class="btn-imprimir"
+          data-url-certificado="{% url 'ventas:qz-certificado' %}" data-url-firmar="{% url 'ventas:qz-firmar' %}">Imprimir ticket</button>
+  <a href="{% url 'ventas:retiro-list' %}" class="btn-volver">Volver a retiros</a>
+  <p id="qz-estado" class="mt-2 text-xs text-gray-500"></p>
+</div>
+
+{% if ticket_data %}
+{{ ticket_data|json_script:"ticket-data" }}
+<script src="{% static 'js/vendor/qz-tray.js' %}"></script>
+{% endif %}
+{# Sin impresora configurada solo conecta el botón a la impresión normal. #}
+<script src="{% static 'js/pages/venta-ticket.js' %}"></script>
+
+</body>
+</html>

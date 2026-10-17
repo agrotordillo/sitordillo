@@ -1,0 +1,86 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Retiros de efectivo{% endblock title %}
+{% block title_layout %}Retiros de efectivo{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Retiros de efectivo</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  {% include "core/includes/_filtro_fecha.html" %}
+</form>
+{% if perms.ventas.add_retiroefectivo %}
+<a href="{% url 'ventas:retiro-create' %}" class="btn-primary w-full sm:w-auto">
+  <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+  </svg>
+  Retirar efectivo
+</a>
+{% endif %}
+{% endblock table_actions %}
+{% block main_content %}
+{% if por_tipo %}
+<div class="flex flex-wrap gap-2 px-4 sm:px-6 py-3 border-b border-gray-100">
+  {% for tipo, monto in por_tipo.items %}
+  <div class="rounded-lg border border-gray-100 px-3 py-2 text-sm">
+    <span class="block text-xs text-gray-500">{{ tipo }}</span>
+    <span class="block font-semibold text-gray-800">${{ monto|moneda }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Tipo</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Descripción</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Caja / cajero</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Hora</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Monto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for retiro in retiros %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3.5 font-mono text-xs text-gray-400">{{ retiro.folio }}</td>
+        <td class="px-4 sm:px-6 py-3.5 text-gray-700">{{ retiro.get_tipo_display }}</td>
+        <td class="px-4 sm:px-6 py-3.5 text-gray-700">
+          {{ retiro.descripcion }}
+          {% if retiro.entregado_a %}<span class="block text-xs text-gray-400">Entregado a {{ retiro.entregado_a }}</span>{% endif %}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 text-gray-500 hidden md:table-cell">
+          {{ retiro.turno.punto_venta.nombre }} · {{ retiro.turno.usuario.get_full_name|default:retiro.turno.usuario.username }}
+        </td>
+        <td class="px-4 sm:px-6 py-3.5 text-gray-500 hidden sm:table-cell">{{ retiro.fecha|date:"H:i" }}</td>
+        <td class="px-4 sm:px-6 py-3.5 text-right font-medium text-gray-800">${{ retiro.monto|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 text-right">
+          <a href="{% url 'ventas:retiro-ticket' retiro.pk %}" target="_blank" rel="noopener" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Ticket</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="px-4 sm:px-6 py-12 text-center text-sm text-gray-400">No hay retiros de efectivo en este día.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if retiros %}
+    <tfoot>
+      <tr class="border-t border-gray-200 bg-gray-50">
+        <td colspan="5" class="px-4 sm:px-6 py-3 text-right text-sm font-semibold text-gray-700">Total retirado ({{ retiros|length }})</td>
+        <td class="px-4 sm:px-6 py-3 text-right text-sm font-semibold text-gray-900">${{ total_retiros|moneda }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endblock main_content %}

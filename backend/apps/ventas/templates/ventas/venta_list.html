@@ -12,9 +12,16 @@
 </nav>
 {% endblock breadcrumbs %}
 {% block table_actions %}
-<form method="get" class="w-full sm:w-auto">
+<form method="get" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
   {% include "core/includes/_filtro_fecha.html" %}
+  <select name="forma_pago" class="input" data-enviar-al-cambiar aria-label="Forma de cobro">
+    <option value="">Todas las formas de cobro</option>
+    {% for fp in formas_pago_opciones %}
+    <option value="{{ fp.pk }}" {% if forma_pago_filtro and fp.pk == forma_pago_filtro.pk %}selected{% endif %}>{{ fp.descripcion }}</option>
+    {% endfor %}
+  </select>
 </form>
+<a href="{% url 'ventas:venta-reporte-pdf' %}?{{ request.GET.urlencode }}" target="_blank" rel="noopener" class="btn-secondary w-full sm:w-auto">PDF</a>
 <a href="{% url 'ventas:devolucion-list' %}" class="btn-secondary w-full sm:w-auto">Devoluciones</a>
 <a href="{% url 'ventas:venta-create' %}" class="btn-primary w-full sm:w-auto">
   <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -24,6 +31,17 @@
 </a>
 {% endblock table_actions %}
 {% block main_content %}
+{% if resumen_cobro %}
+<div class="flex flex-wrap gap-2 px-4 sm:px-6 py-3 border-b border-gray-100">
+  {% for renglon in resumen_cobro %}
+  <a href="?fecha={{ fecha_filtro|date:'Y-m-d' }}&forma_pago={{ renglon.forma_pago.pk }}"
+     class="rounded-lg border px-3 py-2 text-sm {% if forma_pago_filtro and renglon.forma_pago.pk == forma_pago_filtro.pk %}border-primary-300 bg-primary-50{% else %}border-gray-100 hover:bg-gray-50{% endif %}">
+    <span class="block text-xs text-gray-500">{{ renglon.forma_pago.descripcion }} · {{ renglon.ventas }} venta{{ renglon.ventas|pluralize }}</span>
+    <span class="block font-semibold text-gray-800">${{ renglon.monto|moneda }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
@@ -32,7 +50,7 @@
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Sucursal</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Fecha</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Total</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{% if forma_pago_filtro %}Cobrado en {{ forma_pago_filtro.descripcion|lower }}{% else %}Total{% endif %}</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
       </tr>
     </thead>
@@ -46,7 +64,10 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ venta.cliente.display_name }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden sm:table-cell">{{ venta.almacen.nombre }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden md:table-cell">{{ venta.fecha_venta|date:"d/m/Y H:i" }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">
+          ${{ venta.monto_cobro|moneda }}
+          {% if venta.monto_cobro != venta.total %}<span class="block text-xs font-normal text-gray-400">de ${{ venta.total|moneda }} (cobro dividido)</span>{% endif %}
+        </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
           <a href="{% url 'ventas:venta-ticket' venta.pk %}" target="_blank" rel="noopener" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Ticket</a>
           {% if venta.es_remision %}
@@ -81,6 +102,17 @@
       </tr>
       {% endfor %}
     </tbody>
+    {% if ventas %}
+    <tfoot>
+      <tr class="border-t border-gray-200 bg-gray-50">
+        <td colspan="4" class="px-4 sm:px-6 py-3 text-right text-sm font-semibold text-gray-700">
+          Total{% if forma_pago_filtro %} cobrado en {{ forma_pago_filtro.descripcion|lower }}{% endif %} ({{ ventas|length }} venta{{ ventas|length|pluralize }})
+        </td>
+        <td class="px-4 sm:px-6 py-3 text-sm font-semibold text-gray-900">${{ total_cobro|moneda }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+    {% endif %}
   </table>
 </div>
 {% endblock main_content %}

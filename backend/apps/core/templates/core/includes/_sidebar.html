@@ -280,6 +280,9 @@
       {% if perms.ventas.view_devolucioncliente %}
       <a href="{% url 'ventas:devolucion-list' %}" class="sidebar-sublink">Devoluciones</a>
       {% endif %}
+      {% if perms.ventas.view_retiroefectivo %}
+      <a href="{% url 'ventas:retiro-list' %}" class="sidebar-sublink">Retiros de efectivo</a>
+      {% endif %}
       {% if perms.cobros.view_cuentaporcobrar %}
       <a href="{% url 'cobros:cuenta-list' %}" class="sidebar-sublink">Cuentas por cobrar</a>
       {% endif %}

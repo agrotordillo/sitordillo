@@ -19,8 +19,17 @@ from apps.clientes.models import Cliente
 from apps.fiscal.models import FormaPago
 from apps.inventario.models import Lote, MovimientoInventario
 from apps.products.models import Almacen, PaqueteComponente, Producto, PuntoVenta, Turno
-from apps.ventas.models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle, VentaDetalleLote
-from apps.ventas.services import registrar_devolucion, validar_efectivo_recibido
+from apps.ventas.models import (
+    DevolucionCliente,
+    DevolucionClienteDetalle,
+    RetiroEfectivo,
+    Venta,
+    VentaDetalle,
+    VentaDetalleLote,
+    VentaPago,
+)
+from apps.ventas.services import registrar_devolucion, resumen_turno, validar_efectivo_recibido
+from apps.ventas.ticket import construir_ticket_retiro
 from apps.ventas.views import qz_views
 
 User = get_user_model()
@@ -251,3 +260,172 @@ class CobroTests(TestCase):
         self.assertIsNone(venta.forma_pago)
         self.assertIsNone(venta.efectivo_recibido)
         self.assertIsNone(venta.cambio)
+
+
+class ReporteVentasPorCobroTests(TestCase):
+    """Filtro por forma de cobro del listado de ventas y su PDF: el total
+    de una forma de cobro cuenta solo la parte cobrada así en una venta de
+    cobro dividido, no el total de la venta."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.sucursal = Almacen.objects.create(nombre="Sucursal Centro", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        cls.cliente = Cliente.objects.create(nombre="Cliente Prueba")
+        cls.efectivo = FormaPago.objects.get_or_create(clave="01", defaults={"descripcion": "Efectivo"})[0]
+        cls.tarjeta = FormaPago.objects.get_or_create(clave="04", defaults={"descripcion": "Tarjeta de crédito"})[0]
+        cls.producto = Producto.objects.create(nombre="Croqueta", sku="CRQ", precio_venta=Decimal("100.00"))
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+
+        def venta(precio, forma_pago=None, pagos=()):
+            v = Venta.objects.create(cliente=cls.cliente, almacen=cls.sucursal, forma_pago=forma_pago)
+            VentaDetalle.objects.create(venta=v, producto=cls.producto, cantidad=1, precio_unitario=precio)
+            for fp, monto in pagos:
+                VentaPago.objects.create(venta=v, forma_pago=fp, monto=monto)
+            return v
+
+        cls.solo_efectivo = venta(Decimal("100.00"), cls.efectivo)
+        cls.solo_tarjeta = venta(Decimal("250.00"), cls.tarjeta)
+        cls.dividida = venta(Decimal("300.00"), pagos=[(cls.efectivo, Decimal("120.00")), (cls.tarjeta, Decimal("180.00"))])
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def test_filtrar_por_efectivo_suma_solo_lo_cobrado_en_efectivo(self):
+        respuesta = self.client.get(reverse("ventas:venta-list"), {"forma_pago": self.efectivo.pk})
+
+        self.assertEqual(
+            {v.pk for v in respuesta.context["ventas"]}, {self.solo_efectivo.pk, self.dividida.pk}
+        )
+        self.assertEqual(respuesta.context["total_cobro"], Decimal("220.00"))
+
+    def test_sin_filtro_resume_cada_forma_de_cobro(self):
+        respuesta = self.client.get(reverse("ventas:venta-list"))
+
+        resumen = {r["forma_pago"].clave: (r["monto"], r["ventas"]) for r in respuesta.context["resumen_cobro"]}
+        self.assertEqual(resumen, {"01": (Decimal("220.00"), 2), "04": (Decimal("430.00"), 2)})
+        self.assertEqual(respuesta.context["total_cobro"], Decimal("650.00"))
+
+    def test_pdf_del_listado_filtrado(self):
+        respuesta = self.client.get(reverse("ventas:venta-reporte-pdf"), {"forma_pago": self.tarjeta.pk})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta["Content-Type"], "application/pdf")
+        self.assertTrue(respuesta.content.startswith(b"%PDF"))
+
+    def test_forma_de_cobro_invalida_no_rompe_la_pantalla(self):
+        respuesta = self.client.get(reverse("ventas:venta-list"), {"forma_pago": "abc"})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIsNone(respuesta.context["forma_pago_filtro"])
+
+
+class RetiroEfectivoTests(TestCase):
+    """Retiro de efectivo de la caja (por gasto o a caja fuerte): lo hace
+    el cajero sobre su propio turno abierto, imprime comprobante y se
+    resta del efectivo esperado en el corte."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.sucursal = Almacen.objects.create(nombre="Sucursal Centro", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        cls.caja = PuntoVenta.objects.create(almacen=cls.sucursal, codigo="C1", numero=1, nombre="Caja 1")
+        cls.cliente = Cliente.objects.create(nombre="Cliente Prueba")
+        cls.efectivo = FormaPago.objects.get_or_create(clave="01", defaults={"descripcion": "Efectivo"})[0]
+        cls.tarjeta = FormaPago.objects.get_or_create(clave="04", defaults={"descripcion": "Tarjeta de crédito"})[0]
+        cls.producto = Producto.objects.create(nombre="Croqueta", sku="CRQ", precio_venta=Decimal("100.00"))
+        cls.cajero = User.objects.create_user(username="cajero", password="S3guridad!2026")
+        cls.cajero.user_permissions.add(*Permission.objects.filter(
+            codename__in=["add_retiroefectivo", "view_retiroefectivo", "view_venta", "view_turno"]
+        ))
+
+    def setUp(self):
+        self.turno = Turno.objects.create(punto_venta=self.caja, usuario=self.cajero)
+        self.client.force_login(self.cajero)
+
+    def _retirar(self, **datos):
+        return self.client.post(reverse("ventas:retiro-create"), {
+            "tipo": RetiroEfectivo.Tipo.GASTO, "monto": "50.00", "descripcion": "Garrafones de agua",
+            "entregado_a": "", **datos,
+        })
+
+    def test_el_cajero_retira_de_su_turno_e_imprime_comprobante(self):
+        respuesta = self._retirar()
+
+        retiro = RetiroEfectivo.objects.get()
+        self.assertRedirects(respuesta, reverse("ventas:retiro-ticket", args=[retiro.pk]), fetch_redirect_response=False)
+        self.assertEqual(retiro.turno, self.turno)
+        self.assertEqual(retiro.monto, Decimal("50.00"))
+
+        ticket = self.client.get(reverse("ventas:retiro-ticket", args=[retiro.pk]))
+        self.assertContains(ticket, "RETIRO DE EFECTIVO")
+        retiro.refresh_from_db()
+        self.assertEqual(retiro.veces_impreso, 1)
+
+    def test_sin_turno_abierto_no_puede_retirar(self):
+        self.turno.cerrar()
+
+        respuesta = self._retirar()
+
+        self.assertRedirects(respuesta, reverse("products:turno-list"), fetch_redirect_response=False)
+        self.assertFalse(RetiroEfectivo.objects.exists())
+
+    def test_monto_cero_no_se_registra(self):
+        respuesta = self._retirar(monto="0")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(RetiroEfectivo.objects.exists())
+
+    def test_no_se_retira_de_un_turno_cerrado(self):
+        self.turno.cerrar()
+        retiro = RetiroEfectivo(turno=self.turno, tipo=RetiroEfectivo.Tipo.CAJA_FUERTE, monto=1, descripcion="x")
+
+        with self.assertRaisesMessage(ValidationError, "turno ya está cerrado"):
+            retiro.full_clean()
+
+    def test_sin_permiso_no_entra(self):
+        otro = User.objects.create_user(username="mostrador", password="S3guridad!2026")
+        self.client.force_login(otro)
+
+        self.assertEqual(self.client.get(reverse("ventas:retiro-create")).status_code, 403)
+
+    def test_el_corte_resta_los_retiros_del_efectivo_cobrado(self):
+        efectivo = Venta.objects.create(
+            cliente=self.cliente, almacen=self.sucursal, forma_pago=self.efectivo, turno=self.turno
+        )
+        VentaDetalle.objects.create(venta=efectivo, producto=self.producto, cantidad=1, precio_unitario=Decimal("100.00"))
+        dividida = Venta.objects.create(cliente=self.cliente, almacen=self.sucursal, turno=self.turno)
+        VentaDetalle.objects.create(venta=dividida, producto=self.producto, cantidad=1, precio_unitario=Decimal("300.00"))
+        VentaPago.objects.create(venta=dividida, forma_pago=self.efectivo, monto=Decimal("120.00"))
+        VentaPago.objects.create(venta=dividida, forma_pago=self.tarjeta, monto=Decimal("180.00"))
+        RetiroEfectivo.objects.create(turno=self.turno, tipo=RetiroEfectivo.Tipo.GASTO, monto=50, descripcion="Agua")
+        RetiroEfectivo.objects.create(
+            turno=self.turno, tipo=RetiroEfectivo.Tipo.CAJA_FUERTE, monto=100, descripcion="Caja fuerte"
+        )
+
+        resumen = resumen_turno(self.turno)
+
+        self.assertEqual(resumen["efectivo_cobrado"], Decimal("220.00"))
+        self.assertEqual(resumen["total_retiros"], Decimal("150.00"))
+        self.assertEqual(resumen["efectivo_esperado"], Decimal("70.00"))
+        self.assertEqual(resumen["retiros_por_tipo"], {"Gasto": Decimal("50.00"), "Envío a caja fuerte": Decimal("100.00")})
+        corte = self.client.get(reverse("products:turno-corte", args=[self.turno.pk]))
+        self.assertContains(corte, "Efectivo esperado")
+
+    def test_ticket_esc_pos_del_retiro(self):
+        retiro = RetiroEfectivo.objects.create(
+            turno=self.turno, tipo=RetiroEfectivo.Tipo.CAJA_FUERTE, monto=Decimal("1500.00"),
+            descripcion="Envío a caja fuerte", entregado_a="Gerente",
+        )
+
+        datos = construir_ticket_retiro(retiro)
+
+        self.assertIn(b"RETIRO DE EFECTIVO", datos)
+        self.assertIn(b"$1,500.00", datos)
+        self.assertIn(b"Entregado a: Gerente", datos)
+
+    def test_listado_del_dia(self):
+        RetiroEfectivo.objects.create(turno=self.turno, tipo=RetiroEfectivo.Tipo.GASTO, monto=50, descripcion="Agua")
+
+        respuesta = self.client.get(reverse("ventas:retiro-list"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context["total_retiros"], Decimal("50.00"))

@@ -526,3 +526,80 @@ class DevolucionClienteDetalle(BaseAbstractModel):
                 raise ValidationError({
                     "cantidad": f"No puede devolver más de lo pendiente para esta línea ({pendiente}).",
                 })
+
+
+class RetiroEfectivo(BaseAbstractModel):
+    """Salida de efectivo de la caja durante un turno, igual que la
+    "RETIRO DE CAJA" de scvweb: por un gasto pagado con el dinero de la
+    caja o por mandar efectivo a la caja fuerte. Es independiente de
+    gastos.Gasto -no crea uno, solo saca el dinero con su descripción- y
+    tampoco lleva saldo de caja fuerte: solo se registra la salida. Se
+    resta del efectivo esperado en el corte (ver
+    ventas.services.resumen_turno)."""
+
+    class Tipo(models.TextChoices):
+        GASTO = "gasto", "Gasto"
+        CAJA_FUERTE = "caja_fuerte", "Envío a caja fuerte"
+
+    turno = models.ForeignKey(
+        "products.Turno",
+        on_delete=models.PROTECT,
+        related_name="retiros",
+        verbose_name="Turno",
+        help_text="El turno propio y abierto del cajero que retira (ver products.services.turno_abierto_de).",
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, verbose_name="Tipo de retiro")
+    monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto")
+    descripcion = models.CharField(max_length=200, verbose_name="Descripción")
+    entregado_a = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Entregado a",
+        help_text="Quién recibe el efectivo (ej. el encargado que lo lleva a la caja fuerte).",
+    )
+    fecha = models.DateTimeField(default=timezone.now, verbose_name="Fecha")
+    veces_impreso = models.PositiveIntegerField(
+        default=0,
+        editable=False,
+        verbose_name="Veces impreso",
+        help_text="Se incrementa cada vez que se abre el comprobante para imprimirlo o reimprimirlo.",
+    )
+
+    class Meta:
+        verbose_name = "Retiro de efectivo"
+        verbose_name_plural = "Retiros de efectivo"
+        ordering = ["-fecha"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(monto__gt=0),
+                name="ret_monto_positivo",
+                violation_error_message="El monto del retiro debe ser mayor a cero.",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["turno"]),
+            models.Index(fields=["fecha"]),
+        ]
+
+    def __str__(self):
+        return f"{self.folio} · {self.get_tipo_display()} · ${self.monto}"
+
+    def get_folio_prefix(self):
+        return "RET"
+
+    def get_slug_source(self):
+        return f"{self.folio}-{self.turno_id}"
+
+    @property
+    def display_name(self):
+        return self.__str__()
+
+    def clean(self):
+        super().clean()
+        # Solo al registrarlo: un retiro ya guardado no se invalida porque
+        # después se cierre el turno.
+        if self.pk is None and self.turno_id:
+            if not self.turno.esta_abierto:
+                raise ValidationError("El turno ya está cerrado: no se puede retirar efectivo de él.")
+            if not self.turno.es_de_cobro:
+                raise ValidationError("Solo se puede retirar efectivo de un turno de caja (cobro).")

@@ -1,0 +1,91 @@
+{% load core_extras %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ventas {{ fecha|date:"d/m/Y" }}</title>
+<style>
+  @page { size: letter; margin: 1.5cm 1.2cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1f2933; }
+  h1 { font-size: 14pt; margin: 0 0 2px 0; }
+  .logo { width: 44px; height: 44px; }
+  .muted { color: #52606d; font-size: 8.5pt; }
+  .encabezado { width: 100%; margin-bottom: 12px; }
+  .encabezado td { vertical-align: top; }
+  .derecha { text-align: right; }
+  table.lista { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  table.lista th { background-color: #f0f2f5; text-align: left; padding: 5px 4px; font-size: 8.5pt; border-bottom: 1px solid #c5cbd3; }
+  table.lista td { padding: 4px; border-bottom: 1px solid #e4e7eb; }
+  table.lista td.num, table.lista th.num { text-align: right; }
+  tr.total td { font-weight: bold; border-top: 1px solid #1f2933; border-bottom: none; }
+  h2 { font-size: 10pt; margin: 14px 0 4px 0; }
+</style>
+</head>
+<body>
+<table class="encabezado">
+  <tr>
+    <td style="width: 52px;">{% if logo_path %}<img src="{{ logo_path }}" class="logo">{% endif %}</td>
+    <td>
+      <h1>Reporte de ventas</h1>
+      <div class="muted">{% if empresa %}{{ empresa.display_name }}{% endif %}</div>
+    </td>
+    <td class="derecha">
+      <div><strong>{{ fecha|date:"d/m/Y" }}</strong></div>
+      <div class="muted">Forma de cobro: {% if forma_pago %}{{ forma_pago.descripcion }}{% else %}Todas{% endif %}</div>
+      <div class="muted">Generado por {{ usuario.get_full_name|default:usuario.get_username }}</div>
+    </td>
+  </tr>
+</table>
+
+<table class="lista">
+  <thead>
+    <tr>
+      <th>Folio</th>
+      <th>Hora</th>
+      <th>Cliente</th>
+      <th>Sucursal</th>
+      <th>Forma de cobro</th>
+      <th class="num">{% if forma_pago %}Cobrado{% else %}Total{% endif %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for venta in ventas %}
+    <tr>
+      <td>{{ venta.folio }}{% if venta.es_remision %} (remisión){% endif %}</td>
+      <td>{{ venta.fecha_venta|date:"H:i" }}</td>
+      <td>{{ venta.cliente.display_name }}</td>
+      <td>{{ venta.almacen.nombre }}</td>
+      <td>{{ venta.forma_pago_texto }}</td>
+      <td class="num">${{ venta.monto_cobro|moneda }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6">Sin ventas para este filtro.</td></tr>
+    {% endfor %}
+    {% if ventas %}
+    <tr class="total">
+      <td colspan="5" class="derecha">Total ({{ ventas|length }} venta{{ ventas|length|pluralize }})</td>
+      <td class="num">${{ total_cobro|moneda }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+{% if not forma_pago and resumen_cobro %}
+<h2>Resumen por forma de cobro</h2>
+<table class="lista">
+  <thead>
+    <tr><th>Forma de cobro</th><th class="num">Ventas</th><th class="num">Monto</th></tr>
+  </thead>
+  <tbody>
+    {% for renglon in resumen_cobro %}
+    <tr>
+      <td>{{ renglon.forma_pago.descripcion }}</td>
+      <td class="num">{{ renglon.ventas }}</td>
+      <td class="num">${{ renglon.monto|moneda }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</body>
+</html>
