@@ -1,94 +1,66 @@
+import datetime
+from decimal import Decimal
+
 import openpyxl
 from django.contrib.auth.decorators import permission_required
-from django.db.models import DecimalField, OuterRef, Q, Subquery
 from django.http import HttpResponse
 from django.utils import timezone
+from openpyxl.styles import Font, PatternFill
 
 from apps.core.filtros_producto import aplicar_filtros_producto, leer_filtros_producto
-from apps.products.models import Producto, ProductoPrecio
-from apps.products.views.product_views import LISTAS_PRECIO_TABLA
+from apps.products import columnas_listado
+from apps.products.models import Producto
+from apps.products.views.product_views import filtrar_busqueda_producto
 
-ENCABEZADOS = [
-    "Folio", "SKU", "Código de barras", "Nombre", "Tipo", "Estatus",
-    "Categoría", "Subcategoría", "Línea", "Clase", "Marca", "Proveedor", "Código de proveedor",
-    "Unidad de medida", "Contenido", "Unidad auxiliar", "Factor auxiliar", "IVA", "Tasa IVA (%)", "Aplica IEPS", "Tasa IEPS (%)",
-    "Método de costeo", "Precio de costo", "Precio de venta (general)",
-] + [nombre.title() for nombre, _ in LISTAS_PRECIO_TABLA] + [
-    "Stock mínimo", "Stock máximo", "Peso (kg)", "Días de reserva",
-]
+RELLENO_GRUPO = PatternFill("solid", fgColor="F3F4F6")
+
+
+def _valor_excel(valor):
+    if isinstance(valor, Decimal):
+        return float(valor)
+    if isinstance(valor, datetime.datetime):
+        return timezone.localtime(valor).replace(tzinfo=None) if timezone.is_aware(valor) else valor
+    return valor
 
 
 @permission_required("products.view_producto", raise_exception=True)
 def producto_exportar_excel_view(request):
     """Descarga en Excel el mismo listado de Productos que se ve en
-    pantalla -respeta los filtros de búsqueda, marca, línea, categoría,
-    subcategoría y clase si se llega desde ahí-, con toda su información
-    incluidos los 5 precios generales de lista (los mismos que se
-    muestran como columnas en el listado)."""
-    queryset = Producto.objects.select_related(
-        "categoria", "subcategoria", "linea", "clase", "marca", "proveedor", "unidad_medida", "unidad_medida_auxiliar",
-    ).order_by("nombre")
+    pantalla: respeta la búsqueda y los filtros, y también las columnas
+    (cuáles y en qué orden) y la agrupación que el usuario eligió, con una
+    fila por grupo que dice cuántos productos tiene."""
+    claves_columnas, claves_agrupar = columnas_listado.preferencia_de(request.user)
+    columnas = [columnas_listado.COLUMNAS[clave] for clave in claves_columnas]
 
-    q = request.GET.get("q", "").strip()
-    if q:
-        queryset = queryset.filter(Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q))
-
+    queryset = filtrar_busqueda_producto(Producto.objects.all(), request.GET.get("q", "").strip())
     queryset = aplicar_filtros_producto(queryset, leer_filtros_producto(request))
-
-    annotations = {
-        campo: Subquery(
-            ProductoPrecio.objects.filter(
-                producto_id=OuterRef("pk"), lista_precio__nombre=nombre, almacen__isnull=True,
-            ).values("precio_con_impuesto")[:1],
-            output_field=DecimalField(max_digits=12, decimal_places=2),
-        )
-        for nombre, campo in LISTAS_PRECIO_TABLA
-    }
-    queryset = queryset.annotate(**annotations)
+    conteos = columnas_listado.conteos_por_grupo(queryset, claves_agrupar) if claves_agrupar else {}
+    queryset = columnas_listado.preparar_queryset(queryset.order_by("nombre"), claves_columnas, claves_agrupar)
 
     workbook = openpyxl.Workbook()
     hoja = workbook.active
     hoja.title = "Productos"
-    hoja.append(ENCABEZADOS)
+    hoja.append([columna.titulo for columna in columnas])
+    for celda in hoja[1]:
+        celda.font = Font(bold=True)
 
-    for producto in queryset.iterator():
-        hoja.append([
-            producto.folio,
-            producto.sku,
-            producto.codigo_barras or "",
-            producto.nombre,
-            producto.get_tipo_display(),
-            "Activo" if producto.is_active else "Inactivo",
-            producto.categoria.nombre if producto.categoria_id else "",
-            producto.subcategoria.nombre if producto.subcategoria_id else "",
-            producto.linea.nombre if producto.linea_id else "",
-            producto.clase.nombre if producto.clase_id else "",
-            producto.marca.nombre if producto.marca_id else "",
-            producto.proveedor.display_name if producto.proveedor_id else "",
-            producto.codigo_proveedor or "",
-            producto.unidad_medida.nombre if producto.unidad_medida_id else "",
-            producto.contenido_display,
-            producto.unidad_medida_auxiliar.nombre if producto.unidad_medida_auxiliar_id else "",
-            float(producto.factor_unidad_auxiliar) if producto.factor_unidad_auxiliar is not None else None,
-            producto.get_tipo_iva_display(),
-            float(producto.tasa_iva),
-            "Sí" if producto.aplica_ieps else "No",
-            float(producto.tasa_ieps) if producto.tasa_ieps is not None else None,
-            producto.get_costeo_display(),
-            float(producto.precio_costo),
-            float(producto.precio_venta),
-            *[
-                (float(getattr(producto, campo)) if getattr(producto, campo) is not None else None)
-                for _, campo in LISTAS_PRECIO_TABLA
-            ],
-            float(producto.stock_minimo),
-            float(producto.stock_maximo),
-            float(producto.peso) if producto.peso is not None else None,
-            producto.dias_reserva,
-        ])
+    for fila in columnas_listado.filas_agrupadas(queryset.iterator(), claves_agrupar, conteos):
+        if fila["es_grupo"]:
+            sangria = "    " * fila["nivel"]
+            hoja.append([f'{sangria}{fila["titulo"]}: {fila["valor"]} ({fila["conteo"]})'])
+            numero = hoja.max_row
+            hoja.cell(row=numero, column=1).font = Font(bold=True)
+            for indice in range(1, len(columnas) + 1):
+                hoja.cell(row=numero, column=indice).fill = RELLENO_GRUPO
+            continue
+        hoja.append([_valor_excel(columna.valor(fila["producto"])) for columna in columnas])
 
-    for indice, _ in enumerate(ENCABEZADOS, start=1):
-        hoja.column_dimensions[hoja.cell(row=1, column=indice).column_letter].width = 18
+    for indice, columna in enumerate(columnas, start=1):
+        letra = hoja.cell(row=1, column=indice).column_letter
+        hoja.column_dimensions[letra].width = 40 if columna.formato == "nombre" else 18
+        if columna.formato == "fecha":
+            for (celda,) in hoja.iter_rows(min_row=2, min_col=indice, max_col=indice):
+                celda.number_format = "yyyy-mm-dd hh:mm"
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -1,6 +1,8 @@
 from django.urls import path
 
-from .views.product_views import ProductCreateView, ProductListView, ProductToggleActivoView, ProductUpdateView
+from .views.product_views import (
+    ProductCreateView, ProductListPreferenciasView, ProductListView, ProductToggleActivoView, ProductUpdateView,
+)
 from .views.category_views import CategoryCreateView, CategoryListView, CategoryUpdateView
 from .views.subcategory_views import SubcategoryCreateView, SubcategoryListView, SubcategoryUpdateView
 from .views.brand_views import BrandCreateView, BrandListView
@@ -20,6 +22,7 @@ app_name = "products"
 urlpatterns = [
     path("", ProductListView.as_view(), name="product-list"),
     path("exportar/", producto_exportar_excel_view, name="product-exportar"),
+    path("preferencias/", ProductListPreferenciasView.as_view(), name="product-list-preferencias"),
     path("crear/", ProductCreateView.as_view(), name="product-create"),
     path("<int:pk>/editar/", ProductUpdateView.as_view(), name="product-update"),
     path("<int:pk>/toggle-activo/", ProductToggleActivoView.as_view(), name="product-toggle-activo"),

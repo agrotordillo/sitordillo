@@ -305,3 +305,110 @@ class UnidadAuxiliarTests(TestCase):
         self.assertEqual(respuesta.status_code, 302)
         producto.refresh_from_db()
         self.assertEqual(producto.contenido_display, "100 ML")
+
+
+class ListadoPersonalizableTests(TestCase):
+    """"Columnas" y "Agrupar por" del listado de Productos, como en el
+    sistema anterior: cada usuario elige qué columnas ver, en qué orden, y
+    si se agrupa (estático: un campo; dinámico: varios niveles). Se guarda
+    por usuario y lo respeta también el Excel."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.products.models import Linea, Marca
+
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        cls.otro = User.objects.create_superuser(username="otro", password="S3guridad!2026")
+        cls.perros = Linea.objects.create(nombre="PERROS")
+        cls.gatos = Linea.objects.create(nombre="GATOS")
+        cls.marca = Marca.objects.create(nombre="NUPEC")
+        publico = ListaPrecio.objects.get_or_create(nombre="PUBLICO", defaults={"orden": 1})[0]
+        iquinuapa = Almacen.objects.create(nombre="IQUINUAPA", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        # 30 de PERROS (más de una página), 1 de GATOS y 1 sin línea.
+        for numero in range(30):
+            Producto.objects.create(nombre=f"Croqueta {numero:02d}", sku=f"CRQ{numero:02d}", linea=cls.perros, marca=cls.marca)
+        cls.arena = Producto.objects.create(nombre="Arena", sku="ARN", linea=cls.gatos)
+        Producto.objects.create(nombre="Collar", sku="COL")
+        ProductoPrecio.objects.create(
+            producto=cls.arena, lista_precio=publico, almacen=iquinuapa, precio_con_impuesto=Decimal("88.50"),
+        )
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+        self.url = reverse("products:product-list")
+        self.url_preferencias = reverse("products:product-list-preferencias")
+
+    def titulos(self, respuesta):
+        return [columna.titulo for columna in respuesta.context["columnas"]]
+
+    def test_columnas_por_defecto(self):
+        respuesta = self.client.get(self.url)
+        self.assertEqual(
+            self.titulos(respuesta),
+            ["Código", "Nombre", "Tipo", "Unidad", "Estado", "Costo",
+             "Público", "Medio mayoreo", "Mayoreo", "Sub distribuidor", "Promoción"],
+        )
+
+    def test_elegir_columnas_y_orden_por_usuario(self):
+        respuesta = self.client.post(self.url_preferencias, {
+            "accion": "columnas", "columnas": ["nombre", "precio_6", "linea", "no_existe", "nombre"],
+            "next": "/productos/?q=arena",
+        })
+        self.assertRedirects(respuesta, "/productos/?q=arena", fetch_redirect_response=False)
+
+        respuesta = self.client.get(self.url, {"q": "arena"})
+        # Costo es fija: si no se manda, se agrega igual.
+        self.assertEqual(self.titulos(respuesta), ["Nombre", "Público Iquinuapa", "Línea", "Costo"])
+        self.assertContains(respuesta, "88.50")
+        self.assertContains(respuesta, "GATOS")
+
+        # El otro usuario sigue con las columnas por defecto.
+        self.client.force_login(self.otro)
+        self.assertEqual(self.titulos(self.client.get(self.url))[0], "Código")
+
+        self.client.force_login(self.admin)
+        self.client.post(self.url_preferencias, {"accion": "restablecer_columnas"})
+        self.assertEqual(self.titulos(self.client.get(self.url))[0], "Código")
+
+    def test_agrupar_estatico_cuenta_todo_el_resultado(self):
+        self.client.post(self.url_preferencias, {"accion": "agrupar", "modo": "estatico", "agrupar_estatico": "linea"})
+        respuesta = self.client.get(self.url)
+        grupos = [fila for fila in respuesta.context["filas"] if fila["es_grupo"]]
+        # Página 1 (25 productos): GATOS primero, luego PERROS con sus 30 aunque
+        # en esta página solo se vean 24.
+        self.assertEqual([(g["valor"], g["conteo"]) for g in grupos], [("GATOS", 1), ("PERROS", 30)])
+
+        respuesta = self.client.get(self.url, {"page": 2})
+        grupos = [(f["valor"], f["conteo"]) for f in respuesta.context["filas"] if f["es_grupo"]]
+        self.assertEqual(grupos, [("PERROS", 30), ("Sin línea", 1)])
+
+        # Un valor que no está en la lista de estáticos no agrupa.
+        self.client.post(self.url_preferencias, {"accion": "agrupar", "modo": "estatico", "agrupar_estatico": "tipo"})
+        self.assertEqual(self.client.get(self.url).context["agrupar"], [])
+
+    def test_agrupar_dinamico_anida_niveles(self):
+        self.client.post(self.url_preferencias, {
+            "accion": "agrupar", "modo": "dinamico", "agrupar": ["linea", "marca", "inventado"],
+        })
+        respuesta = self.client.get(self.url, {"q": "croqueta 0"})
+        filas = respuesta.context["filas"]
+        self.assertEqual([a.clave for a in respuesta.context["agrupar"]], ["linea", "marca"])
+        linea, marca = filas[0], filas[1]
+        self.assertEqual((linea["valor"], linea["nivel"], linea["conteo"]), ("PERROS", 0, 10))
+        self.assertEqual((marca["valor"], marca["nivel"], marca["grupos"]), ("NUPEC", 1, linea["id"]))
+        self.assertEqual(filas[2]["grupos"], f'{linea["id"]} {marca["id"]}')
+
+    def test_excel_respeta_columnas_y_grupos(self):
+        import io
+
+        import openpyxl
+
+        self.client.post(self.url_preferencias, {"accion": "columnas", "columnas": ["sku", "nombre"]})
+        self.client.post(self.url_preferencias, {"accion": "agrupar", "modo": "estatico", "agrupar_estatico": "linea"})
+        respuesta = self.client.get(reverse("products:product-exportar"), {"q": "a"})
+        hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
+        filas = [tuple(celda.value for celda in fila) for fila in hoja.iter_rows()]
+        self.assertEqual(filas[0], ("Código", "Nombre", "Costo"))
+        self.assertEqual(filas[1][0], "Línea: GATOS (1)")
+        self.assertEqual(filas[2], ("ARN", "Arena", 0.0))
+        self.assertEqual(filas[3][0], "Línea: PERROS (30)")

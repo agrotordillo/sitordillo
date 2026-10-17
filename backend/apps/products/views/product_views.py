@@ -1,5 +1,5 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import DecimalField, OuterRef, Q, Subquery
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
@@ -9,18 +9,9 @@ from django.contrib.messages.views import SuccessMessageMixin
 
 from apps.core.filtros_producto import FiltrosProductoMixin
 from apps.core.navegacion import url_de_regreso
+from apps.products import columnas_listado
 from apps.products.models import Producto, ProductoPrecio
 from apps.products.forms import ProductForm
-
-# (nombre de la ListaPrecio, nombre del campo anotado) para las 5 listas
-# generales que se muestran como columnas en el listado de productos.
-LISTAS_PRECIO_TABLA = [
-    ("PUBLICO", "precio_publico"),
-    ("MEDIO MAYOREO", "precio_medio_mayoreo"),
-    ("MAYOREO", "precio_mayoreo"),
-    ("SUB DISTRIBUIDOR", "precio_sub_distribuidor"),
-    ("PROMOCION", "precio_promocion"),
-]
 
 
 class NextUrlMixin:
@@ -125,7 +116,17 @@ class ProductToggleActivoView(PermissionRequiredMixin, View):
         return redirect(url_de_regreso(request, reverse("products:product-list")))
 
 
+def filtrar_busqueda_producto(queryset, q):
+    if q:
+        queryset = queryset.filter(Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q))
+    return queryset
+
+
 class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
+    """Las columnas (cuáles y en qué orden) y la agrupación las elige cada
+    usuario con "Columnas" y "Agrupar por" (ver apps.products.columnas_listado
+    y ProductListPreferenciasView)."""
+
     permission_required = "products.view_producto"
     model = Producto
     template_name = "products/product_list.html"
@@ -133,26 +134,76 @@ class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
     extra_context = {"active_module": "products"}
     paginate_by = 25
 
-    def get_queryset(self):
-        queryset = super().get_queryset().select_related("unidad_medida_auxiliar")
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            queryset = queryset.filter(
-                Q(folio__icontains=q) | Q(sku__icontains=q) | Q(nombre__icontains=q)
-            )
+    def get_preferencia(self):
+        if not hasattr(self, "_preferencia"):
+            self._preferencia = columnas_listado.preferencia_de(self.request.user)
+        return self._preferencia
 
-        annotations = {
-            campo: Subquery(
-                ProductoPrecio.objects.filter(
-                    producto_id=OuterRef("pk"), lista_precio__nombre=nombre, almacen__isnull=True,
-                ).values("precio_con_impuesto")[:1],
-                output_field=DecimalField(max_digits=12, decimal_places=2),
-            )
-            for nombre, campo in LISTAS_PRECIO_TABLA
-        }
-        return queryset.annotate(**annotations)
+    def get_queryset(self):
+        self.queryset_filtrado = filtrar_busqueda_producto(
+            super().get_queryset(), self.request.GET.get("q", "").strip(),
+        )
+        claves_columnas, claves_agrupar = self.get_preferencia()
+        return columnas_listado.preparar_queryset(self.queryset_filtrado, claves_columnas, claves_agrupar)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["q"] = self.request.GET.get("q", "").strip()
+        claves_columnas, claves_agrupar = self.get_preferencia()
+        columnas = [columnas_listado.COLUMNAS[clave] for clave in claves_columnas]
+        conteos = (
+            columnas_listado.conteos_por_grupo(self.queryset_filtrado, claves_agrupar) if claves_agrupar else {}
+        )
+        filas = columnas_listado.filas_agrupadas(context["products"], claves_agrupar, conteos)
+        for fila in filas:
+            if not fila["es_grupo"]:
+                fila["celdas"] = [(columna, columna.valor(fila["producto"])) for columna in columnas]
+        context.update({
+            "q": self.request.GET.get("q", "").strip(),
+            "columnas": columnas,
+            "filas": filas,
+            "total_columnas": len(columnas) + 1,
+            "muestra_contenido_aparte": "contenido" in claves_columnas,
+            "agrupar": [columnas_listado.AGRUPACIONES[clave] for clave in claves_agrupar],
+            "columnas_disponibles": [
+                columna for clave, columna in columnas_listado.COLUMNAS.items() if clave not in claves_columnas
+            ],
+            "agrupar_estatico": (
+                claves_agrupar[0]
+                if len(claves_agrupar) == 1 and claves_agrupar[0] in columnas_listado.AGRUPACIONES_ESTATICAS
+                else ""
+            ),
+            "agrupar_es_dinamico": bool(claves_agrupar) and not (
+                len(claves_agrupar) == 1 and claves_agrupar[0] in columnas_listado.AGRUPACIONES_ESTATICAS
+            ),
+            "agrupaciones_estaticas": [
+                columnas_listado.AGRUPACIONES[clave] for clave in columnas_listado.AGRUPACIONES_ESTATICAS
+            ],
+            "agrupaciones_disponibles": [
+                agrupacion for clave, agrupacion in columnas_listado.AGRUPACIONES.items()
+                if clave not in claves_agrupar
+            ],
+        })
         return context
+
+
+class ProductListPreferenciasView(PermissionRequiredMixin, View):
+    """Guarda lo que el usuario eligió en "Columnas" o "Agrupar por" del
+    listado de Productos y regresa al listado con los mismos filtros."""
+
+    permission_required = "products.view_producto"
+    http_method_names = ["post"]
+
+    def post(self, request):
+        accion = request.POST.get("accion")
+        if accion == "columnas":
+            columnas_listado.guardar_preferencia(request.user, columnas=request.POST.getlist("columnas"))
+        elif accion == "restablecer_columnas":
+            columnas_listado.guardar_preferencia(request.user, columnas=columnas_listado.COLUMNAS_DEFAULT)
+        elif accion == "agrupar":
+            if request.POST.get("modo") == "dinamico":
+                agrupar = request.POST.getlist("agrupar")
+            else:
+                estatico = request.POST.get("agrupar_estatico", "")
+                agrupar = [estatico] if estatico in columnas_listado.AGRUPACIONES_ESTATICAS else []
+            columnas_listado.guardar_preferencia(request.user, agrupar=agrupar)
+        return redirect(url_de_regreso(request, reverse("products:product-list")))

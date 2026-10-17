@@ -125,3 +125,28 @@ class EnvioUnico(models.Model):
 
     def __str__(self):
         return f"{self.token} · {self.ruta}"
+
+
+class PreferenciaListado(models.Model):
+    """Cómo quiere ver un usuario un listado: qué columnas y en qué orden, y
+    por qué campos se agrupa (como "Columnas" y "Agrupar por" del sistema
+    anterior, que solo lo guardaba en la sesión). `columnas` y `agrupar`
+    son listas de claves del catálogo de cada listado (p.ej.
+    apps.products.columnas_listado); una clave que ya no exista se ignora
+    al leerla."""
+
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferencias_listado")
+    vista = models.CharField(max_length=80)
+    columnas = models.JSONField(default=list, blank=True)
+    agrupar = models.JSONField(default=list, blank=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Preferencia de listado"
+        verbose_name_plural = "Preferencias de listado"
+        constraints = [
+            models.UniqueConstraint(fields=["usuario", "vista"], name="preferencia_listado_unica_por_usuario"),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} · {self.vista}"
