@@ -60,10 +60,12 @@
         </td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
           {% if factura.estatus == 'borrador' or factura.estatus == 'error' %}
-          <form method="post" action="{% url 'facturacion:factura-timbrar' factura.pk %}" class="inline" x-data="{ enviando: false }" @submit="enviando = true">
-            {% csrf_token %}
-            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50" :disabled="enviando" x-text="enviando ? 'Timbrando…' : 'Timbrar'">Timbrar</button>
-          </form>
+            {% if perms.facturacion.change_factura %}
+            <form method="post" action="{% url 'facturacion:factura-timbrar' factura.pk %}" class="inline" x-data="{ enviando: false }" @submit="enviando = true">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50" :disabled="enviando" x-text="enviando ? 'Timbrando…' : 'Timbrar'">Timbrar</button>
+            </form>
+            {% endif %}
           {% elif factura.estatus == 'timbrando' and perms.facturacion.delete_factura %}
           <form method="post" action="{% url 'facturacion:factura-liberar-timbrado' factura.pk %}" class="inline" data-confirmar="¿Ya verificaste en el portal de Facturama que esta factura NO se timbró? Si se timbró y la liberas, al reintentar se emitiría un CFDI duplicado.">
             {% csrf_token %}
@@ -72,10 +74,12 @@
           {% elif factura.estatus == 'timbrada' %}
           <a href="{% url 'facturacion:factura-pdf' factura.pk %}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">PDF</a>
           <a href="{% url 'facturacion:factura-xml' factura.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">XML</a>
-          <form method="post" action="{% url 'facturacion:factura-cancelar' factura.pk %}" class="inline" data-confirmar="¿Cancelar esta factura timbrada?">
-            {% csrf_token %}
-            <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cancelar</button>
-          </form>
+            {% if perms.facturacion.delete_factura %}
+            <form method="post" action="{% url 'facturacion:factura-cancelar' factura.pk %}" class="inline" data-confirmar="¿Cancelar esta factura timbrada?">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Cancelar</button>
+            </form>
+            {% endif %}
           {% endif %}
         </td>
       </tr>
