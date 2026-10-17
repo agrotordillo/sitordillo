@@ -37,7 +37,9 @@ class VentaListView(FiltroFechaMixin, PermissionRequiredMixin, ListView):
     filtro_fecha_campo = "fecha_venta"
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("cliente", "almacen").prefetch_related("detalles")
+        queryset = (
+            super().get_queryset().select_related("cliente", "almacen", "factura").prefetch_related("detalles")
+        )
         queryset = self.aplicar_filtro_fecha(queryset)
         visibles = almacenes_visibles(self.request.user)
         if visibles is not None:

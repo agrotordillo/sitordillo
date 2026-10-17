@@ -49,7 +49,22 @@
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700 font-medium">${{ venta.total|moneda }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right space-x-3">
           <a href="{% url 'ventas:venta-ticket' venta.pk %}" target="_blank" rel="noopener" class="text-sm text-gray-600 hover:text-gray-800 font-medium">Ticket</a>
-          {% if not venta.factura and not venta.es_remision %}
+          {% if venta.es_remision %}
+          {# una remisión nunca se factura #}
+          {% elif venta.factura %}
+            {% if venta.factura.estatus == 'timbrada' %}
+              {% if perms.facturacion.view_factura %}
+              <a href="{% url 'facturacion:factura-pdf' venta.factura.pk %}" target="_blank" rel="noopener" class="text-sm text-primary-600 hover:text-primary-700 font-medium">PDF factura</a>
+              {% endif %}
+            {% elif perms.facturacion.change_factura %}
+              <form method="post" action="{% url 'facturacion:factura-timbrar' venta.factura.pk %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Timbrar factura</button>
+              </form>
+            {% elif perms.facturacion.view_factura %}
+              <span class="text-sm text-gray-400" title="{{ venta.factura.mensaje_error }}">Factura: {{ venta.factura.get_estatus_display }}</span>
+            {% endif %}
+          {% elif perms.facturacion.add_factura %}
           <a href="{% url 'facturacion:factura-generar' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Facturar</a>
           {% endif %}
           <a href="{% url 'ventas:venta-devolver' venta.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Devolver</a>
