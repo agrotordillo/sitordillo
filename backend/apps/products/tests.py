@@ -240,3 +240,68 @@ class OrdenListaPreciosTests(TestCase):
             # Fuera de la tabla del sistema anterior: al final.
             ("PUBLICO", "BODEGA SUR"), ("MAYOREO", "BODEGA SUR"),
         ])
+
+
+class UnidadAuxiliarTests(TestCase):
+    """Unidad auxiliar del sistema anterior: el contenido de cada presentación
+    (1 PIEZA = 100 ML), con el que el negocio identifica el producto."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.products.models import UnidadMedida
+
+        cls.pieza = UnidadMedida.objects.create(nombre="PIEZA", abreviatura="PZA")
+        cls.ml = UnidadMedida.objects.create(nombre="MILILITRO", abreviatura="ML")
+        cls.kg = UnidadMedida.objects.create(nombre="KILOGRAMO", abreviatura="KG")
+
+    def test_reglas_de_importacion(self):
+        from apps.products.management.commands.import_legacy_productos import campos_unidad_auxiliar
+
+        unidades = {1: self.pieza, 2: self.ml}
+        fila = {"id_unidad_medida_auxiliar": 2, "factor_unidad_medida_auxiliar": "100.00000000", "control_auxiliar": "NO"}
+        campos, sin_unidad = campos_unidad_auxiliar(fila, unidades)
+        self.assertEqual(campos, {"unidad_medida_auxiliar": self.ml, "factor_unidad_auxiliar": Decimal("100.0000"), "control_auxiliar": False})
+        self.assertFalse(sin_unidad)
+
+        # Factor 0 en el legado = sin capturar: no se trae la unidad suelta.
+        fila = {"id_unidad_medida_auxiliar": 1, "factor_unidad_medida_auxiliar": "0.00000000", "control_auxiliar": "SI"}
+        campos, sin_unidad = campos_unidad_auxiliar(fila, unidades)
+        self.assertEqual(campos, {"unidad_medida_auxiliar": None, "factor_unidad_auxiliar": None, "control_auxiliar": True})
+        self.assertFalse(sin_unidad)
+
+        # Factor sin unidad: no se trae y se reporta.
+        fila = {"id_unidad_medida_auxiliar": None, "factor_unidad_medida_auxiliar": "40.00000000", "control_auxiliar": ""}
+        campos, sin_unidad = campos_unidad_auxiliar(fila, unidades)
+        self.assertIsNone(campos["factor_unidad_auxiliar"])
+        self.assertTrue(sin_unidad)
+
+    def test_contenido_display(self):
+        producto = Producto(nombre="Sulfa", sku="3S100", unidad_medida_auxiliar=self.ml, factor_unidad_auxiliar=Decimal("100.0000"))
+        self.assertEqual(producto.contenido_display, "100 ML")
+        producto.unidad_medida_auxiliar, producto.factor_unidad_auxiliar = self.kg, Decimal("0.5000")
+        self.assertEqual(producto.contenido_display, "0.5 KG")
+        self.assertEqual(Producto(nombre="Sin", sku="X").contenido_display, "")
+
+    def test_formulario_pide_unidad_y_factor_juntos(self):
+        admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        self.client.force_login(admin)
+        producto = Producto.objects.create(nombre="Sulfa", sku="3S100")
+        url = reverse("products:product-update", args=[producto.pk])
+        base = {
+            "nombre": "Sulfa", "sku": "3S100", "tipo": "producto", "tipo_iva": "gravado", "tasa_iva": "16.00",
+            "precio_costo": "0", "precio_venta": "0", "stock_minimo": "0", "stock_maximo": "0",
+            "actualizar_precios_lista": "False",
+        }
+
+        respuesta = self.client.post(url, {**base, "factor_unidad_auxiliar": "100"})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("unidad_medida_auxiliar", respuesta.context["form"].errors)
+
+        respuesta = self.client.post(url, {**base, "unidad_medida_auxiliar": self.ml.pk})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("factor_unidad_auxiliar", respuesta.context["form"].errors)
+
+        respuesta = self.client.post(url, {**base, "unidad_medida_auxiliar": self.ml.pk, "factor_unidad_auxiliar": "100"})
+        self.assertEqual(respuesta.status_code, 302)
+        producto.refresh_from_db()
+        self.assertEqual(producto.contenido_display, "100 ML")

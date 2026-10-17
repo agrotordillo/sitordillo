@@ -604,6 +604,33 @@ class Producto(BaseAbstractModel):
         related_name="productos",
         verbose_name="Unidad de medida",
     )
+    # Unidad auxiliar del sistema anterior: el contenido de cada presentación
+    # (p. ej. 1 PIEZA = 100 ML, 1 SACO = 40 KG), que es como se identifica
+    # el producto en el negocio. Se importa del legado
+    # (id_unidad_medida_auxiliar, factor_unidad_medida_auxiliar,
+    # control_auxiliar, ver import_legacy_productos).
+    unidad_medida_auxiliar = models.ForeignKey(
+        UnidadMedida,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="productos_auxiliar",
+        verbose_name="Unidad de medida auxiliar",
+        help_text="Unidad del contenido de cada presentación (ML, KG, GR, LITRO, etc.).",
+    )
+    factor_unidad_auxiliar = models.DecimalField(
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Factor de unidad auxiliar",
+        help_text="Cuántas unidades auxiliares trae una unidad del producto (p. ej. 100 para un frasco de 100 ML).",
+    )
+    control_auxiliar = models.BooleanField(
+        default=False,
+        verbose_name="Se controla en unidad auxiliar",
+        help_text="Dato del sistema anterior; hoy es solo informativo.",
+    )
     almacen = models.ForeignKey(
         Almacen,
         on_delete=models.PROTECT,
@@ -699,6 +726,10 @@ class Producto(BaseAbstractModel):
                 condition=models.Q(volumen__isnull=True) | models.Q(volumen__gte=0),
                 name="producto_volumen_no_negativo",
             ),
+            models.CheckConstraint(
+                condition=models.Q(factor_unidad_auxiliar__isnull=True) | models.Q(factor_unidad_auxiliar__gt=0),
+                name="producto_factor_auxiliar_positivo",
+            ),
         ]
         indexes = [
             models.Index(fields=["sku"]),
@@ -729,8 +760,24 @@ class Producto(BaseAbstractModel):
     def es_paquete(self):
         return self.tipo == self.TipoProducto.PAQUETE
 
+    @property
+    def contenido_display(self):
+        """Contenido de la presentación con su unidad auxiliar, p. ej.
+        "100 ML" o "0.5 KG"; vacío si no tiene unidad auxiliar o factor."""
+        if not self.unidad_medida_auxiliar_id or not self.factor_unidad_auxiliar:
+            return ""
+        factor = self.factor_unidad_auxiliar.normalize()
+        texto = f"{factor:f}"
+        return f"{texto} {self.unidad_medida_auxiliar.abreviatura or self.unidad_medida_auxiliar.nombre}"
+
     def clean(self):
         super().clean()
+        if self.factor_unidad_auxiliar is not None and self.factor_unidad_auxiliar <= 0:
+            raise ValidationError({"factor_unidad_auxiliar": "El factor debe ser mayor a cero, o déjalo vacío."})
+        if self.factor_unidad_auxiliar and not self.unidad_medida_auxiliar_id:
+            raise ValidationError({"unidad_medida_auxiliar": "Indica la unidad auxiliar de ese factor."})
+        if self.unidad_medida_auxiliar_id and not self.factor_unidad_auxiliar:
+            raise ValidationError({"factor_unidad_auxiliar": "Indica cuántas unidades auxiliares trae el producto."})
         if self.subcategoria and self.categoria and self.subcategoria.categoria_id != self.categoria_id:
             raise ValidationError({"subcategoria": "La subcategoría seleccionada no pertenece a la categoría indicada."})
         if self.precio_costo < 0:

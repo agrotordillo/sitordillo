@@ -134,7 +134,7 @@ class ProductListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related("unidad_medida_auxiliar")
         q = self.request.GET.get("q", "").strip()
         if q:
             queryset = queryset.filter(

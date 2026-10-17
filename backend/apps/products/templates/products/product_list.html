@@ -67,7 +67,7 @@
             {% for product in products %}
             <tr class="hover:bg-gray-50/50 transition-colors">
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-mono text-xs text-gray-500">{{ product.sku }}</td>
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ product.nombre }}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ product.nombre }}{% if product.contenido_display %}<span class="block text-xs font-normal text-gray-400">Contenido: {{ product.contenido_display }}</span>{% endif %}</td>
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 hidden lg:table-cell">
                     {{ product.get_tipo_display }}{% if product.es_paquete %} · {{ product.almacen.nombre }}{% endif %}
                 </td>

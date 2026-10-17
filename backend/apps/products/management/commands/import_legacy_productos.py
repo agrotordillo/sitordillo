@@ -22,6 +22,13 @@ migración de datos de apps.products):
     significado de negocio consistente; se revisó de nuevo y sí es una
     clasificación real, así que ahora se trae.
   - id_punto_entrega se ignora (100% vacío en los datos reales).
+  - Unidad auxiliar (id_unidad_medida_auxiliar, factor_unidad_medida_auxiliar,
+    control_auxiliar): es el contenido de cada presentación (1 PIEZA = 100 ML,
+    1 SACO = 40 KG), con el que el negocio identifica el producto. Al principio
+    se descartó sin querer; el usuario pidió traerlo. Unidad y factor solo se
+    importan juntos y con factor > 0 (ver campos_unidad_auxiliar). Para
+    llenarlo en productos ya importados sin tocar nada más:
+    --solo-unidad-auxiliar.
   - Las 10 columnas de precio/utilidad se mapean así:
       1 PUBLICO (general), 2 MEDIO MAYOREO (general), 3 MAYOREO (general),
       4 SUB DISTRIBUIDOR (general), 5 PROMOCION (general),
@@ -150,6 +157,24 @@ def parse_sql_rows(path):
     return rows
 
 
+def campos_unidad_auxiliar(r, unidad_by_legacy_id):
+    """Unidad auxiliar del legado (el contenido de cada presentación, p. ej.
+    1 PIEZA = 100 ML): id_unidad_medida_auxiliar, factor_unidad_medida_auxiliar
+    y control_auxiliar. Un factor 0 en el legado es "sin capturar", así que
+    unidad y factor solo se traen juntos y con factor > 0 (en el legado hay
+    ~1,250 productos con unidad auxiliar pero factor 0, casi todos PIEZA ->
+    PIEZA, que no dicen nada). Devuelve (campos, factor_sin_unidad)."""
+    factor = Decimal(str(r["factor_unidad_medida_auxiliar"] or 0))
+    unidad = unidad_by_legacy_id.get(r["id_unidad_medida_auxiliar"])
+    completo = factor > 0 and unidad is not None
+    campos = {
+        "unidad_medida_auxiliar": unidad if completo else None,
+        "factor_unidad_auxiliar": factor.quantize(Decimal("0.0001")) if completo else None,
+        "control_auxiliar": (r["control_auxiliar"] or "").strip().upper() == "SI",
+    }
+    return campos, factor > 0 and unidad is None
+
+
 def to_decimal(value, places=TWO_PLACES):
     if value is None:
         return None
@@ -173,11 +198,23 @@ class Command(BaseCommand):
                 "los que todavía no existan. Implica --force."
             ),
         )
+        parser.add_argument(
+            "--solo-unidad-auxiliar", action="store_true",
+            help=(
+                "Actualiza ÚNICAMENTE la unidad auxiliar (contenido por presentación: unidad, "
+                "factor y control auxiliar) de los productos que ya existen, por SKU. No toca "
+                "precios, costos ni ningún otro dato."
+            ),
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         force = options["force"]
         sync = options["sync"]
+
+        if options["solo_unidad_auxiliar"]:
+            self._handle_solo_unidad_auxiliar(dry_run)
+            return
 
         if not dry_run and not sync and Producto.objects.exists() and not force:
             raise CommandError(
@@ -297,17 +334,7 @@ class Command(BaseCommand):
             clase_by_legacy_id[legacy_id] = obj
 
         # --- UnidadMedida ---
-        unidad_by_legacy_id = {}
-        for row in unidad_rows:
-            legacy_id, codigo, nombre = row[0], row[1].strip(), row[2].strip()
-            obj = UnidadMedida.objects.filter(nombre__iexact=nombre).first()
-            if obj is None:
-                obj, created = UnidadMedida.objects.get_or_create(
-                    abreviatura=codigo, defaults={"nombre": nombre}
-                )
-                if created:
-                    stats["unidades"] += 1
-            unidad_by_legacy_id[legacy_id] = obj
+        unidad_by_legacy_id = self._mapa_unidades(unidad_rows, stats)
 
         # --- Almacenes para overrides de sucursal ---
         iquinuapa, created = Almacen.objects.get_or_create(
@@ -368,6 +395,73 @@ class Command(BaseCommand):
                 self.stdout.write(f"  ... {total_procesados} productos procesados")
 
         return stats
+
+    def _mapa_unidades(self, unidad_rows, stats):
+        unidad_by_legacy_id = {}
+        for row in unidad_rows:
+            legacy_id, codigo, nombre = row[0], row[1].strip(), row[2].strip()
+            obj = UnidadMedida.objects.filter(nombre__iexact=nombre).first()
+            if obj is None:
+                obj, created = UnidadMedida.objects.get_or_create(
+                    abreviatura=codigo, defaults={"nombre": nombre}
+                )
+                if created:
+                    stats["unidades"] += 1
+            unidad_by_legacy_id[legacy_id] = obj
+        return unidad_by_legacy_id
+
+    def _handle_solo_unidad_auxiliar(self, dry_run):
+        for name in ("unidad_medida", "producto"):
+            if not (DATA_DIR / f"{name}.sql").exists():
+                raise CommandError(f"No encuentro {DATA_DIR / f'{name}.sql'}")
+        unidad_rows = parse_sql_rows(DATA_DIR / "unidad_medida.sql")
+        producto_rows = parse_sql_rows(DATA_DIR / "producto.sql")
+        stats = {"unidades": 0}
+        campos_auxiliar = ["unidad_medida_auxiliar", "factor_unidad_auxiliar", "control_auxiliar"]
+        actualizados, sin_cambio, factor_sin_unidad, no_encontrados = [], 0, [], 0
+        try:
+            with transaction.atomic():
+                unidad_by_legacy_id = self._mapa_unidades(unidad_rows, stats)
+                por_sku = {p.sku: p for p in Producto.objects.all()}
+                for row in producto_rows:
+                    r = dict(zip(PRODUCTO_COLS, row))
+                    producto = por_sku.get(r["codigo"].strip())
+                    if producto is None:
+                        no_encontrados += 1
+                        continue
+                    campos, sin_unidad = campos_unidad_auxiliar(r, unidad_by_legacy_id)
+                    if sin_unidad:
+                        factor_sin_unidad.append(producto.sku)
+                    actual = {
+                        "unidad_medida_auxiliar": producto.unidad_medida_auxiliar_id,
+                        "factor_unidad_auxiliar": producto.factor_unidad_auxiliar,
+                        "control_auxiliar": producto.control_auxiliar,
+                    }
+                    nuevo = {**campos, "unidad_medida_auxiliar": campos["unidad_medida_auxiliar"].pk
+                             if campos["unidad_medida_auxiliar"] else None}
+                    if actual == nuevo:
+                        sin_cambio += 1
+                        continue
+                    for campo, valor in campos.items():
+                        setattr(producto, campo, valor)
+                    actualizados.append(producto)
+                Producto.objects.bulk_update(actualizados, campos_auxiliar, batch_size=500)
+                if dry_run:
+                    raise _DryRunRollback()
+        except _DryRunRollback:
+            self.stdout.write(self.style.WARNING("Dry-run: no se escribió nada, se revirtió la transacción."))
+
+        con_contenido = sum(1 for p in actualizados if p.factor_unidad_auxiliar)
+        self.stdout.write(self.style.SUCCESS(
+            f"Unidad auxiliar: productos actualizados={len(actualizados)} (con contenido: {con_contenido}) "
+            f"sin cambio={sin_cambio} no encontrados por SKU={no_encontrados} "
+            f"unidades creadas={stats['unidades']}"
+        ))
+        if factor_sin_unidad:
+            self.stdout.write(self.style.WARNING(
+                f"Con factor pero sin unidad auxiliar en el legado (no se trajeron, revisar a mano): "
+                f"{', '.join(factor_sin_unidad)}"
+            ))
 
     def _crear_o_actualizar_producto(
         self, r, marca_by_legacy_id, categoria_by_legacy_id, linea_by_legacy_id, clase_by_legacy_id,
@@ -449,6 +543,7 @@ class Command(BaseCommand):
             peso=peso,
             dias_reserva=dias_reserva,
             codigo_proveedor=codigo_proveedor,
+            **campos_unidad_auxiliar(r, unidad_by_legacy_id)[0],
         )
 
         producto = Producto.objects.filter(sku=sku).first() if sync else None

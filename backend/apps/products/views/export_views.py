@@ -11,7 +11,7 @@ from apps.products.views.product_views import LISTAS_PRECIO_TABLA
 ENCABEZADOS = [
     "Folio", "SKU", "Código de barras", "Nombre", "Tipo", "Estatus",
     "Categoría", "Subcategoría", "Línea", "Clase", "Marca", "Proveedor", "Código de proveedor",
-    "Unidad de medida", "IVA", "Tasa IVA (%)", "Aplica IEPS", "Tasa IEPS (%)",
+    "Unidad de medida", "Contenido", "Unidad auxiliar", "Factor auxiliar", "IVA", "Tasa IVA (%)", "Aplica IEPS", "Tasa IEPS (%)",
     "Método de costeo", "Precio de costo", "Precio de venta (general)",
 ] + [nombre.title() for nombre, _ in LISTAS_PRECIO_TABLA] + [
     "Stock mínimo", "Stock máximo", "Peso (kg)", "Días de reserva",
@@ -26,7 +26,7 @@ def producto_exportar_excel_view(request):
     incluidos los 5 precios generales de lista (los mismos que se
     muestran como columnas en el listado)."""
     queryset = Producto.objects.select_related(
-        "categoria", "subcategoria", "linea", "clase", "marca", "proveedor", "unidad_medida",
+        "categoria", "subcategoria", "linea", "clase", "marca", "proveedor", "unidad_medida", "unidad_medida_auxiliar",
     ).order_by("nombre")
 
     q = request.GET.get("q", "").strip()
@@ -67,6 +67,9 @@ def producto_exportar_excel_view(request):
             producto.proveedor.display_name if producto.proveedor_id else "",
             producto.codigo_proveedor or "",
             producto.unidad_medida.nombre if producto.unidad_medida_id else "",
+            producto.contenido_display,
+            producto.unidad_medida_auxiliar.nombre if producto.unidad_medida_auxiliar_id else "",
+            float(producto.factor_unidad_auxiliar) if producto.factor_unidad_auxiliar is not None else None,
             producto.get_tipo_iva_display(),
             float(producto.tasa_iva),
             "Sí" if producto.aplica_ieps else "No",

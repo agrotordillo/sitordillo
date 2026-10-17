@@ -213,6 +213,19 @@
                 </div>
               </div>
               <div>
+                <label class="label">Contenido (unidad auxiliar) <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <div class="flex items-center gap-2">
+                  <div class="w-32 shrink-0">{{ form.factor_unidad_auxiliar }}</div>
+                  <div class="flex-1">{{ form.unidad_medida_auxiliar }}</div>
+                </div>
+                <p class="mt-1.5 text-xs text-gray-400">Cuánto trae cada presentación, p. ej. 100 ML o 40 KG.</p>
+                {% if form.factor_unidad_auxiliar.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.factor_unidad_auxiliar.errors.0 }}</p>{% endif %}
+                {% if form.unidad_medida_auxiliar.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.unidad_medida_auxiliar.errors.0 }}</p>{% endif %}
+                <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                  {{ form.control_auxiliar }} {{ form.control_auxiliar.label }}
+                </label>
+              </div>
+              <div>
                 <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal <span class="text-gray-400 font-normal">(solo para paquetes/combos)</span></label>
                 {{ form.almacen }}
                 {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
