@@ -29,29 +29,25 @@ class Categoria(BaseAbstractModel):
         return self.nombre.strip()
 
 class Subcategoria(BaseAbstractModel):
-    nombre = models.CharField(max_length=100, verbose_name="Nombre de la subcategoría")
-    categoria = models.ForeignKey(
-        Categoria,
-        on_delete=models.CASCADE,
-        related_name="subcategorias",
-        verbose_name="Categoría padre",
+    """Catálogo independiente, como Marca, Línea o Clase: ya no cuelga de
+    una Categoría. El producto tiene su categoría y su subcategoría, cada
+    una por separado."""
+
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Nombre de la subcategoría",
+        error_messages={"unique": "Ya existe una %(model_name)s con este nombre."},
     )
     descripcion = models.TextField(blank=True, null=True)
 
     class Meta:
         verbose_name = "Subcategoría"
         verbose_name_plural = "Subcategorías"
-        ordering = ["categoria__nombre", "nombre"]
-        constraints = [
-            models.UniqueConstraint(fields=["categoria", "nombre"], name="unique_subcategoria_por_categoria"),
-        ]
-        indexes = [
-            models.Index(fields=["categoria"]),
-            models.Index(fields=["nombre"]),
-        ]
+        ordering = ["nombre"]
 
     def __str__(self):
-        return f"{self.nombre} ({self.categoria.nombre})"
+        return self.nombre
 
     def get_folio_prefix(self):
         return "SUB"
@@ -778,8 +774,6 @@ class Producto(BaseAbstractModel):
             raise ValidationError({"unidad_medida_auxiliar": "Indica la unidad auxiliar de ese factor."})
         if self.unidad_medida_auxiliar_id and not self.factor_unidad_auxiliar:
             raise ValidationError({"factor_unidad_auxiliar": "Indica cuántas unidades auxiliares trae el producto."})
-        if self.subcategoria and self.categoria and self.subcategoria.categoria_id != self.categoria_id:
-            raise ValidationError({"subcategoria": "La subcategoría seleccionada no pertenece a la categoría indicada."})
         if self.precio_costo < 0:
             raise ValidationError({"precio_costo": "El precio de costo no puede ser negativo."})
         if self.precio_venta < 0:

@@ -10,11 +10,8 @@ clases, marca_id, linea_id, categoria_id, subcategoria_id, clase_id
 Para el filtro de sucursal, además: mostrar_filtro_almacen, almacenes,
 almacen_id.
 
-El select de Subcategoría depende del de Categoría (vía el componente
-Alpine "dependentSelect", el mismo que usa el formulario de producto):
-la plantilla que incluye este parcial debe cargar, en ese orden,
-static/js/modules/forms/dependent-select.js y
-static/js/vendor/alpine.min.js en su bloque extra_js.
+Subcategoría es un catálogo independiente de Categoría: cada select filtra
+por su cuenta.
 {% endcomment %}
 <div>
   <label class="label">Marca</label>
@@ -34,39 +31,23 @@ static/js/vendor/alpine.min.js en su bloque extra_js.
     {% endfor %}
   </select>
 </div>
-<div
-  class="contents"
-  x-data="dependentSelect({
-    parent: '#id_categoria_filtro',
-    child: '#id_subcategoria_filtro',
-    url: '{% url 'api:subcategories-by-category' %}',
-    param: 'category',
-    initial: '{{ subcategoria_id|escapejs }}',
-    placeholder: 'Elige categoría primero'
-  })"
->
-  <div>
-    <label class="label">Categoría</label>
-    <select name="categoria" id="id_categoria_filtro" class="input w-full">
-      <option value="">Todas</option>
-      {% for categoria in categorias %}
-      <option value="{{ categoria.pk }}" {% if categoria_id == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nombre }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label class="label">Subcategoría</label>
-    <select name="subcategoria" id="id_subcategoria_filtro" class="input w-full" {% if not categoria_id %}disabled{% endif %}>
-      {% if categoria_id %}
-      <option value="">Todas</option>
-      {% for sub in subcategorias %}
-      <option value="{{ sub.pk }}" {% if subcategoria_id == sub.pk|stringformat:"s" %}selected{% endif %}>{{ sub.nombre }}</option>
-      {% endfor %}
-      {% else %}
-      <option value="">Elige categoría primero</option>
-      {% endif %}
-    </select>
-  </div>
+<div>
+  <label class="label">Categoría</label>
+  <select name="categoria" class="input w-full">
+    <option value="">Todas</option>
+    {% for categoria in categorias %}
+    <option value="{{ categoria.pk }}" {% if categoria_id == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div>
+  <label class="label">Subcategoría</label>
+  <select name="subcategoria" class="input w-full">
+    <option value="">Todas</option>
+    {% for sub in subcategorias %}
+    <option value="{{ sub.pk }}" {% if subcategoria_id == sub.pk|stringformat:"s" %}selected{% endif %}>{{ sub.nombre }}</option>
+    {% endfor %}
+  </select>
 </div>
 <div>
   <label class="label">Clase</label>

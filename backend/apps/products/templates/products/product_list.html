@@ -59,6 +59,14 @@
       </svg>
       Descargar Excel
     </a>
+    {% if perms.products.change_productoprecio %}
+    <a href="{% url 'products:precios-masivos' %}" class="btn-secondary w-full sm:w-auto">
+      <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 0 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z" clip-rule="evenodd" />
+      </svg>
+      Actualizar precios
+    </a>
+    {% endif %}
     <a href="{% url 'products:product-create' %}" class="btn-primary w-full sm:w-auto">
       <svg class="w-4 h-4 me-1.5 -ms-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
         <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -119,9 +127,9 @@
                 {% elif columna.formato == "costo" %}
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 whitespace-nowrap">{{ valor|moneda:4|default:"—" }}</td>
                 {% elif columna.formato == "porcentaje" %}
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 whitespace-nowrap">{% if valor is not None %}{{ valor|floatformat:"-2" }}%{% else %}—{% endif %}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 whitespace-nowrap">{% if valor is not None %}{{ valor|floatformat:"-2u" }}%{% else %}—{% endif %}</td>
                 {% elif columna.formato == "numero" %}
-                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 whitespace-nowrap">{% if valor is not None %}{{ valor|floatformat:"-3" }}{% else %}—{% endif %}</td>
+                <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-600 whitespace-nowrap">{% if valor is not None %}{{ valor|floatformat:"-3u" }}{% else %}—{% endif %}</td>
                 {% elif columna.formato == "fecha" %}
                 <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-500 whitespace-nowrap">{{ valor|date:"d/m/Y H:i" }}</td>
                 {% elif columna.clave == "tipo" %}
@@ -202,6 +210,5 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/ui/listado-personalizable.js' %}"></script>
-<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
 <script src="{% static 'js/vendor/alpine.min.js' %}"></script>
 {% endblock extra_js %}

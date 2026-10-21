@@ -1,0 +1,130 @@
+{% extends "core/layouts/_main_form_layout.html" %}
+{% load core_extras %}
+{% block title %}Actualizar precios{% endblock title %}
+{% block title_layout %}Actualizar precios{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li><a href="{% url 'products:product-list' %}" class="text-gray-400 hover:text-primary-600">Productos</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Actualizar precios</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block main_content %}
+{% if not revisado or errores or not cambios %}
+<div class="space-y-5">
+  <p class="text-sm text-gray-500">
+    Cambia el costo y los precios de muchos productos a la vez con una hoja de cálculo. Primero se revisa el archivo
+    y se muestra qué va a cambiar; nada se guarda hasta que lo apliques.
+  </p>
+
+  <div class="rounded-xl border border-gray-100 p-4 sm:p-5 space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+      <span class="label mb-0 sm:w-24">Descargar</span>
+      <a href="{% url 'products:precios-masivos-plantilla' %}" class="text-sm font-medium text-primary-600 hover:text-primary-700 underline">
+        Descargar la plantilla de hoja de cálculo (actualizacion_precios.xlsx)
+      </a>
+    </div>
+    <form method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
+      {% csrf_token %}
+      <label for="{{ form.archivo.id_for_label }}" class="label mb-0 sm:w-24 sm:pt-2.5">Archivo</label>
+      <div class="flex-1">
+        {{ form.archivo }}
+        {% if form.archivo.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.archivo.errors.0 }}</p>{% endif %}
+        <p class="mt-1.5 text-xs text-gray-400">
+          Solo .xlsx de hasta 5 MB con la estructura de la plantilla. En la hoja "Instrucciones" dice qué lista es cada
+          columna precio_1, precio_2… Las celdas vacías o en 0 no cambian nada.
+        </p>
+      </div>
+      <button type="submit" name="accion" value="revisar" class="btn-primary sm:self-start">Revisar archivo</button>
+    </form>
+  </div>
+
+  {% if revisado %}
+  {% if errores %}
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <p class="font-semibold">No se aplicó nada: corrige {{ errores|length }} error{{ errores|length|pluralize:"es" }} en "{{ archivo_nombre }}" y vuelve a subirlo.</p>
+    <ul class="mt-2 list-disc ps-5 space-y-0.5 max-h-80 overflow-y-auto">
+      {% for error in errores %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+    "{{ archivo_nombre }}" no cambia nada: los costos y precios que trae ya son los que tienen los productos.
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% else %}
+<div class="space-y-4">
+  <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    Revisa los cambios de "{{ archivo_nombre }}": <strong>{{ cambios|length }} producto{{ cambios|length|pluralize }}</strong>,
+    {{ cambian_costo }} con costo nuevo y {{ cambian_precios }} precio{{ cambian_precios|pluralize }} de lista.
+    Todavía no se ha guardado nada.
+  </div>
+
+  <div class="relative overflow-x-auto border border-gray-100 rounded-xl max-h-[60vh]">
+    <table class="w-full text-sm text-left text-gray-600">
+      <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100 sticky top-0">
+        <tr>
+          <th scope="col" class="px-3 py-2.5 font-semibold">Línea</th>
+          <th scope="col" class="px-3 py-2.5 font-semibold">Producto</th>
+          <th scope="col" class="px-3 py-2.5 font-semibold text-right">Costo</th>
+          <th scope="col" class="px-3 py-2.5 font-semibold">Precios de lista (con impuesto)</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for cambio in cambios %}
+        <tr class="align-top">
+          <td class="px-3 py-2.5 text-gray-400">{{ cambio.linea }}</td>
+          <td class="px-3 py-2.5">
+            <span class="font-mono text-xs text-gray-500">{{ cambio.sku }}</span>
+            <span class="block font-medium text-gray-800">{{ cambio.nombre }}</span>
+          </td>
+          <td class="px-3 py-2.5 text-right whitespace-nowrap">
+            {% if cambio.costo_nuevo %}
+            <span class="text-gray-400 line-through">{{ cambio.costo_antes|moneda:4 }}</span>
+            <span class="block font-medium text-gray-800">{{ cambio.costo_nuevo|moneda:4 }}</span>
+            {% else %}
+            <span class="text-gray-400">{{ cambio.costo_antes|moneda:4 }}</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-2.5">
+            {% if cambio.precios %}
+            <ul class="space-y-0.5">
+              {% for precio in cambio.precios %}
+              <li class="whitespace-nowrap">
+                <span class="text-gray-500">{{ precio.lista }}:</span>
+                {% if precio.antes %}<span class="text-gray-400 line-through">{{ precio.antes|moneda }}</span> →{% else %}<span class="text-xs text-emerald-600">(nuevo)</span>{% endif %}
+                <span class="font-medium text-gray-800">{{ precio.nuevo|moneda }}</span>
+                {% if precio.utilidad %}<span class="text-xs text-gray-400">· {{ precio.utilidad|floatformat:"-2u" }}% utilidad</span>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <span class="text-xs text-gray-400">Solo cambia el costo; los precios se quedan igual.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" name="accion" value="cancelar" class="btn-secondary w-full">Cancelar</button>
+    </form>
+    <form method="post" data-confirmar="¿Aplicar los cambios de precios a {{ cambios|length }} producto{{ cambios|length|pluralize }}?">
+      {% csrf_token %}
+      <input type="hidden" name="token" value="{{ token }}">
+      <button type="submit" name="accion" value="aplicar" class="btn-primary w-full">Aplicar cambios</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock main_content %}

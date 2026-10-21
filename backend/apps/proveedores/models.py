@@ -88,7 +88,7 @@ class Proveedor(BaseAbstractModel):
 
     @property
     def nombre(self):
-        # Compatibilidad con OptionSerializer (source="nombre") usado en selects rápidos.
+        # Alias de display_name, para tratar al proveedor como cualquier catálogo con "nombre".
         return self.display_name
 
     def clean(self):

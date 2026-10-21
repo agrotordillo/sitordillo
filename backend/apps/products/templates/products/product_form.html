@@ -16,15 +16,7 @@
 {% endblock breadcrumbs %}
 {% block main_content %}
 <form data-borrador method="post"
-      {% if object %}data-costo-original="{{ object.precio_costo|stringformat:'f' }}"{% endif %}
-      x-data="dependentSelect({
-        parent: '#id_categoria',
-        child: '#id_subcategoria',
-        url: '/api/products/subcategories/',
-        param: 'category',
-        initial: '{{ form.subcategoria.value|default_if_none:"" }}',
-        placeholder: 'Selecciona primero una categoría'
-      })">
+      {% if object %}data-costo-original="{{ object.precio_costo|stringformat:'f' }}"{% endif %}>
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next_url }}">
 
@@ -167,14 +159,21 @@
               </div>
               <div>
                 <label for="{{ form.subcategoria.id_for_label }}" class="label">Subcategoría <span class="text-gray-400 font-normal">(opcional)</span></label>
-                {{ form.subcategoria }}
-                <p x-show="loading" x-cloak class="mt-1.5 text-xs text-gray-400 flex items-center gap-1.5">
-                  <svg class="animate-spin w-3.5 h-3.5 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                  Cargando subcategorías…
-                </p>
+                <div class="flex items-center gap-2" x-data="quickCreate({
+                  target: '#id_subcategoria',
+                  url: '{% url 'api:subcategoria-quick-create' %}',
+                  title: 'Nueva subcategoría',
+                  fields: [
+                    { name: 'nombre', label: 'Nombre', required: true, autofocus: true },
+                    { name: 'descripcion', label: 'Descripción', type: 'textarea' }
+                  ]
+                })">
+                  {{ form.subcategoria }}
+                  <button type="button" class="btn-icon-outline" @click="show()" aria-label="Agregar nueva subcategoría" title="Agregar nueva subcategoría">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4.75a.75.75 0 0 1 .75.75v3.75h3.75a.75.75 0 0 1 0 1.5H10.75v3.75a.75.75 0 0 1-1.5 0V10.75H5.5a.75.75 0 0 1 0-1.5h3.75V5.5A.75.75 0 0 1 10 4.75Z" /></svg>
+                  </button>
+                  {% include "products/includes/_quick_create_modal.html" %}
+                </div>
               </div>
               <div>
                 <label for="{{ form.clase.id_for_label }}" class="label">Clase <span class="text-gray-400 font-normal">(opcional)</span></label>
@@ -530,7 +529,6 @@
 {% endblock main_content %}
 {% block extra_js %}
 <script src="{% static 'js/modules/forms/producto-costo-confirmar.js' %}"></script>
-<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
 <script src="{% static 'js/modules/forms/quick-create.js' %}"></script>
 <script src="{% static 'js/modules/forms/clave-prod-serv-search.js' %}"></script>
 <script src="{% static 'js/modules/forms/clave-unidad-search.js' %}"></script>

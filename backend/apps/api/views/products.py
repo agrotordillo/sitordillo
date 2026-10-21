@@ -1,33 +1,29 @@
 from django.db.models import Q, Sum
 from django.db.models.functions import Upper
-from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.clientes.models import Cliente
 from apps.products.busqueda import buscar_productos, ordenar_por_coincidencia
-from apps.products.forms import BrandForm, ClaseForm, LineaForm, UnitMeasureForm
-from apps.products.models import Producto, Subcategoria
+from apps.products.forms import BrandForm, ClaseForm, LineaForm, SubcategoryForm, UnitMeasureForm
+from apps.products.models import Producto
 from apps.core.parametros import id_valido, ids_validos
 from apps.products.services import resolver_lista_precio_cliente, resolver_precio_autorizado
 from apps.api.permissions import PuedeEditarProductos, RequierePermisos
-from apps.api.serializers.products import ActualizarCostoSerializer, OptionSerializer
+from apps.api.serializers.products import ActualizarCostoSerializer
 
 
-class SubcategoriesByCategoryView(ListAPIView):
-    """Subcategorías activas filtradas por categoría."""
-    serializer_class = OptionSerializer
-    pagination_class = None
+class SubcategoriaQuickCreateView(APIView):
+    """Alta rápida de Subcategoría desde el formulario de producto."""
 
-    def get_queryset(self):
-        category_id = id_valido(self.request.query_params.get("category"))
-        if not category_id:
-            return Subcategoria.objects.none()
-        return (
-            Subcategoria.objects
-            .filter(categoria_id=category_id, is_active=True)
-            .order_by("nombre")
-        )
+    permission_classes = [PuedeEditarProductos]
+
+    def post(self, request):
+        form = SubcategoryForm(request.data)
+        if not form.is_valid():
+            return Response({"errors": form.errors}, status=400)
+        obj = form.save()
+        return Response({"value": obj.id, "label": obj.nombre}, status=201)
 
 
 class BrandQuickCreateView(APIView):

@@ -66,13 +66,8 @@ def contexto_filtros_producto(request, user=None, *, incluir_almacen=False, solo
     contexto["lineas"] = Linea.objects.filter(is_active=True).order_by("nombre")
     contexto["categorias"] = Categoria.objects.filter(is_active=True).order_by("nombre")
     contexto["clases"] = Clase.objects.filter(is_active=True).order_by("nombre")
-
-    categoria_id = id_valido(filtros.get("categoria"))
-    contexto["subcategorias"] = (
-        Subcategoria.objects.filter(categoria_id=categoria_id, is_active=True).order_by("nombre")
-        if categoria_id
-        else Subcategoria.objects.none()
-    )
+    # Catálogo independiente: ya no depende de la categoría elegida.
+    contexto["subcategorias"] = Subcategoria.objects.filter(is_active=True).order_by("nombre")
 
     if incluir_almacen:
         almacenes = Almacen.objects.filter(is_active=True)

@@ -8,7 +8,7 @@ from .views.products import (
     ProductoBuscarView,
     ProductoPreciosPorClienteView,
     ProductoResolverSkusView,
-    SubcategoriesByCategoryView,
+    SubcategoriaQuickCreateView,
     UnitMeasureQuickCreateView,
 )
 from .views.clientes import ClienteBuscarView
@@ -20,9 +20,9 @@ app_name = "api"
 
 urlpatterns = [
     path(
-        "products/subcategories/",
-        SubcategoriesByCategoryView.as_view(),
-        name="subcategories-by-category",
+        "products/subcategorias/create/",
+        SubcategoriaQuickCreateView.as_view(),
+        name="subcategoria-quick-create",
     ),
     path(
         "products/brands/create/",

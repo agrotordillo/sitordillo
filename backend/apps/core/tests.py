@@ -530,7 +530,6 @@ class ParametrosInvalidosTests(TestCase):
             ("inventario:surtimiento-list", malo),
             ("products:product-list", {"marca": "abc", "subcategoria": "x"}),
             ("api:producto-buscar", {"q": "abc", "almacen": "abc", "cliente": "x", "precio_almacen": "y"}),
-            ("api:subcategories-by-category", {"category": "abc"}),
             ("api:promocion-vigente", {"producto": "a", "proveedor": "b", "fecha": "2026-02-30"}),
         ]
         for nombre, parametros in pantallas:
@@ -555,7 +554,8 @@ class ParametrosInvalidosTests(TestCase):
         self.assertRedirects(multiple, reverse("pagos:cuenta-list"), fetch_redirect_response=False)
 
     def test_el_filtro_de_subcategoria_no_inyecta_codigo(self):
-        # El valor se pintaba dentro del x-data de Alpine (B32).
+        # El valor se pintaba dentro del x-data de Alpine (B32); hoy solo se
+        # compara contra las opciones del select, pero se sigue cuidando.
         respuesta = self.client.get(reverse("products:product-list"), {"categoria": "1", "subcategoria": "';alert(1)//"})
         self.assertNotContains(respuesta, "alert(1)")
 

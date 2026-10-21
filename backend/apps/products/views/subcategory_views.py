@@ -42,6 +42,3 @@ class SubcategoryListView(PermissionRequiredMixin, ListView):
     template_name = "subcategories/subcategory_list.html"
     context_object_name = "subcategories"
     extra_context = {"active_module": "subcategories"}
-
-    def get_queryset(self):
-        return super().get_queryset().select_related("categoria")

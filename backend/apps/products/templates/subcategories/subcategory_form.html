@@ -23,13 +23,6 @@
       <p class="mt-1.5 text-xs text-red-600">{{ form.nombre.errors.0 }}</p>
       {% endif %}
     </div>
-    <div>
-      <label for="{{ form.categoria.id_for_label }}" class="label">Categoría padre</label>
-      {{ form.categoria }}
-      {% if form.categoria.errors %}
-      <p class="mt-1.5 text-xs text-red-600">{{ form.categoria.errors.0 }}</p>
-      {% endif %}
-    </div>
     <div class="md:col-span-2">
       <label for="{{ form.descripcion.id_for_label }}" class="label">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
       {{ form.descripcion }}

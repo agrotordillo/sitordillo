@@ -33,6 +33,9 @@
       {% if perms.products.add_producto %}
       <a href="{% url 'products:product-create' %}" class="sidebar-sublink">Crear producto</a>
       {% endif %}
+      {% if perms.products.change_productoprecio %}
+      <a href="{% url 'products:precios-masivos' %}" class="sidebar-sublink">Actualizar precios (Excel)</a>
+      {% endif %}
       {% if perms.products.view_categoria %}
       <a href="{% url 'products:category-list' %}" class="sidebar-link">
         <svg class="w-5 h-5 text-[#3BA9FF]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">

@@ -504,3 +504,168 @@ class BusquedaProductoTests(TestCase):
                 self.assertEqual(respuesta.status_code, 200)
                 self.assertContains(respuesta, "producto-search-input")
                 self.assertNotContains(respuesta, "CADENA METALICA</option>")
+
+
+class PreciosMasivosTests(TestCase):
+    """"Actualizar precios" con la plantilla del sistema anterior: se revisa
+    el archivo (qué cambia y errores por línea) sin guardar nada, y solo se
+    aplica al confirmar. Celdas vacías o en 0 no cambian; el % de utilidad
+    de cada precio capturado se recalcula; los no capturados no se tocan."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        cls.publico = ListaPrecio.objects.get_or_create(nombre="PUBLICO", defaults={"orden": 1})[0]
+        cls.mayoreo = ListaPrecio.objects.get_or_create(nombre="MAYOREO", defaults={"orden": 3})[0]
+        cls.url = reverse("products:precios-masivos")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+        # Exento de IVA para que las cuentas sean directas.
+        self.sulfa = Producto.objects.create(
+            nombre="3 SULFA", sku="3S100", precio_costo=Decimal("80.0000"), precio_venta=Decimal("115.00"),
+            tipo_iva=Producto.TipoIVA.EXENTO,
+        )
+        self.publico_sulfa = ProductoPrecio.objects.create(
+            producto=self.sulfa, lista_precio=self.publico, utilidad_pct=Decimal("43.75"), precio_con_impuesto=Decimal("115.00"),
+        )
+        self.mayoreo_sulfa = ProductoPrecio.objects.create(
+            producto=self.sulfa, lista_precio=self.mayoreo, utilidad_pct=Decimal("28.125"), precio_con_impuesto=Decimal("102.50"),
+        )
+        self.eje = Producto.objects.create(nombre="EJE SOLO", sku="E", precio_costo=Decimal("10.0000"), tipo_iva=Producto.TipoIVA.EXENTO)
+
+    def archivo(self, renglones, titulo=None):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from apps.products.precios_masivos import generar_plantilla
+
+        libro = generar_plantilla()
+        hoja = libro["Precios"]
+        if titulo is not None:
+            hoja["A1"] = titulo
+        for renglon in renglones:
+            hoja.append(renglon)
+        contenido = io.BytesIO()
+        libro.save(contenido)
+        return SimpleUploadedFile("precios.xlsx", contenido.getvalue())
+
+    def revisar(self, renglones, **kwargs):
+        return self.client.post(self.url, {"accion": "revisar", "archivo": self.archivo(renglones, **kwargs)})
+
+    def test_plantilla_como_la_del_sistema_anterior(self):
+        import io
+
+        import openpyxl
+
+        respuesta = self.client.get(reverse("products:precios-masivos-plantilla"))
+        libro = openpyxl.load_workbook(io.BytesIO(respuesta.content))
+        hoja = libro["Precios"]
+        self.assertEqual(hoja["A1"].value, "Actualización de precios")
+        self.assertEqual(
+            [c.value for c in hoja[2]],
+            ["codigo_producto", "nombre_producto", "costo"] + [f"precio_{n}" for n in range(1, 10)],
+        )
+        self.assertIn("Instrucciones", libro.sheetnames)
+
+    def test_revisar_no_guarda_y_aplicar_si(self):
+        # Costo 90 y Público 130 (Mayoreo vacío: no se toca); "e" en minúsculas.
+        respuesta = self.revisar([
+            ["3S100", "3 SULFA", 90, 130, None, 0],
+            ["e", "EJE", None, None, None, 25],
+        ])
+        cambios = respuesta.context["cambios"]
+        self.assertEqual(respuesta.context["errores"], [])
+        self.assertEqual([c["sku"] for c in cambios], ["3S100", "E"])
+        self.assertEqual(cambios[0]["costo_nuevo"], "90.0000")
+        self.assertEqual([(p["lista"], p["antes"], p["nuevo"], p["utilidad"]) for p in cambios[0]["precios"]],
+                         [("Público", "115.00", "130.00", "44.4444")])
+        self.assertEqual([(p["lista"], p["antes"], p["nuevo"]) for p in cambios[1]["precios"]], [("Mayoreo", None, "25.00")])
+        self.sulfa.refresh_from_db()
+        self.assertEqual(self.sulfa.precio_costo, Decimal("80.0000"))
+
+        respuesta = self.client.post(self.url, {"accion": "aplicar", "token": respuesta.context["token"]})
+        self.assertRedirects(respuesta, self.url, fetch_redirect_response=False)
+        self.sulfa.refresh_from_db()
+        self.publico_sulfa.refresh_from_db()
+        self.mayoreo_sulfa.refresh_from_db()
+        self.assertEqual((self.sulfa.precio_costo, self.sulfa.precio_venta), (Decimal("90.0000"), Decimal("130.00")))
+        self.assertEqual((self.publico_sulfa.precio_con_impuesto, self.publico_sulfa.utilidad_pct), (Decimal("130.00"), Decimal("44.4444")))
+        self.assertEqual((self.mayoreo_sulfa.precio_con_impuesto, self.mayoreo_sulfa.utilidad_pct), (Decimal("102.50"), Decimal("28.1250")))
+        nuevo = ProductoPrecio.objects.get(producto=self.eje, lista_precio=self.mayoreo, almacen__isnull=True)
+        self.assertEqual((nuevo.precio_con_impuesto, nuevo.utilidad_pct), (Decimal("25.00"), Decimal("150.0000")))
+
+        # La misma revisión no se aplica dos veces.
+        respuesta = self.client.post(self.url, {"accion": "aplicar", "token": "otro"})
+        self.assertRedirects(respuesta, self.url, fetch_redirect_response=False)
+
+    def test_errores_por_linea_y_no_se_aplica_nada(self):
+        respuesta = self.revisar([
+            ["NOEXISTE", "", 10],
+            ["3S100", "", -5],
+            ["E", "", None, "abc"],
+            ["E", "", 12],
+            ["E", "", 13],
+        ])
+        errores = respuesta.context["errores"]
+        self.assertEqual(len(errores), 4)
+        self.assertIn("Línea 3: el código de producto NOEXISTE no existe.", errores)
+        self.assertTrue(errores[1].startswith("Línea 4 (3S100): el costo no puede ser negativo"))
+        self.assertTrue(errores[2].startswith("Línea 5 (E): precio_1"))
+        self.assertIn("Línea 7: el código E ya viene en la línea 6.", errores)
+        self.assertNotIn("precios_masivos_revision", self.client.session)
+        self.assertNotContains(respuesta, "Aplicar cambios")
+
+        respuesta = self.revisar([["3S100", "", 90]], titulo="Otra cosa")
+        self.assertIn("estructura de la plantilla", respuesta.context["errores"][0])
+
+    def test_sin_permiso_de_productos_no_cambia_el_costo(self):
+        from django.contrib.auth.models import Permission
+
+        capturista = User.objects.create_user(username="precios", password="S3guridad!2026")
+        capturista.user_permissions.add(Permission.objects.get(codename="change_productoprecio"))
+        self.client.force_login(capturista)
+        respuesta = self.revisar([["3S100", "", 90, 130], ["E", "", None, 20]])
+        self.assertEqual(len(respuesta.context["errores"]), 1)
+        self.assertIn("no tienes permiso para cambiar el costo", respuesta.context["errores"][0])
+
+
+class SubcategoriaIndependienteTests(TestCase):
+    """La subcategoría es un catálogo independiente (como Marca o Clase): ya
+    no cuelga de una categoría, y el producto tiene las dos por separado."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.products.models import Categoria, Subcategoria
+
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        cls.perros = Categoria.objects.create(nombre="PERROS")
+        cls.gatos = Categoria.objects.create(nombre="GATOS")
+        cls.alimento = Subcategoria.objects.create(nombre="ALIMENTO SECO")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def test_cualquier_combinacion_de_categoria_y_subcategoria(self):
+        for categoria in (self.perros, self.gatos):
+            producto = Producto(nombre=f"Croqueta {categoria.nombre}", sku=f"CRQ-{categoria.nombre}", categoria=categoria, subcategoria=self.alimento)
+            producto.full_clean()
+            producto.save()
+        respuesta = self.client.get(reverse("products:product-list"), {"subcategoria": self.alimento.pk})
+        self.assertEqual(len(respuesta.context["products"]), 2)
+        # El filtro ofrece todas las subcategorías aunque no se elija categoría.
+        self.assertContains(respuesta, f'<option value="{self.alimento.pk}" selected>ALIMENTO SECO</option>', html=True)
+
+    def test_alta_y_nombre_unico(self):
+        respuesta = self.client.post(reverse("products:subcategory-create"), {"nombre": "MEDICAMENTO", "descripcion": ""})
+        self.assertRedirects(respuesta, reverse("products:subcategory-list"), fetch_redirect_response=False)
+        respuesta = self.client.post(reverse("products:subcategory-create"), {"nombre": "MEDICAMENTO", "descripcion": ""})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("nombre", respuesta.context["form"].errors)
+
+    def test_alta_rapida_desde_el_formulario_de_producto(self):
+        respuesta = self.client.post(reverse("api:subcategoria-quick-create"), {"nombre": "ACCESORIOS"})
+        self.assertEqual(respuesta.status_code, 201)
+        self.assertEqual(respuesta.json()["label"], "ACCESORIOS")
+        self.assertContains(self.client.get(reverse("products:product-create")), "ACCESORIOS")

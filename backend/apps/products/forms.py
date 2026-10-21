@@ -61,15 +61,6 @@ class ProductForm(BaseModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["almacen"].queryset = Almacen.objects.filter(is_active=True, tipo=Almacen.Tipo.SUCURSAL)
-        cat_id = self.data.get("categoria") if self.is_bound else None
-        if not cat_id and self.instance.pk:
-            cat_id = self.instance.categoria_id
-        if cat_id:
-            self.fields["subcategoria"].queryset = Subcategoria.objects.filter(
-                categoria_id=cat_id, is_active=True
-            )
-        else:
-            self.fields["subcategoria"].queryset = Subcategoria.objects.none()
 
 
 class CategoryForm(BaseModelForm):
@@ -81,7 +72,7 @@ class CategoryForm(BaseModelForm):
 class SubcategoryForm(BaseModelForm):
     class Meta:
         model = Subcategoria
-        fields = ["nombre", "categoria", "descripcion"]
+        fields = ["nombre", "descripcion"]
 
 
 class BrandForm(BaseModelForm):
