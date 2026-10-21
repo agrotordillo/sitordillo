@@ -23,6 +23,27 @@
 <form data-borrador method="post" x-data="formsetRows({ totalFormsSelector: '#id_precios-TOTAL_FORMS' })">
   {% csrf_token %}
   {{ formset.management_form }}
+
+  <div class="mb-5 grid gap-4 sm:grid-cols-2 rounded-xl border border-gray-100 p-4" data-precios-base data-costo-original="{{ costo_guardado|stringformat:'f' }}">
+    <div>
+      <label for="{{ producto_form.precio_costo.id_for_label }}" class="label">Precio de costo</label>
+      {{ producto_form.precio_costo }}
+      {% if producto_form.precio_costo.errors %}<p class="mt-1 text-xs text-red-600">{{ producto_form.precio_costo.errors.0 }}</p>{% endif %}
+      <div class="mt-2 flex flex-wrap items-center gap-2" data-confirmar-costo hidden>
+        <button type="button" class="btn-secondary" data-confirmar-costo-boton>Actualizar también precios de lista</button>
+        <span class="text-xs text-gray-400" data-confirmar-costo-estado>Si no lo confirmas, solo se guarda el costo.</span>
+      </div>
+    </div>
+    <div>
+      <label for="{{ producto_form.precio_venta.id_for_label }}" class="label">Precio de venta</label>
+      {{ producto_form.precio_venta }}
+      {% if producto_form.precio_venta.errors %}<p class="mt-1 text-xs text-red-600">{{ producto_form.precio_venta.errors.0 }}</p>{% endif %}
+      <p class="mt-1.5 text-xs text-gray-400">Es el precio de Público en general: si lo cambias aquí cambia esa fila de la lista, y al revés.</p>
+    </div>
+    {% if not puede_editar_producto %}
+    <p class="sm:col-span-2 text-xs text-amber-600">Para cambiar el costo o el precio de venta necesitas permiso para editar productos.</p>
+    {% endif %}
+  </div>
   {% if formset.non_form_errors %}
   <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
     {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}

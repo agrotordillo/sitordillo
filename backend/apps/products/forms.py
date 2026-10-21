@@ -180,6 +180,26 @@ PaqueteComponenteFormSet = inlineformset_factory(
 )
 
 
+class PreciosBaseProductoForm(BaseModelForm):
+    """Precio de costo y precio de venta del producto, editables también
+    desde la pantalla de Precios (producto_precios_view). Las listas NO se
+    recalculan solas al guardar el costo: si el usuario lo confirma, ya
+    vienen recalculadas en el formset (precio-lista-calc.js), que es lo que
+    se guarda."""
+
+    class Meta:
+        model = Producto
+        fields = ["precio_costo", "precio_venta"]
+
+    def __init__(self, *args, puede_editar=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["precio_costo"].widget.attrs.update({"step": "0.0001", "min": "0"})
+        self.fields["precio_venta"].widget.attrs.update({"step": "0.01", "min": "0"})
+        if not puede_editar:
+            for campo in self.fields.values():
+                campo.disabled = True
+
+
 class ProductoPrecioForm(BaseModelForm):
     class Meta:
         model = ProductoPrecio

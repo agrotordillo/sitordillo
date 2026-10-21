@@ -184,19 +184,56 @@ class ConfirmarActualizarPreciosListaTests(TestCase):
         self.assertEqual([f["lista"] for f in datos["filas"]], ["PUBLICO"])
         self.assertTrue(datos["filas"][0]["es_publico_general"])
 
-    def test_guardar_la_pantalla_de_precios_iguala_el_precio_de_venta_a_publico(self):
-        url = reverse("products:producto-precios", args=[self.producto.pk])
-        respuesta = self.client.post(url, {
+    def datos_pantalla_precios(self, costo="100.0000", venta="151.00", publico="151.00", mayoreo="140.00"):
+        return {
+            "producto-precio_costo": costo, "producto-precio_venta": venta,
             "precios-TOTAL_FORMS": "2", "precios-INITIAL_FORMS": "2",
             "precios-MIN_NUM_FORMS": "0", "precios-MAX_NUM_FORMS": "1000",
             "precios-0-id": self.precio_publico.pk, "precios-0-lista_precio": self.publico.pk,
-            "precios-0-almacen": "", "precios-0-utilidad_pct": "", "precios-0-precio_con_impuesto": "175.00",
+            "precios-0-almacen": "", "precios-0-utilidad_pct": "30", "precios-0-precio_con_impuesto": publico,
             "precios-1-id": self.precio_mayoreo.pk, "precios-1-lista_precio": self.mayoreo.pk,
-            "precios-1-almacen": "", "precios-1-utilidad_pct": "", "precios-1-precio_con_impuesto": "140.00",
-        })
+            "precios-1-almacen": "", "precios-1-utilidad_pct": "", "precios-1-precio_con_impuesto": mayoreo,
+        }
+
+    def test_guardar_la_pantalla_de_precios_iguala_el_precio_de_venta_a_publico(self):
+        url = reverse("products:producto-precios", args=[self.producto.pk])
+        respuesta = self.client.post(url, self.datos_pantalla_precios(venta="160.00", publico="175.00"))
         self.assertEqual(respuesta.status_code, 302)
         self.producto.refresh_from_db()
         self.assertEqual(self.producto.precio_venta, Decimal("175.00"))
+
+    def test_pantalla_de_precios_cambia_el_costo_sin_recalcular_solo(self):
+        # Sin confirmar: el costo cambia y los precios se guardan tal cual vienen.
+        url = reverse("products:producto-precios", args=[self.producto.pk])
+        respuesta = self.client.post(url, self.datos_pantalla_precios(costo="120.0000"))
+        self.assertEqual(respuesta.status_code, 302)
+        self.producto.refresh_from_db()
+        self.precio_publico.refresh_from_db()
+        self.assertEqual(self.producto.precio_costo, Decimal("120.0000"))
+        self.assertEqual(self.precio_publico.precio_con_impuesto, Decimal("151.00"))
+        self.assertEqual(self.precio_publico.utilidad_pct, Decimal("30"))
+
+    def test_pantalla_de_precios_guarda_lo_recalculado_al_confirmar(self):
+        # Confirmado: la pantalla manda Público ya recalculado
+        # (120 × 1.30 × 1.16 = 180.96 -> 181.00) y el precio de venta lo toma.
+        url = reverse("products:producto-precios", args=[self.producto.pk])
+        respuesta = self.client.post(url, self.datos_pantalla_precios(costo="120.0000", venta="181.00", publico="181.00"))
+        self.assertEqual(respuesta.status_code, 302)
+        self.producto.refresh_from_db()
+        self.assertEqual((self.producto.precio_costo, self.producto.precio_venta), (Decimal("120.0000"), Decimal("181.00")))
+
+    def test_sin_permiso_de_productos_no_cambia_el_costo(self):
+        from django.contrib.auth.models import Permission
+
+        capturista = User.objects.create_user(username="precios", password="S3guridad!2026")
+        capturista.user_permissions.add(Permission.objects.get(codename="change_productoprecio"))
+        self.client.force_login(capturista)
+        url = reverse("products:producto-precios", args=[self.producto.pk])
+        self.assertContains(self.client.get(url), "necesitas permiso para editar productos")
+        respuesta = self.client.post(url, self.datos_pantalla_precios(costo="1.0000"))
+        self.assertEqual(respuesta.status_code, 302)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.precio_costo, Decimal("100.0000"))
 
 
 class OrdenListaPreciosTests(TestCase):
