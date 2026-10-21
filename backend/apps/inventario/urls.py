@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views.inventario_views import ExistenciaListView, LoteListView
+from .views.inventario_views import ExistenciaExcelView, ExistenciaListView, LoteListView
 from .views.correccion_views import corregir_lote_view, reportar_merma_view
 from .views.surtimiento_views import SurtimientoListView
 from .views.kardex_views import kardex_producto_view
@@ -31,6 +31,7 @@ urlpatterns = [
     path("lotes/<int:pk>/corregir/", corregir_lote_view, name="lote-corregir"),
     path("lotes/<int:pk>/merma/", reportar_merma_view, name="lote-merma"),
     path("existencias/", ExistenciaListView.as_view(), name="existencia-list"),
+    path("existencias/excel/", ExistenciaExcelView.as_view(), name="existencia-exportar"),
     path("surtimiento/", SurtimientoListView.as_view(), name="surtimiento-list"),
     path("kardex/", kardex_producto_view, name="kardex-producto"),
     path("existencia-sin-movimiento/", existencia_sin_movimiento_view, name="existencia-sin-movimiento"),

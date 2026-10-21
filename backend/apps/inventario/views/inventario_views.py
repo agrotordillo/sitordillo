@@ -1,6 +1,13 @@
+from decimal import Decimal
+
+import openpyxl
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Sum
+from django.http import HttpResponse
+from django.utils import timezone
 from django.views.generic import ListView
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 
 from apps.compras.models import OrdenCompra
 from apps.core.filtros_producto import FiltrosProductoMixin
@@ -72,15 +79,79 @@ class ExistenciaListView(FiltrosProductoMixin, PermissionRequiredMixin, ListView
         if fecha_hasta:
             queryset = queryset.filter(fecha_ingreso__lte=fecha_hasta)
 
-        return (
-            queryset.values("producto__nombre", "producto__sku", "almacen__nombre")
+        agrupado = (
+            queryset.values("producto_id", "producto__nombre", "producto__sku", "almacen_id", "almacen__nombre")
             .annotate(total=Sum("cantidad_disponible"))
-            .order_by("producto__nombre", "almacen__nombre")
+            .order_by("producto__nombre", "producto_id")
         )
+        self.almacenes, filas = pivotar_por_almacen(agrupado)
+        return filas
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["almacenes"] = self.almacenes
         context["q"] = self.request.GET.get("q", "").strip()
         context["fecha_desde"] = self.request.GET.get("fecha_desde", "")
         context["fecha_hasta"] = self.request.GET.get("fecha_hasta", "")
+        context["querystring"] = self.request.GET.urlencode()
         return context
+
+
+def pivotar_por_almacen(agrupado):
+    """De una fila por (producto, almacén) a una fila por producto con una
+    columna por almacén, como se leía en el sistema anterior. Las columnas
+    son solo los almacenes con existencia en el resultado, por nombre; la
+    celda queda en None donde ese producto no tiene existencia."""
+    agrupado = list(agrupado)
+    almacenes = sorted({(fila["almacen__nombre"], fila["almacen_id"]) for fila in agrupado})
+    posicion = {almacen_id: indice for indice, (_, almacen_id) in enumerate(almacenes)}
+
+    filas = {}
+    for registro in agrupado:
+        fila = filas.setdefault(registro["producto_id"], {
+            "producto__nombre": registro["producto__nombre"],
+            "producto__sku": registro["producto__sku"],
+            "cantidades": [None] * len(almacenes),
+            "total": Decimal("0"),
+        })
+        fila["cantidades"][posicion[registro["almacen_id"]]] = registro["total"]
+        fila["total"] += registro["total"]
+    return [nombre for nombre, _ in almacenes], list(filas.values())
+
+
+class ExistenciaExcelView(ExistenciaListView):
+    """Descarga en Excel la misma tabla de Existencias que se ve en
+    pantalla, con los mismos filtros."""
+
+    def render_to_response(self, context, **response_kwargs):
+        almacenes = context["almacenes"]
+        workbook = openpyxl.Workbook()
+        hoja = workbook.active
+        hoja.title = "Existencias"
+        hoja.append(["SKU", "Producto", *almacenes, "Total"])
+        for celda in hoja[1]:
+            celda.font = Font(bold=True)
+
+        for fila in context["existencias"]:
+            hoja.append([
+                fila["producto__sku"],
+                fila["producto__nombre"],
+                *(float(cantidad) if cantidad is not None else None for cantidad in fila["cantidades"]),
+                float(fila["total"]),
+            ])
+
+        hoja.column_dimensions["A"].width = 14
+        hoja.column_dimensions["B"].width = 40
+        for indice in range(3, len(almacenes) + 4):
+            hoja.column_dimensions[get_column_letter(indice)].width = 16
+            for (celda,) in hoja.iter_rows(min_row=2, min_col=indice, max_col=indice):
+                celda.number_format = "#,##0.00"
+        hoja.freeze_panes = "C2"
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        fecha_hoy = timezone.localdate().isoformat()
+        response["Content-Disposition"] = f'attachment; filename="existencias_{fecha_hoy}.xlsx"'
+        workbook.save(response)
+        return response

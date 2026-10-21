@@ -1,7 +1,9 @@
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 from unittest import mock
 
+import openpyxl
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -665,6 +667,30 @@ class BusquedaExistenciasTests(TestCase):
         self.assertEqual(skus("e"), ["E"])
         self.assertEqual(sorted(skus("")), ["3S100", "CEP", "E"])
         self.assertContains(self.client.get(url, {"q": "nada"}), 'que coincidan con "nada"')
+
+    def test_existencias_una_columna_por_almacen(self):
+        otro = Almacen.objects.create(nombre="BODEGA", tipo=Almacen.Tipo.SUCURSAL, numero=2)
+        cepillo = Producto.objects.get(sku="CEP")
+        for cantidad in (Decimal("3"), Decimal("4")):
+            Lote.objects.create(
+                producto=cepillo, almacen=otro, fecha_ingreso=date(2026, 1, 1),
+                costo_unitario=Decimal("10"), cantidad_inicial=cantidad, cantidad_disponible=cantidad,
+            )
+
+        contexto = self.client.get(reverse("inventario:existencia-list")).context
+        self.assertEqual(contexto["almacenes"], ["BODEGA", "CENTRO"])
+        fila = next(fila for fila in contexto["existencias"] if fila["producto__sku"] == "CEP")
+        self.assertEqual((fila["cantidades"], fila["total"]), ([Decimal("7"), Decimal("5")], Decimal("12")))
+        # Solo salen los almacenes con existencia de lo filtrado.
+        respuesta = self.client.get(reverse("inventario:existencia-list"), {"q": "e"})
+        self.assertEqual(respuesta.context["almacenes"], ["CENTRO"])
+
+        excel = self.client.get(reverse("inventario:existencia-exportar"), {"q": "cep"})
+        hoja = openpyxl.load_workbook(BytesIO(excel.content)).active
+        self.assertEqual(
+            [list(fila) for fila in hoja.iter_rows(values_only=True)],
+            [["SKU", "Producto", "BODEGA", "CENTRO", "Total"], ["CEP", "CEPILLO", 7, 5, 12]],
+        )
 
     def test_lotes(self):
         url = reverse("inventario:lote-list")
