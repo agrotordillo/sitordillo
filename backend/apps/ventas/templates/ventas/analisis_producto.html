@@ -1,0 +1,153 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras static %}
+{% block title %}Análisis de ventas por producto{% endblock title %}
+{% block title_layout %}Análisis de ventas por producto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Análisis de ventas por producto</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 items-end w-full">
+  <div>
+    <label class="label">Sucursal</label>
+    <select name="almacen" class="input w-full">
+      {% for a in almacenes %}
+      <option value="{{ a.pk }}" {% if almacen and almacen.pk == a.pk %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <div class="flex-1">
+      <label class="label">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde|date:'Y-m-d' }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta|date:'Y-m-d' }}" class="input w-full">
+    </div>
+  </div>
+  <div class="sm:col-span-2 lg:col-span-2">
+    <label class="label">Buscar</label>
+    <input type="text" name="q" value="{{ q }}" placeholder="Nombre o SKU (código)..." class="input w-full">
+  </div>
+  {% include "core/includes/_filtros_producto.html" %}
+  <div>
+    <label class="label">Mostrar</label>
+    <select name="mostrar" class="input w-full">
+      {% for valor, etiqueta in opciones_mostrar %}
+      <option value="{{ valor }}" {% if mostrar == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Agrupar por</label>
+    <select name="agrupar" class="input w-full">
+      <option value="">Sin agrupar</option>
+      {% for valor, etiqueta in agrupaciones %}
+      <option value="{{ valor }}" {% if agrupar == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4 lg:justify-end">
+    <button type="submit" class="btn-primary">Consultar</button>
+    <a href="{% url 'ventas:analisis-producto' %}?limpiar_filtros=1" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+  </div>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+{% if not almacen %}
+<p class="px-4 sm:px-6 py-12 text-center text-sm text-gray-400">Elige una sucursal para ver su análisis.</p>
+{% else %}
+<p class="px-4 sm:px-6 pb-4 text-sm text-gray-500">
+  {{ almacen.nombre }} · del {{ fecha_desde|date:"d/m/Y" }} al {{ fecha_hasta|date:"d/m/Y" }} ·
+  {{ resultado.productos }} producto{{ resultado.productos|pluralize }}.
+  Las devoluciones de cliente cuentan como entrada; lo apartado en pedidos sigue contando como existencia
+  hasta que se entrega en la venta.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Marca</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Unidad</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Inicial</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Entradas</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Salidas</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Ventas</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right bg-amber-50/70">Final</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for grupo in resultado.grupos %}
+      {% if agrupar %}
+      <tr class="bg-gray-50/70">
+        <th scope="colgroup" colspan="8" class="px-4 sm:px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-600">
+          {% if grupo.nombre %}{{ grupo.nombre }}{% else %}Sin {{ agrupar_etiqueta|lower }}{% endif %}
+        </th>
+      </tr>
+      {% endif %}
+      {% for fila in grupo.filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-3 font-medium text-gray-800">
+          {{ fila.producto.nombre }}
+          <span class="block text-xs text-gray-400 font-mono">{{ fila.producto.sku }}</span>
+        </td>
+        <td class="px-4 sm:px-6 py-3 text-gray-500 hidden md:table-cell">{{ fila.producto.marca.nombre|default:"—" }}</td>
+        <td class="px-4 sm:px-6 py-3 text-gray-500 hidden md:table-cell">{{ fila.producto.unidad_medida.nombre|default:"—" }}</td>
+        <td class="px-3 py-3 text-right">{{ fila.inicial|moneda }}</td>
+        <td class="px-3 py-3 text-right text-emerald-700">{{ fila.entradas|moneda }}</td>
+        <td class="px-3 py-3 text-right text-red-600">{{ fila.salidas|moneda }}</td>
+        <td class="px-3 py-3 text-right text-primary-700 font-medium">{{ fila.ventas|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right font-semibold text-gray-800 bg-amber-50/70">{{ fila.final|moneda }}</td>
+      </tr>
+      {% endfor %}
+      {% if agrupar %}
+      <tr class="bg-gray-50/40 font-semibold text-gray-700">
+        <td class="px-4 sm:px-6 py-2.5 text-right md:hidden">Subtotal</td>
+        <td colspan="3" class="px-4 sm:px-6 py-2.5 text-right hidden md:table-cell">Subtotal</td>
+        <td class="px-3 py-2.5 text-right">{{ grupo.totales.inicial|moneda }}</td>
+        <td class="px-3 py-2.5 text-right">{{ grupo.totales.entradas|moneda }}</td>
+        <td class="px-3 py-2.5 text-right">{{ grupo.totales.salidas|moneda }}</td>
+        <td class="px-3 py-2.5 text-right">{{ grupo.totales.ventas|moneda }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right bg-amber-50/70">{{ grupo.totales.final|moneda }}</td>
+      </tr>
+      {% endif %}
+      {% empty %}
+      <tr>
+        <td colspan="8" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay productos con movimiento en {{ almacen.nombre }} que coincidan con los filtros</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if resultado.grupos %}
+    <tfoot class="border-t-2 border-gray-200 font-semibold text-gray-800">
+      <tr>
+        <td class="px-4 sm:px-6 py-3 text-right md:hidden">Total</td>
+        <td colspan="3" class="px-4 sm:px-6 py-3 text-right hidden md:table-cell">Total</td>
+        <td class="px-3 py-3 text-right">{{ resultado.totales.inicial|moneda }}</td>
+        <td class="px-3 py-3 text-right">{{ resultado.totales.entradas|moneda }}</td>
+        <td class="px-3 py-3 text-right">{{ resultado.totales.salidas|moneda }}</td>
+        <td class="px-3 py-3 text-right">{{ resultado.totales.ventas|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right bg-amber-50/70">{{ resultado.totales.final|moneda }}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endif %}
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+{% endblock extra_js %}

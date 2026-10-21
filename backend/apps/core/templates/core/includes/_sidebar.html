@@ -184,7 +184,7 @@
       {% endif %}
       {% endif %}
 
-      {% if perms.clientes.view_cliente or perms.compras.view_ordencompra or perms.compras.view_promocionproveedor or perms.compras.view_ordencompradetalle or perms.pagos.view_cuentaporpagar or perms.pagos.view_recibopago or perms.pagos.view_banco or perms.gastos.view_gasto or perms.gastos.view_conceptogasto or perms.gastos.view_centrocosto or perms.gastos.view_vehiculo or perms.gastos.view_bitacoraaccesogastos or perms.ventas.view_venta or perms.ventas.view_devolucioncliente or perms.cobros.view_cuentaporcobrar or perms.comisiones.view_comisionlinea or perms.comisiones.view_comisionproducto or perms.facturacion.view_factura or perms.facturacion.change_empresa %}
+      {% if perms.clientes.view_cliente or perms.compras.view_ordencompra or perms.compras.view_promocionproveedor or perms.compras.view_ordencompradetalle or perms.pagos.view_cuentaporpagar or perms.pagos.view_recibopago or perms.pagos.view_banco or perms.gastos.view_gasto or perms.gastos.view_conceptogasto or perms.gastos.view_centrocosto or perms.gastos.view_vehiculo or perms.gastos.view_bitacoraaccesogastos or perms.ventas.view_venta or perms.ventas.view_devolucioncliente or perms.ventas.view_analisis_ventas or perms.cobros.view_cuentaporcobrar or perms.comisiones.view_comisionlinea or perms.comisiones.view_comisionproducto or perms.facturacion.view_factura or perms.facturacion.change_empresa %}
       <div class="sidebar-section">Operaciones</div>
       {% if perms.clientes.view_cliente %}
       <a href="{% url 'clientes:cliente-list' %}" class="sidebar-link">
@@ -282,6 +282,10 @@
       {% endif %}
       {% if perms.ventas.view_retiroefectivo %}
       <a href="{% url 'ventas:retiro-list' %}" class="sidebar-sublink">Retiros de efectivo</a>
+      {% endif %}
+      {% if perms.ventas.view_analisis_ventas %}
+      <a href="{% url 'ventas:analisis-producto' %}" class="sidebar-sublink">Análisis de ventas por producto</a>
+      <a href="{% url 'ventas:analisis-precio' %}" class="sidebar-sublink">Análisis de ventas por precio</a>
       {% endif %}
       {% if perms.cobros.view_cuentaporcobrar %}
       <a href="{% url 'cobros:cuenta-list' %}" class="sidebar-sublink">Cuentas por cobrar</a>

@@ -2,7 +2,7 @@ import base64
 import hashlib
 import shutil
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
@@ -14,11 +14,12 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.clientes.models import Cliente
 from apps.fiscal.models import FormaPago
 from apps.inventario.models import Lote, MovimientoInventario
-from apps.products.models import Almacen, PaqueteComponente, Producto, PuntoVenta, Turno
+from apps.products.models import Almacen, Linea, ListaPrecio, PaqueteComponente, Producto, PuntoVenta, Turno
 from apps.ventas.models import (
     DevolucionCliente,
     DevolucionClienteDetalle,
@@ -429,3 +430,215 @@ class RetiroEfectivoTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.context["total_retiros"], Decimal("50.00"))
+
+
+def _en(dia, mes=3):
+    """Mediodía de `dia`/`mes` de 2026, con zona horaria."""
+    return timezone.make_aware(datetime(2026, mes, dia, 12, 0))
+
+
+class AnalisisVentasProductoTests(TestCase):
+    """Análisis de ventas por producto (control_ven_analisis_ventas_productos
+    en scvweb): inicial, entradas, salidas, ventas y final de una sucursal en
+    un rango de fechas, a partir de los movimientos de inventario."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.sucursal = Almacen.objects.create(nombre="Sucursal Centro", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        cls.otra = Almacen.objects.create(nombre="Sucursal Norte", tipo=Almacen.Tipo.SUCURSAL, numero=2)
+        cls.cliente = Cliente.objects.create(nombre="Cliente Prueba")
+        cls.linea = Linea.objects.create(nombre="Alimentos")
+        cls.croqueta = Producto.objects.create(nombre="Croqueta", sku="CRQ", linea=cls.linea)
+        cls.vacuna = Producto.objects.create(nombre="Vacuna", sku="VAC")
+        cls.agotado = Producto.objects.create(nombre="Collar", sku="COL")
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+
+        lote = cls._lote(cls.croqueta, cls.sucursal)
+        cls._mov(lote, MovimientoInventario.Tipo.ENTRADA, 10, _en(10, 2))  # antes del periodo
+        cls._mov(lote, MovimientoInventario.Tipo.ENTRADA, 5, _en(5))
+        cls._mov(lote, MovimientoInventario.Tipo.TRASPASO, -2, _en(6))
+        cls._mov(lote, MovimientoInventario.Tipo.MERMA, -1, _en(7))
+        cls._mov(lote, MovimientoInventario.Tipo.SALIDA, -3, _en(8))
+        venta = Venta.objects.create(cliente=cls.cliente, almacen=cls.sucursal, fecha_venta=_en(8))
+        detalle = VentaDetalle.objects.create(venta=venta, producto=cls.croqueta, cantidad=3, precio_unitario=10)
+        VentaDetalleLote.objects.create(detalle=detalle, lote=lote, cantidad=3, costo_unitario=lote.costo_unitario)
+        cls._mov(lote, MovimientoInventario.Tipo.DEVOLUCION, 1, _en(9))
+        # No cuentan: el apartado de un pedido, lo de después del periodo y
+        # lo de otra sucursal.
+        cls._mov(lote, MovimientoInventario.Tipo.PEDIDO, -2, _en(10))
+        cls._mov(lote, MovimientoInventario.Tipo.ENTRADA, 100, _en(1, 4))
+        cls._mov(cls._lote(cls.croqueta, cls.otra), MovimientoInventario.Tipo.ENTRADA, 50, _en(5))
+
+        cls._mov(cls._lote(cls.vacuna, cls.sucursal), MovimientoInventario.Tipo.ENTRADA, 4, _en(1, 2))
+        lote_agotado = cls._lote(cls.agotado, cls.sucursal)
+        cls._mov(lote_agotado, MovimientoInventario.Tipo.ENTRADA, 2, _en(1, 2))
+        cls._mov(lote_agotado, MovimientoInventario.Tipo.AJUSTE, -2, _en(2, 2))
+
+    @staticmethod
+    def _lote(producto, almacen):
+        return Lote.objects.create(
+            producto=producto, almacen=almacen, fecha_ingreso=date(2026, 1, 1),
+            costo_unitario=Decimal("10.00"), cantidad_inicial=1, cantidad_disponible=0,
+        )
+
+    @staticmethod
+    def _mov(lote, tipo, cantidad, cuando):
+        MovimientoInventario.objects.create(
+            lote=lote, tipo=tipo, cantidad=cantidad, cantidad_anterior=0, cantidad_nueva=0, fecha_movimiento=cuando,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _consultar(self, **filtros):
+        parametros = {"almacen": self.sucursal.pk, "fecha_desde": "2026-03-01", "fecha_hasta": "2026-03-31", **filtros}
+        respuesta = self.client.get(reverse("ventas:analisis-producto"), parametros)
+        self.assertEqual(respuesta.status_code, 200)
+        return respuesta.context["resultado"]
+
+    def _filas(self, resultado):
+        return {
+            fila["producto"].sku: tuple(fila[c] for c in ("inicial", "entradas", "salidas", "ventas", "final"))
+            for grupo in resultado["grupos"]
+            for fila in grupo["filas"]
+        }
+
+    def test_separa_ventas_de_las_demas_salidas_y_cuadra_la_existencia_final(self):
+        filas = self._filas(self._consultar())
+
+        # Entradas: compra (5) + devolución (1). Salidas: traspaso (2) +
+        # merma (1). Ventas: 3. Final: 10 + 6 - 3 - 3.
+        self.assertEqual(filas["CRQ"], (10, 6, 3, 3, 10))
+        self.assertEqual(filas["VAC"], (4, 0, 0, 0, 4))
+        self.assertNotIn("COL", filas)
+
+    def test_opciones_de_mostrar(self):
+        self.assertEqual(set(self._filas(self._consultar(mostrar="con_movimiento"))), {"CRQ"})
+        self.assertEqual(set(self._filas(self._consultar(mostrar="todos"))), {"CRQ", "VAC", "COL"})
+
+    def test_agrupa_por_linea_con_subtotales(self):
+        resultado = self._consultar(agrupar="linea")
+
+        self.assertEqual(
+            [(g["nombre"], g["totales"]["final"]) for g in resultado["grupos"]], [("Alimentos", 10), (None, 4)],
+        )
+        self.assertEqual(resultado["totales"]["inicial"], 14)
+
+    def test_filtra_por_linea(self):
+        self.assertEqual(set(self._filas(self._consultar(linea=self.linea.pk))), {"CRQ"})
+
+    def test_requiere_el_permiso_de_analisis(self):
+        cajero = User.objects.create_user(username="cajero", password="S3guridad!2026")
+        cajero.user_permissions.add(Permission.objects.get(codename="view_venta"))
+        self.client.force_login(cajero)
+        self.assertEqual(self.client.get(reverse("ventas:analisis-producto")).status_code, 403)
+
+        cajero.user_permissions.add(Permission.objects.get(codename="view_analisis_ventas"))
+        cajero = User.objects.get(pk=cajero.pk)
+        self.client.force_login(cajero)
+        self.assertEqual(self.client.get(reverse("ventas:analisis-producto")).status_code, 200)
+
+    def test_parametros_invalidos_no_rompen_la_pantalla(self):
+        respuesta = self.client.get(
+            reverse("ventas:analisis-producto"), {"almacen": "abc", "fecha_desde": "2026-02-30", "agrupar": "x"},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIsNone(respuesta.context["almacen"])
+
+
+class AnalisisVentasPrecioTests(TestCase):
+    """Análisis de ventas por precio (grid_ven_analisis_ventas_por_precio en
+    scvweb): el importe sin impuesto repartido por lista de precios, con
+    venta con impuesto, costo y utilidad."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.sucursal = Almacen.objects.create(nombre="Sucursal Centro", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        cls.cliente = Cliente.objects.create(nombre="Cliente Prueba")
+        cls.publico = ListaPrecio.objects.get_or_create(nombre="PUBLICO")[0]
+        cls.mayoreo = ListaPrecio.objects.get_or_create(nombre="MAYOREO")[0]
+        # IVA 16%: 116.00 con impuesto son 100.00 sin impuesto.
+        cls.producto = Producto.objects.create(nombre="Croqueta", sku="CRQ", precio_costo=Decimal("45.00"))
+        cls.admin = User.objects.create_superuser(username="admin", password="S3guridad!2026")
+        lote = Lote.objects.create(
+            producto=cls.producto, almacen=cls.sucursal, fecha_ingreso=date(2026, 1, 1),
+            costo_unitario=Decimal("50.00"), cantidad_inicial=10, cantidad_disponible=10,
+        )
+
+        def linea(cuando, cantidad, precio, lista, surtido=True, remision=False):
+            venta = Venta.objects.create(
+                cliente=cls.cliente, almacen=cls.sucursal, fecha_venta=cuando, es_remision=remision,
+            )
+            detalle = VentaDetalle.objects.create(
+                venta=venta, producto=cls.producto, cantidad=cantidad, precio_unitario=precio, lista_precio=lista,
+            )
+            if surtido:
+                VentaDetalleLote.objects.create(detalle=detalle, lote=lote, cantidad=cantidad, costo_unitario=Decimal("50.00"))
+            return detalle
+
+        linea(_en(5), 2, Decimal("116.00"), cls.publico)
+        linea(_en(6), 1, Decimal("104.40"), cls.mayoreo)
+        # Sin registro de lotes ni de lista: costo de catálogo, "Sin lista".
+        linea(_en(7), 1, Decimal("116.00"), None, surtido=False, remision=True)
+        linea(_en(1, 4), 5, Decimal("116.00"), cls.publico)  # fuera del periodo
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _consultar(self, **filtros):
+        parametros = {"fecha_desde": "2026-03-01", "fecha_hasta": "2026-03-31", **filtros}
+        respuesta = self.client.get(reverse("ventas:analisis-precio"), parametros)
+        self.assertEqual(respuesta.status_code, 200)
+        return respuesta.context["resultado"]
+
+    def _por_lista(self, resultado, importes):
+        nombres = [nombre for _, nombre in resultado["columnas_lista"]]
+        return {nombre: importe for nombre, importe in zip(nombres, importes) if importe}
+
+    def test_reparte_el_importe_sin_impuesto_por_lista_con_costo_y_utilidad(self):
+        resultado = self._consultar()
+
+        [fila] = resultado["filas"]
+        self.assertEqual(fila["nombre"], "Croqueta")
+        self.assertEqual(
+            self._por_lista(resultado, fila["importes_lista"]),
+            {"PUBLICO": Decimal("200.00"), "MAYOREO": Decimal("90.00"), "Sin lista": Decimal("100.00")},
+        )
+        self.assertEqual(
+            (fila["cantidad"], fila["importe"], fila["total"], fila["costo"], fila["utilidad"], fila["margen"]),
+            (4, Decimal("390.00"), Decimal("452.40"), Decimal("195.00"), Decimal("195.00"), Decimal("50.0")),
+        )
+        self.assertEqual(resultado["totales"]["importe"], Decimal("390.00"))
+
+    def test_solo_ventas_deja_fuera_las_remisiones(self):
+        resultado = self._consultar(tipo="venta")
+
+        self.assertEqual(resultado["totales"]["importe"], Decimal("290.00"))
+        self.assertNotIn("Sin lista", [nombre for _, nombre in resultado["columnas_lista"]])
+
+    def test_detalle_muestra_cada_linea(self):
+        resultado = self._consultar(agrupar="detalle")
+
+        self.assertEqual([fila["importe"] for fila in resultado["filas"]], [Decimal("200.00"), Decimal("90.00"), Decimal("100.00")])
+        self.assertEqual(resultado["totales"]["costo"], Decimal("195.00"))
+
+    def test_agrupa_por_cliente(self):
+        [fila] = self._consultar(agrupar="cliente")["filas"]
+
+        self.assertEqual((fila["nombre"], fila["importe"]), ("Cliente Prueba", Decimal("390.00")))
+
+    def test_requiere_el_permiso_de_analisis(self):
+        cajero = User.objects.create_user(username="cajero", password="S3guridad!2026")
+        cajero.user_permissions.add(Permission.objects.get(codename="view_venta"))
+        self.client.force_login(cajero)
+
+        self.assertEqual(self.client.get(reverse("ventas:analisis-precio")).status_code, 403)
+
+    def test_parametros_invalidos_no_rompen_la_pantalla(self):
+        respuesta = self.client.get(
+            reverse("ventas:analisis-precio"), {"cliente": "abc", "fecha_hasta": "x", "agrupar": "otro", "page": "z"},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context["agrupar"], "producto")

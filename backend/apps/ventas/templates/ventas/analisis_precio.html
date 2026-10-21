@@ -1,0 +1,179 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras static product_extras cliente_extras %}
+{% block title %}Análisis de ventas por precio{% endblock title %}
+{% block title_layout %}Análisis de ventas por precio{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Análisis de ventas por precio</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 items-end w-full">
+  <div class="flex items-center gap-1.5">
+    <div class="flex-1">
+      <label class="label">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde|date:'Y-m-d' }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta|date:'Y-m-d' }}" class="input w-full">
+    </div>
+  </div>
+  <div>
+    <label class="label">Cliente</label>
+    <div class="cliente-search relative" data-cliente-search-url="{% url 'api:cliente-buscar' %}">
+      <input type="hidden" name="cliente" value="{{ cliente_id }}">
+      <input type="text" class="input cliente-search-input w-full" placeholder="Nombre, RFC o folio..." value="{{ cliente_id|cliente_label }}" autocomplete="off">
+      <div class="cliente-search-results hidden absolute z-20 mt-1.5 w-full bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+    </div>
+  </div>
+  <div>
+    <label class="label">Producto</label>
+    <div class="producto-search relative" data-producto-search-url="{% url 'api:producto-buscar' %}">
+      <input type="hidden" name="producto" value="{{ producto_id }}">
+      <input type="text" class="input producto-search-input w-full" placeholder="SKU o nombre..." value="{{ producto_id|producto_label }}" autocomplete="off">
+      <div class="producto-search-results hidden z-[55] bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 max-h-64 overflow-y-auto divide-y divide-gray-50"></div>
+    </div>
+  </div>
+  <div>
+    <label class="label">Tipo</label>
+    <select name="tipo" class="input w-full">
+      <option value="">Ventas y remisiones</option>
+      {% for valor, etiqueta in tipos_venta %}
+      <option value="{{ valor }}" {% if tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% include "core/includes/_filtros_producto.html" %}
+  <div>
+    <label class="label">Agrupar por</label>
+    <select name="agrupar" class="input w-full">
+      {% for valor, etiqueta in agrupaciones %}
+      <option value="{{ valor }}" {% if agrupar == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4 lg:justify-end">
+    <button type="submit" class="btn-primary">Consultar</button>
+    <a href="{% url 'ventas:analisis-precio' %}?limpiar_filtros=1" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+  </div>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="px-4 sm:px-6 pb-4 text-sm text-gray-500">
+  Del {{ fecha_desde|date:"d/m/Y" }} al {{ fecha_hasta|date:"d/m/Y" }}. Cada lista de precios muestra el
+  importe sin impuesto de lo que se vendió con ella; el costo es el de los lotes que surtieron cada línea.
+  Las devoluciones no se restan.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        {% if es_detalle %}
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold whitespace-nowrap">Fecha / folio</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Cliente</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
+        {% else %}
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{{ agrupar_etiqueta }}</th>
+        {% endif %}
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Cantidad</th>
+        {% for clave, nombre in resultado.columnas_lista %}
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap">{{ nombre }}</th>
+        {% endfor %}
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap bg-amber-50/70">Importe s/imp.</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap">Venta c/imp.</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Costo</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Utilidad</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Margen</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in resultado.filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        {% if es_detalle %}
+        <td class="px-4 sm:px-6 py-3 text-gray-500 whitespace-nowrap">
+          {{ fila.detalle.venta.fecha_venta|date:"d/m/Y H:i" }}
+          <span class="block text-xs text-gray-400 font-mono">{{ fila.detalle.venta.folio }}{% if fila.detalle.venta.es_remision %} · Remisión{% endif %}</span>
+        </td>
+        <td class="px-4 sm:px-6 py-3 text-gray-700">
+          {{ fila.detalle.venta.cliente.display_name }}
+          <span class="block text-xs text-gray-400">{{ fila.detalle.venta.almacen.nombre }}</span>
+        </td>
+        <td class="px-4 sm:px-6 py-3 font-medium text-gray-800">
+          {{ fila.nombre }}
+          <span class="block text-xs text-gray-400 font-mono">{{ fila.secundario }}</span>
+        </td>
+        {% else %}
+        <td class="px-4 sm:px-6 py-3 font-medium text-gray-800">
+          {{ fila.nombre }}
+          {% if fila.secundario %}<span class="block text-xs text-gray-400 font-mono">{{ fila.secundario }}</span>{% endif %}
+        </td>
+        {% endif %}
+        <td class="px-3 py-3 text-right whitespace-nowrap">
+          {{ fila.cantidad|moneda }}{% if es_detalle and fila.detalle.producto.unidad_medida %} <span class="text-xs text-gray-400">{{ fila.detalle.producto.unidad_medida.nombre }}</span>{% endif %}
+        </td>
+        {% for importe in fila.importes_lista %}
+        <td class="px-3 py-3 text-right whitespace-nowrap">{% if importe is not None %}${{ importe|moneda }}{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+        {% endfor %}
+        <td class="px-3 py-3 text-right whitespace-nowrap font-semibold text-gray-800 bg-amber-50/70">${{ fila.importe|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ fila.total|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap text-gray-500">${{ fila.costo|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap font-medium {% if fila.utilidad < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">${{ fila.utilidad|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right whitespace-nowrap {% if fila.margen < 0 %}text-red-600{% endif %}">{% if fila.margen is not None %}{{ fila.margen|moneda:1 }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="20" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay ventas en el periodo que coincidan con los filtros</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if resultado.filas %}
+    <tfoot class="border-t-2 border-gray-200 font-semibold text-gray-800">
+      <tr>
+        <td {% if es_detalle %}colspan="3"{% endif %} class="px-4 sm:px-6 py-3 text-right">Total{% if is_paginated %} del periodo{% endif %}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">{{ resultado.totales.cantidad|moneda }}</td>
+        {% for importe in resultado.totales.importes_lista %}
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ importe|moneda }}</td>
+        {% endfor %}
+        <td class="px-3 py-3 text-right whitespace-nowrap bg-amber-50/70">${{ resultado.totales.importe|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.total|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.costo|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.utilidad|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right whitespace-nowrap">{% if resultado.totales.margen is not None %}{{ resultado.totales.margen|moneda:1 }}%{% else %}—{% endif %}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% if is_paginated %}
+<div class="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-gray-100">
+  <p class="text-sm text-gray-400">
+    Página {{ page_obj.number }} de {{ paginator.num_pages }} · {{ paginator.count }} línea{{ paginator.count|pluralize }}
+  </p>
+  <div class="flex items-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="{% querystring page=page_obj.previous_page_number %}" class="btn-secondary">Anterior</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a href="{% querystring page=page_obj.next_page_number %}" class="btn-secondary">Siguiente</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock main_content %}
+{% block extra_js %}
+<script src="{% static 'js/modules/forms/dependent-select.js' %}"></script>
+<script src="{% static 'js/vendor/alpine.min.js' %}"></script>
+<script src="{% static 'js/modules/forms/producto-search.js' %}"></script>
+<script src="{% static 'js/modules/forms/cliente-search.js' %}"></script>
+{% endblock extra_js %}

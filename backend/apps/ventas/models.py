@@ -92,6 +92,10 @@ class Venta(BaseAbstractModel):
         verbose_name = "Venta"
         verbose_name_plural = "Ventas"
         ordering = ["-fecha_venta"]
+        # Los análisis de ventas muestran costo y utilidad: no basta con
+        # view_venta, que también tiene el cajero ("Ventas y Caja"). Ningún
+        # grupo lo trae de inicio; lo asigna el administrador.
+        permissions = [("view_analisis_ventas", "Puede ver los análisis de ventas")]
         indexes = [
             models.Index(fields=["cliente"]),
             models.Index(fields=["almacen"]),

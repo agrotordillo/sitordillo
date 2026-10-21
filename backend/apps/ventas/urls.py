@@ -7,6 +7,7 @@ from .views.venta_views import (
     VentaTicketView,
     recuperar_documento_view,
 )
+from .views.analisis_views import AnalisisVentasPrecioView, AnalisisVentasProductoView
 from .views.devolucion_views import DevolucionClienteListView, devolucion_cliente_view
 from .views.qz_views import qz_certificado_view, qz_firmar_view
 from .views.retiro_views import RetiroEfectivoListView, RetiroEfectivoTicketView, retiro_efectivo_create_view
@@ -24,6 +25,8 @@ urlpatterns = [
     path("retiros/", RetiroEfectivoListView.as_view(), name="retiro-list"),
     path("retiros/crear/", retiro_efectivo_create_view, name="retiro-create"),
     path("retiros/<int:pk>/ticket/", RetiroEfectivoTicketView.as_view(), name="retiro-ticket"),
+    path("analisis-por-producto/", AnalisisVentasProductoView.as_view(), name="analisis-producto"),
+    path("analisis-por-precio/", AnalisisVentasPrecioView.as_view(), name="analisis-precio"),
     path("qz/certificado/",qz_certificado_view, name="qz-certificado"),
     path("qz/firmar/", qz_firmar_view, name="qz-firmar"),
 ]
