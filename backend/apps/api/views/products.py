@@ -180,9 +180,10 @@ class ProductoPreciosPorClienteView(APIView):
 class ProductoResolverSkusView(APIView):
     """Resuelve una lista de SKUs a productos (coincidencia exacta,
     insensible a mayúsculas/minúsculas). Pensado para la carga por lista
-    (pegas SKU + cantidad por línea) de Compras, Ventas y Cotizaciones.
+    (pegas SKU + cantidad por línea) de Compras, Ventas, Cotizaciones y
+    Traspasos.
 
-    Con `almacen` en el body (ventas/cotizaciones) solo se ofrecen los
+    Con `almacen` en el body (ventas/cotizaciones/traspasos) solo se ofrecen los
     productos con existencia ahí -mismo criterio que ProductoBuscarView-;
     los que sí existen como producto pero sin stock en esa sucursal se
     reportan aparte en `sin_existencia`, distinto de `no_encontrados`
