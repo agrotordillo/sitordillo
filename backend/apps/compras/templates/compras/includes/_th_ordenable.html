@@ -1,0 +1,14 @@
+{% comment %}
+Encabezado de columna ordenable (clic -> asc, clic de nuevo -> desc).
+Variables: campo (clave en ORDEN_CAMPOS), label (texto), url (ya armada
+por la vista, ordenar_urls.<campo>), align="right" opcional. Usa del
+contexto del padre (sin "only" en el include): ordenar_campo,
+ordenar_descendente.
+{% endcomment %}
+<a href="{{ url }}" class="inline-flex items-center gap-1 hover:text-gray-700 {% if align == "right" %}flex-row-reverse{% endif %}">
+  {{ label }}
+  <span class="inline-flex flex-col leading-none shrink-0">
+    <svg class="w-2 h-2 {% if campo == ordenar_campo and not ordenar_descendente %}text-gray-600{% else %}text-gray-300{% endif %}" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6l5 6H5l5-6z" /></svg>
+    <svg class="w-2 h-2 -mt-0.5 {% if campo == ordenar_campo and ordenar_descendente %}text-gray-600{% else %}text-gray-300{% endif %}" viewBox="0 0 20 20" fill="currentColor"><path d="M10 14l-5-6h10l-5 6z" /></svg>
+  </span>
+</a>

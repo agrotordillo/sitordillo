@@ -22,6 +22,24 @@
       <span class="text-sm text-gray-400">a</span>
       <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input">
     </div>
+    <select name="almacen" class="input">
+      <option value="">Todos los almacenes</option>
+      {% for almacen in almacenes %}
+      <option value="{{ almacen.pk }}" {% if almacen_id == almacen.pk|stringformat:"s" %}selected{% endif %}>{{ almacen.nombre }}</option>
+      {% endfor %}
+    </select>
+    <select name="linea" class="input">
+      <option value="">Todas las líneas</option>
+      {% for linea in lineas %}
+      <option value="{{ linea.pk }}" {% if linea_id == linea.pk|stringformat:"s" %}selected{% endif %}>{{ linea.nombre }}</option>
+      {% endfor %}
+    </select>
+    <select name="marca" class="input">
+      <option value="">Todas las marcas</option>
+      {% for marca in marcas %}
+      <option value="{{ marca.pk }}" {% if marca_id == marca.pk|stringformat:"s" %}selected{% endif %}>{{ marca.nombre }}</option>
+      {% endfor %}
+    </select>
     <button type="submit" class="btn-icon-outline" aria-label="Filtrar" title="Filtrar">
       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
@@ -64,17 +82,17 @@
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Fecha</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">Documento</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Proveedor</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">Código</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Producto</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Cantidad</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Costo</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Importe</th>
-        <th scope="col" data-col="recibida" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">Recibida</th>
-        <th scope="col" data-col="precio_neto" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">Precio neto</th>
-        <th scope="col" data-col="estatus" class="hidden px-4 sm:px-6 py-3 font-semibold">Estatus</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{% include "compras/includes/_th_ordenable.html" with campo="fecha" label="Fecha" url=ordenar_urls.fecha %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden md:table-cell">{% include "compras/includes/_th_ordenable.html" with campo="documento" label="Documento" url=ordenar_urls.documento %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{% include "compras/includes/_th_ordenable.html" with campo="proveedor" label="Proveedor" url=ordenar_urls.proveedor %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold hidden sm:table-cell">{% include "compras/includes/_th_ordenable.html" with campo="codigo" label="Código" url=ordenar_urls.codigo %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{% include "compras/includes/_th_ordenable.html" with campo="producto" label="Producto" url=ordenar_urls.producto %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">{% include "compras/includes/_th_ordenable.html" with campo="cantidad" label="Cantidad" url=ordenar_urls.cantidad align="right" %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">{% include "compras/includes/_th_ordenable.html" with campo="costo" label="Costo" url=ordenar_urls.costo align="right" %}</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">{% include "compras/includes/_th_ordenable.html" with campo="importe" label="Importe" url=ordenar_urls.importe align="right" %}</th>
+        <th scope="col" data-col="recibida" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">{% include "compras/includes/_th_ordenable.html" with campo="recibida" label="Recibida" url=ordenar_urls.recibida align="right" %}</th>
+        <th scope="col" data-col="precio_neto" class="hidden px-4 sm:px-6 py-3 font-semibold text-right">{% include "compras/includes/_th_ordenable.html" with campo="precio_neto" label="Precio neto" url=ordenar_urls.precio_neto align="right" %}</th>
+        <th scope="col" data-col="estatus" class="hidden px-4 sm:px-6 py-3 font-semibold">{% include "compras/includes/_th_ordenable.html" with campo="estatus" label="Estatus" url=ordenar_urls.estatus %}</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -113,6 +131,23 @@
       </tr>
       {% endfor %}
     </tbody>
+    {% if detalles %}
+    <tfoot class="border-t border-gray-200 bg-gray-50/60">
+      <tr class="font-semibold text-gray-700">
+        <td class="px-4 sm:px-6 py-3">Total ({{ paginator.count }} línea{{ paginator.count|pluralize }})</td>
+        <td class="px-4 sm:px-6 py-3 hidden md:table-cell"></td>
+        <td class="px-4 sm:px-6 py-3"></td>
+        <td class="px-4 sm:px-6 py-3 hidden sm:table-cell"></td>
+        <td class="px-4 sm:px-6 py-3"></td>
+        <td class="px-4 sm:px-6 py-3 text-right">{{ total_cantidad|floatformat:2 }}</td>
+        <td class="px-4 sm:px-6 py-3"></td>
+        <td class="px-4 sm:px-6 py-3 text-right">${{ total_importe|moneda }}</td>
+        <td data-col="recibida" class="hidden px-4 sm:px-6 py-3 text-right">{{ total_recibida|floatformat:2 }}</td>
+        <td data-col="precio_neto" class="hidden px-4 sm:px-6 py-3"></td>
+        <td data-col="estatus" class="hidden px-4 sm:px-6 py-3"></td>
+      </tr>
+    </tfoot>
+    {% endif %}
   </table>
 </div>
 {% if is_paginated %}
@@ -122,10 +157,10 @@
   </p>
   <div class="flex items-center gap-2">
     {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}" class="btn-secondary">Anterior</a>
+    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if almacen_id %}&almacen={{ almacen_id }}{% endif %}{% if linea_id %}&linea={{ linea_id }}{% endif %}{% if marca_id %}&marca={{ marca_id }}{% endif %}" class="btn-secondary">Anterior</a>
     {% endif %}
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}" class="btn-secondary">Siguiente</a>
+    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}{% if almacen_id %}&almacen={{ almacen_id }}{% endif %}{% if linea_id %}&linea={{ linea_id }}{% endif %}{% if marca_id %}&marca={{ marca_id }}{% endif %}" class="btn-secondary">Siguiente</a>
     {% endif %}
   </div>
 </div>
