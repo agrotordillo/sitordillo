@@ -22,17 +22,18 @@
 {% endblock table_actions %}
 {% block main_content %}
 <p class="text-sm text-gray-500 mb-4">
-  % propio de cada colaborador para una línea, aplicado a ventas en PUBLICO y MEDIO MAYOREO. En
-  cualquier otra lista de precio (mayoreo/sub distribuidor/promoción) la comisión es 1% fijo,
-  sin importar lo capturado aquí.
+  Reglas de cada colaborador: sobre lo que él vende o sobre toda la venta de una sucursal, para una línea,
+  categoría y/o clase (vacío = todo). Si varias reglas aplican a un producto, gana la más específica
+  (categoría, luego clase, luego línea). Un % para PUBLICO/MEDIO MAYOREO y otro para las demás listas.
 </p>
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
       <tr>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Colaborador</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Línea</th>
-        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Comisión</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">Regla</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">PUBLICO / M. MAYOREO</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Otras listas</th>
         <th scope="col" class="px-4 sm:px-6 py-3 font-semibold"></th>
       </tr>
     </thead>
@@ -40,15 +41,16 @@
       {% for comision in comisiones %}
       <tr class="hover:bg-gray-50/50 transition-colors">
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 font-medium text-gray-800">{{ comision.colaborador.get_full_name|default:comision.colaborador.username }}</td>
-        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">{{ comision.linea.nombre }}</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-gray-700">{{ comision.descripcion }}</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">{{ comision.porcentaje }}%</td>
+        <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right text-gray-700">{{ comision.porcentaje_otras_listas }}%</td>
         <td class="px-4 sm:px-6 py-3.5 sm:py-4 text-right">
           <a href="{% url 'comisiones_ruta:comision-colaborador-linea-update' comision.pk %}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Editar</a>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="4" class="px-4 sm:px-6 py-12 text-center">
+        <td colspan="5" class="px-4 sm:px-6 py-12 text-center">
           <p class="text-sm text-gray-400">No hay comisiones por colaborador capturadas</p>
         </td>
       </tr>

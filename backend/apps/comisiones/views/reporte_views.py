@@ -77,7 +77,9 @@ def reporte_comisiones_view(request):
         documento = detalle.venta.documento_mostrador
         empleado = documento.created_by if documento else detalle.venta.created_by
 
-        precio_neto_unitario = (detalle.subtotal / detalle.cantidad) if detalle.cantidad else Decimal("0.00")
+        # Sobre el importe sin impuestos, igual que el Excel de comisiones con el
+        # que se paga (datos/COMISIONES P36.xlsx) -decisión del usuario-.
+        precio_neto_unitario = (detalle.importe_sin_impuesto / detalle.cantidad) if detalle.cantidad else Decimal("0.00")
         importe_neto = (precio_neto_unitario * cantidad_neta).quantize(Decimal("0.01"))
         comision = (importe_neto * pct / Decimal("100")).quantize(Decimal("0.01"))
 

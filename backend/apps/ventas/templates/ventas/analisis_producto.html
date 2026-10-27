@@ -73,6 +73,12 @@
   Las devoluciones de cliente cuentan como entrada; lo apartado en pedidos sigue contando como existencia
   hasta que se entrega en la venta.
 </p>
+{% if resultado.totales.ventas_historicas %}
+<p class="mx-4 sm:mx-6 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+  Las ventas incluyen {{ resultado.totales.ventas_historicas|moneda }} unidades importadas del sistema anterior
+  (scv_web). Esas ventas no movieron el inventario de sitordillo, así que no se restan de la existencia.
+</p>
+{% endif %}
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">

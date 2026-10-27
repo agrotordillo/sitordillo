@@ -16,7 +16,7 @@ class ComisionColaboradorLineaListView(PermissionRequiredMixin, ListView):
     extra_context = {"active_module": "sales"}
 
     def get_queryset(self):
-        return super().get_queryset().select_related("colaborador", "linea")
+        return super().get_queryset().select_related("colaborador", "linea", "categoria", "clase", "almacen")
 
 
 class ComisionColaboradorLineaCreateView(PermissionRequiredMixin, SuccessMessageMixin, CreateView):

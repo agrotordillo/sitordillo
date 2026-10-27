@@ -40,6 +40,7 @@ VISTAS_CON_FILTROS = frozenset({
     "ventas:venta-list",
     "ventas:analisis-producto",
     "ventas:analisis-precio",
+    "ventas:ventas-producto",
     "cobros:cuenta-list",
     "comisiones:reporte",
     "comisiones_ruta:reporte",

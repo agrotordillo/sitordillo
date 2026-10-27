@@ -1,0 +1,133 @@
+{% extends "core/layouts/_main_table_layout.html" %}
+{% load core_extras %}
+{% block title %}Ventas por producto{% endblock title %}
+{% block title_layout %}Ventas por producto{% endblock title_layout %}
+{% block breadcrumbs %}
+<nav class="inline-flex mt-1" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center gap-1.5 text-sm">
+    <li><a href="{% url 'home' %}" class="text-gray-400 hover:text-primary-600">Inicio</a></li>
+    <li class="text-gray-300">/</li>
+    <li class="text-gray-500 font-medium">Ventas por producto</li>
+  </ol>
+</nav>
+{% endblock breadcrumbs %}
+{% block table_actions %}
+<form method="get" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 items-end w-full">
+  <div>
+    <label class="label">Almacén</label>
+    <select name="almacen" class="input w-full">
+      <option value="">Todos</option>
+      {% for a in almacenes %}
+      <option value="{{ a.pk }}" {% if almacen and almacen.pk == a.pk %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <div class="flex-1">
+      <label class="label">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ fecha_desde|date:'Y-m-d' }}" class="input w-full">
+    </div>
+    <div class="flex-1">
+      <label class="label">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ fecha_hasta|date:'Y-m-d' }}" class="input w-full">
+    </div>
+  </div>
+  <div>
+    <label class="label">Tipo</label>
+    <select name="tipo" class="input w-full">
+      <option value="">Ventas y remisiones</option>
+      {% for valor, etiqueta in tipos_venta %}
+      <option value="{{ valor }}" {% if tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Agrupar por</label>
+    <select name="agrupar" class="input w-full">
+      {% for valor, etiqueta in agrupaciones %}
+      <option value="{{ valor }}" {% if agrupar == valor %}selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="label">Buscar producto</label>
+    <input type="search" name="q" value="{{ q }}" placeholder="SKU o nombre..." class="input w-full">
+  </div>
+  {% include "core/includes/_filtros_producto.html" %}
+  <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4 lg:justify-end">
+    <button type="submit" class="btn-primary">Consultar</button>
+    <a href="{% url 'ventas:ventas-producto-excel' %}?{{ request.GET.urlencode }}" class="btn-secondary">Descargar Excel</a>
+    <a href="{% url 'ventas:ventas-producto' %}?limpiar_filtros=1" class="btn-icon-outline" aria-label="Limpiar filtros" title="Limpiar filtros">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+      </svg>
+    </a>
+  </div>
+</form>
+{% endblock table_actions %}
+{% block main_content %}
+<p class="px-4 sm:px-6 pb-4 text-sm text-gray-500">
+  {% if almacen %}{{ almacen.nombre }}{% else %}Todos los almacenes{% endif %} · del {{ fecha_desde|date:"d/m/Y" }}
+  al {{ fecha_hasta|date:"d/m/Y" }} · {{ resultado.filas|length }} renglón{{ resultado.filas|length|pluralize:"es" }}.
+  Registros = líneas de venta; cantidad auxiliar = cantidad × el contenido de la presentación. El costo es el de los
+  lotes (o el histórico, en ventas del sistema anterior). Las devoluciones no se restan.
+</p>
+<div class="relative overflow-x-auto">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold">{{ agrupar_etiqueta }}</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Registros</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Cantidad</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap">Cant. auxiliar</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Costo</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap bg-amber-50/70">Importe s/imp.</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right">Utilidad</th>
+        <th scope="col" class="px-3 py-3 font-semibold text-right whitespace-nowrap">Importe c/imp.</th>
+        <th scope="col" class="px-4 sm:px-6 py-3 font-semibold text-right">Margen</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for fila in resultado.filas %}
+      <tr class="hover:bg-gray-50/50 transition-colors">
+        <td class="px-4 sm:px-6 py-2.5 font-medium text-gray-800">
+          {{ fila.nombre }}
+          {% if fila.secundario %}<span class="block text-xs text-gray-400 font-mono">{{ fila.secundario }}</span>{% endif %}
+        </td>
+        <td class="px-3 py-2.5 text-right">{{ fila.registros }}</td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap">{{ fila.cantidad|moneda }}</td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap">
+          {{ fila.cantidad_auxiliar|moneda }}{% if fila.unidad_auxiliar %} <span class="text-xs text-gray-400">{{ fila.unidad_auxiliar }}</span>{% endif %}
+        </td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap text-gray-500">${{ fila.costo|moneda }}</td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap font-semibold text-gray-800 bg-amber-50/70">${{ fila.importe|moneda }}</td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap font-medium {% if fila.utilidad < 0 %}text-red-600{% else %}text-emerald-700{% endif %}">${{ fila.utilidad|moneda }}</td>
+        <td class="px-3 py-2.5 text-right whitespace-nowrap">${{ fila.total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right whitespace-nowrap {% if fila.margen < 0 %}text-red-600{% endif %}">{% if fila.margen is not None %}{{ fila.margen|moneda:1 }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" class="px-4 sm:px-6 py-12 text-center">
+          <p class="text-sm text-gray-400">No hay ventas en el periodo que coincidan con los filtros</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if resultado.filas %}
+    <tfoot class="border-t-2 border-gray-200 font-semibold text-gray-800">
+      <tr>
+        <td class="px-4 sm:px-6 py-3 text-right">Total</td>
+        <td class="px-3 py-3 text-right">{{ resultado.totales.registros }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">{{ resultado.totales.cantidad|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">{{ resultado.totales.cantidad_auxiliar|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.costo|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap bg-amber-50/70">${{ resultado.totales.importe|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.utilidad|moneda }}</td>
+        <td class="px-3 py-3 text-right whitespace-nowrap">${{ resultado.totales.total|moneda }}</td>
+        <td class="px-4 sm:px-6 py-3 text-right whitespace-nowrap">{% if resultado.totales.margen is not None %}{{ resultado.totales.margen|moneda:1 }}%{% else %}—{% endif %}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endblock main_content %}

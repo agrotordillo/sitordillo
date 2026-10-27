@@ -59,6 +59,12 @@ Modo --sync (resincronizar productos ya importados):
   Los catálogos (Marca/Categoría/Línea/Clase/UnidadMedida) siempre se
   reutilizan por nombre si ya existen -esto no depende de --sync-, nunca
   se duplican entre corridas.
+
+Modo --solo-nuevos (2026-10-27): da de alta únicamente los SKU que no
+  existen -los productos que se crearon en el sistema anterior después del
+  volcado original y que aparecen en las compras, ventas o existencias
+  importadas de scv_web- y no toca los existentes. Se usa con --directorio
+  datos/scv_web/catalogos/, donde exportar_scv_web deja el volcado actual.
 """
 import ast
 import re
@@ -136,11 +142,17 @@ TIPO_MAP = {
 BARCODE_JUNK = {"-", ".", ",", "0", ""}
 
 
+INSERT_DE_UN_RENGLON = re.compile(r"^INSERT INTO `?\w+`? VALUES ", re.IGNORECASE)
+
+
 def parse_sql_rows(path):
+    """Renglones de un volcado SQL de una tabla: el de phpMyAdmin (un renglón
+    por línea, "(...),") o el de mariadb-dump --skip-extended-insert (un
+    "INSERT INTO `t` VALUES (...);" por línea, ver exportar_scv_web)."""
     rows = []
     with open(path, encoding="utf8") as f:
         for line in f:
-            s = line.strip()
+            s = INSERT_DE_UN_RENGLON.sub("", line.strip())
             if not s.startswith("("):
                 continue
             if s.endswith(","):
@@ -206,11 +218,28 @@ class Command(BaseCommand):
                 "precios, costos ni ningún otro dato."
             ),
         )
+        parser.add_argument(
+            "--solo-nuevos", action="store_true",
+            help=(
+                "Da de alta ÚNICAMENTE los SKU que todavía no existen (p. ej. productos que se crearon "
+                "en el sistema anterior después del último volcado); los existentes no se tocan. "
+                "Implica --force."
+            ),
+        )
+        parser.add_argument(
+            "--directorio", default=str(DATA_DIR),
+            help="Carpeta con los volcados .sql (por defecto datos/; exportar_scv_web los deja en "
+            "datos/scv_web/catalogos/).",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        force = options["force"]
+        force = options["force"] or options["solo_nuevos"]
         sync = options["sync"]
+        self.solo_nuevos = options["solo_nuevos"]
+        self.data_dir = Path(options["directorio"])
+        if sync and self.solo_nuevos:
+            raise CommandError("--sync y --solo-nuevos no se combinan: uno actualiza los existentes y el otro no.")
 
         if options["solo_unidad_auxiliar"]:
             self._handle_solo_unidad_auxiliar(dry_run)
@@ -224,7 +253,7 @@ class Command(BaseCommand):
             )
 
         for name in ("marca", "categoria", "linea", "unidad_medida", "producto"):
-            path = DATA_DIR / f"{name}.sql"
+            path = self.data_dir / f"{name}.sql"
             if not path.exists():
                 raise CommandError(f"No encuentro {path}")
 
@@ -233,18 +262,18 @@ class Command(BaseCommand):
         # importan sin Clase (se puede volver a importar solo esa parte
         # más adelante corriendo el comando con --force una vez que se
         # tenga el archivo).
-        clase_path = DATA_DIR / "clase.sql"
+        clase_path = self.data_dir / "clase.sql"
         clase_rows = parse_sql_rows(clase_path) if clase_path.exists() else []
         if not clase_rows:
             self.stdout.write(self.style.WARNING(
                 f"No encuentro {clase_path} (o está vacío): los productos se importan sin Clase."
             ))
 
-        marca_rows = parse_sql_rows(DATA_DIR / "marca.sql")
-        categoria_rows = parse_sql_rows(DATA_DIR / "categoria.sql")
-        linea_rows = parse_sql_rows(DATA_DIR / "linea.sql")
-        unidad_rows = parse_sql_rows(DATA_DIR / "unidad_medida.sql")
-        producto_rows = parse_sql_rows(DATA_DIR / "producto.sql")
+        marca_rows = parse_sql_rows(self.data_dir / "marca.sql")
+        categoria_rows = parse_sql_rows(self.data_dir / "categoria.sql")
+        linea_rows = parse_sql_rows(self.data_dir / "linea.sql")
+        unidad_rows = parse_sql_rows(self.data_dir / "unidad_medida.sql")
+        producto_rows = parse_sql_rows(self.data_dir / "producto.sql")
 
         self.stdout.write(
             f"Filas leídas: marca={len(marca_rows)} categoria={len(categoria_rows)} "
@@ -271,6 +300,7 @@ class Command(BaseCommand):
             f"(omitidos por error: {stats['productos_omitidos']}) "
             f"ProductoPrecio={stats['producto_precios']} "
             f"Nombres desambiguados={stats['nombres_desambiguados']}"
+            + (f" Ya existían (no se tocaron)={stats['productos_existentes']}" if self.solo_nuevos else "")
         ))
         if stats["errores"]:
             self.stdout.write(self.style.WARNING(f"Errores ({len(stats['errores'])}), primeros 20:"))
@@ -304,7 +334,8 @@ class Command(BaseCommand):
                     stats["marcas"] += 1
             marca_by_legacy_id[legacy_id] = obj
         for loser_id, winner_id in MARCA_MERGE.items():
-            marca_by_legacy_id[loser_id] = marca_by_legacy_id[winner_id]
+            if winner_id in marca_by_legacy_id:
+                marca_by_legacy_id[loser_id] = marca_by_legacy_id[winner_id]
 
         # --- Categoria ---
         categoria_by_legacy_id = {}
@@ -373,9 +404,20 @@ class Command(BaseCommand):
 
         # --- Productos ---
         nombres_usados = {}
+        skus_existentes = set()
+        if self.solo_nuevos:
+            # El nombre es único (sin distinguir mayúsculas) en todo el
+            # catálogo: un producto nuevo que se llame igual que uno existente
+            # se desambigua con su SKU, igual que entre los del mismo volcado.
+            nombres_usados = {n.lower(): True for n in Producto.objects.values_list("nombre", flat=True)}
+            skus_existentes = {s.strip() for s in Producto.objects.values_list("sku", flat=True)}
+            stats["productos_existentes"] = 0
         total_procesados = 0
         for row in producto_rows:
             r = dict(zip(PRODUCTO_COLS, row))
+            if r["codigo"].strip() in skus_existentes:
+                stats["productos_existentes"] += 1
+                continue
             try:
                 # savepoint por producto: si uno falla, solo se revierte ese
                 # producto y sus precios, no toda la importación.
@@ -412,10 +454,10 @@ class Command(BaseCommand):
 
     def _handle_solo_unidad_auxiliar(self, dry_run):
         for name in ("unidad_medida", "producto"):
-            if not (DATA_DIR / f"{name}.sql").exists():
-                raise CommandError(f"No encuentro {DATA_DIR / f'{name}.sql'}")
-        unidad_rows = parse_sql_rows(DATA_DIR / "unidad_medida.sql")
-        producto_rows = parse_sql_rows(DATA_DIR / "producto.sql")
+            if not (self.data_dir / f"{name}.sql").exists():
+                raise CommandError(f"No encuentro {self.data_dir / f'{name}.sql'}")
+        unidad_rows = parse_sql_rows(self.data_dir / "unidad_medida.sql")
+        producto_rows = parse_sql_rows(self.data_dir / "producto.sql")
         stats = {"unidades": 0}
         campos_auxiliar = ["unidad_medida_auxiliar", "factor_unidad_auxiliar", "control_auxiliar"]
         actualizados, sin_cambio, factor_sin_unidad, no_encontrados = [], 0, [], 0

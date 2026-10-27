@@ -5,13 +5,14 @@ import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from io import StringIO
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import connection, transaction
 from django.test import Client, RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
@@ -29,11 +30,12 @@ from apps.fiscal.models import FormaPago, RegimenFiscal
 from apps.inventario.models import Lote
 from apps.pagos.models import CuentaPorPagar, Pago
 from apps.pagos.services import registrar_pago
-from apps.products.models import Almacen, Producto, PuntoVenta, Turno
+from apps.products.models import LISTA_PRECIO_NOMBRES_GENERALES, Almacen, ListaPrecio, Producto, PuntoVenta, Turno
 from apps.proveedores.models import Proveedor
 from apps.traspasos.models import Traspaso, TraspasoDetalle, TraspasoLote
 from apps.traspasos.services import recibir_traspaso
-from apps.ventas.models import Venta, VentaDetalleLote
+from apps.ventas.analisis import analisis_por_precio
+from apps.ventas.models import DevolucionCliente, Venta, VentaDetalle, VentaDetalleLote
 
 User = get_user_model()
 
@@ -683,3 +685,463 @@ class FiltrosRecordadosTests(TestCase):
         url = reverse("ventas:venta-list")
         self.client.get(url, {"fecha": "2026-01-15"})
         self.assertEqual(self.client.get(url).status_code, 200)
+
+
+# Archivo -> renglones de los TSV que exportar_scv_web saca de scv_web.
+ARCHIVOS_SCV_WEB = {
+    "asociados": [
+        [4152, "CLIENTE", "XAXX010101000", "PUBLICO EN GENERAL.", "", "", "0.000000", "NO", "0.0000", 0, "", 0, "616"],
+        [9000, "CLIENTE", ".", "CLIENTE NUEVO", "", "", "0.000000", "NO", "0.0000", 0, "", 2, "616"],
+        [1, "PROVEEDOR", "AAA-010101-AAA", "PROVEEDOR VIEJO", "", "", "0.000000", "SI", "0.0000", 0, "", 0, "601"],
+        # RFC mal capturado en scv_web: no se puede dar de alta sin corregirlo.
+        [2, "PROVEEDOR", "MALO SF", "PROVEEDOR MAL CAPTURADO SA", "", "", "0.000000", "NO", "0.0000", 0, "", 0, "601"],
+    ],
+    "ventas": [
+        [100, "NOTA_VENTA", "0102V1", "2025-01-02 08:00:00", 4152, "02", "CONTADO", "300.000000", "249.900000", 8],
+        [101, "NOTA_REMISION", "0102R1", "2025-01-02 09:00:00", 9000, "M3", "CONTADO", "0.000000", "100.000000", 86],
+    ],
+    # La misma persona con dos usuarios en scv_web.
+    "vendedores": [[8, "mgonzalez", "MARLIT GONZALEZ DE LOS SANTOS"], [86, "Marlit", "MARLIT GONZALEZ DE LOS SANTOS"]],
+    "ventas_productos": [
+        [1, 100, "MAIQ", "30.000", "6.650000", "8.330000", "249.900000", "249.900000", 2],
+        [2, 100, "NO-EXISTE", "1.000", "5.000000", "10.000000", "10.000000", "10.000000", 1],
+        # Costo mal capturado en scv_web (36,000 por pieza contra 40 de precio).
+        [3, 101, "PAN4", "2.000", "36000.000000", "40.000000", "80.000000", "100.000000", 1],
+    ],
+    "ventas_pagos": [
+        [1, 100, "01", "249.900000", ""],
+        [2, 101, "01", "60.000000", ""],
+        [3, 101, "03", "40.000000", "TRF-1"],
+    ],
+    "devoluciones": [[500, "0102D1", "2025-01-03 10:00:00", 100, "NO LE QUEDO"]],
+    "devoluciones_productos": [[1, 500, "MAIQ", "5.000"]],
+    "compras": [
+        [700, "2025-01-02 00:00:00", 1, "02", "F-123", "CREDITO", "INDEFINIDO", "99", "SI",
+         "0.000000", "0.000000", "0.000000", "0.000000", "12600.000000", ""],
+        [701, "2025-01-03 00:00:00", 2, "02", "F-200", "CONTADO", "CAJA", "01", "SI",
+         "0.000000", "0.000000", "0.000000", "0.000000", "30.000000", ""],
+    ],
+    # Valor unitario mal capturado (36,000 en vez de 36): manda el importe.
+    # NO-EXISTE: producto que se dio de alta en scv_web después del volcado.
+    "compras_productos": [
+        [1, 700, "PAN4", "350.000", "36000.000000", "12600.000000"],
+        [2, 700, "NO-EXISTE", "1.000", "10.000000", "10.000000"],
+        [3, 701, "PAN4", "1.000", "30.000000", "30.000000"],
+    ],
+    # almacén, código, existencia, costo actual en scv_web.
+    "existencias": [
+        ["02", "MAIQ", "120.500", "6.650000"],
+        ["M3", "PAN4", "3.000", "0.000000"],
+        ["01", "MAIQ", "-2.000", "6.650000"],
+        ["06", "NO-EXISTE", "5.000", "10.000000"],
+    ],
+}
+
+
+class ImportacionScvWebTests(TestCase):
+    """Importación del historial de ventas y compras de scv_web (evaluación
+    del 2026-10-26, ver apps.core.scv_web): reglas de almacenes, clientes,
+    costos y pagos, y que no se pueda repetir ni depurar encima."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cedis = Almacen.objects.create(nombre="CEDIS BODEGA SUR", tipo=Almacen.Tipo.CEDIS, numero=1)
+        for numero, nombre in enumerate(
+            ["ALDAMA", "IQUINUAPA", "HUIMANGUILLO", "TECOLUTILLA", "LERDO", "MERCADO", "BODEGA SUR"], start=2
+        ):
+            Almacen.objects.create(nombre=nombre, tipo=Almacen.Tipo.SUCURSAL, numero=numero)
+        for clave, descripcion in [("01", "Efectivo"), ("03", "Transferencia"), ("99", "Por definir")]:
+            FormaPago.objects.get_or_create(clave=clave, defaults={"descripcion": descripcion})
+        for orden, nombre in enumerate(LISTA_PRECIO_NOMBRES_GENERALES, start=1):
+            ListaPrecio.objects.get_or_create(nombre=nombre, defaults={"orden": orden})
+        regimen = RegimenFiscal.objects.get_or_create(
+            clave="601", defaults={"descripcion": "General de Ley Personas Morales", "aplica_moral": True}
+        )[0]
+        cls.proveedor = Proveedor.objects.create(
+            tipo_persona=Proveedor.TipoPersona.MORAL, rfc="AAA010101AAA", nombre_fiscal="Proveedor de siempre",
+            regimen_fiscal=regimen, descuento=Decimal("10.00"),
+        )
+        cls.publico = Cliente.objects.create(nombre="PUBLICO EN GENERAL.")
+        cls.maiz = Producto.objects.create(nombre="Maíz", sku="MAIQ", precio_costo=Decimal("9.00"))
+        cls.panacur = Producto.objects.create(nombre="Panacur", sku="PAN4", precio_costo=Decimal("30.00"))
+
+    def setUp(self):
+        self.directorio = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.directorio)
+        for nombre, filas in ARCHIVOS_SCV_WEB.items():
+            with open(f"{self.directorio}/{nombre}.tsv", "w", encoding="utf8", newline="") as archivo:
+                archivo.writelines("\t".join(str(valor) for valor in fila) + "\n" for fila in filas)
+
+    def _importar(self, comando, **opciones):
+        salida = StringIO()
+        call_command(comando, directorio=self.directorio, stdout=salida, **opciones)
+        return salida.getvalue()
+
+    def test_venta_del_02_va_a_la_sucursal_bodega_sur_con_su_costo_historico(self):
+        self._importar("import_legacy_ventas")
+
+        venta = Venta.objects.get(id_legado=100)
+        self.assertEqual((venta.folio, venta.almacen.nombre, venta.cliente), ("0102V1", "BODEGA SUR", self.publico))
+        self.assertEqual((venta.forma_pago.clave, venta.efectivo_recibido), ("01", Decimal("300.00")))
+        # El renglón de un producto que no existe en sitordillo se omite.
+        [detalle] = venta.detalles.all()
+        self.assertEqual(
+            (detalle.producto, detalle.cantidad, detalle.precio_unitario, detalle.costo_unitario),
+            (self.maiz, Decimal("30.00"), Decimal("8.33"), Decimal("6.6500")),
+        )
+        self.assertEqual(detalle.lista_precio.nombre, "MEDIO MAYOREO")
+        self.assertFalse(detalle.lotes.exists())
+
+    def test_remision_de_un_movil_crea_almacen_inactivo_cliente_y_pagos_divididos(self):
+        self._importar("import_legacy_ventas")
+
+        venta = Venta.objects.get(id_legado=101)
+        self.assertTrue(venta.es_remision)
+        self.assertEqual(
+            (venta.almacen.nombre, venta.almacen.tipo, venta.almacen.is_active),
+            ("MOVIL CLIENTES SUR", Almacen.Tipo.MOVIL, False),
+        )
+        self.assertEqual(venta.cliente.nombre, "CLIENTE NUEVO")
+        self.assertIsNone(venta.forma_pago)
+        self.assertEqual(
+            sorted((p.forma_pago.clave, p.monto, p.referencia) for p in venta.pagos.all()),
+            [("01", Decimal("60.00"), ""), ("03", Decimal("40.00"), "TRF-1")],
+        )
+        # Costo absurdo del sistema anterior: vacío, para que el análisis use el de catálogo.
+        [detalle] = venta.detalles.all()
+        self.assertEqual((detalle.precio_unitario, detalle.costo_unitario), (Decimal("50.00"), None))
+        self.assertEqual(Almacen.objects.filter(is_active=False).count(), 11)
+
+    def test_la_devolucion_se_liga_a_la_linea_de_la_venta_importada(self):
+        self._importar("import_legacy_ventas")
+
+        devolucion = DevolucionCliente.objects.get(id_legado=500)
+        [linea] = devolucion.detalles.all()
+        self.assertEqual((devolucion.venta.id_legado, linea.venta_detalle.producto, linea.cantidad), (100, self.maiz, 5))
+
+    def test_reimportar_no_duplica(self):
+        self._importar("import_legacy_ventas")
+        salida = self._importar("import_legacy_ventas")
+
+        self.assertIn("ya importadas antes: 2", salida)
+        self.assertEqual(Venta.objects.count(), 2)
+        self.assertEqual(DevolucionCliente.objects.count(), 1)
+        self.assertEqual(Cliente.objects.filter(nombre="CLIENTE NUEVO").count(), 1)
+
+    def test_dry_run_no_escribe_nada(self):
+        salida = self._importar("import_legacy_ventas", dry_run=True)
+
+        self.assertIn("Se crearían 11 almacenes", salida)
+        self.assertFalse(Venta.objects.exists())
+        self.assertFalse(Almacen.objects.filter(is_active=False).exists())
+        self.assertFalse(Cliente.objects.filter(nombre="CLIENTE NUEVO").exists())
+
+    def test_el_analisis_usa_el_costo_historico_de_la_venta_importada(self):
+        self._importar("import_legacy_ventas")
+
+        resultado = analisis_por_precio(VentaDetalle.objects.filter(venta__id_legado__isnull=False))
+        costos = {fila["nombre"]: fila["costo"] for fila in resultado["filas"]}
+        # Maíz: 30 x 6.65 histórico. Panacur sin costo histórico: 2 x 30.00 de catálogo.
+        self.assertEqual(costos, {"Maíz": Decimal("199.50"), "Panacur": Decimal("60.00")})
+
+    def test_compra_del_02_va_al_cedis_recibida_con_el_precio_del_importe(self):
+        self._importar("import_legacy_compras")
+
+        orden = OrdenCompra.objects.get(id_legado=700)
+        self.assertEqual(
+            (orden.proveedor, orden.almacen_destino, orden.estatus, orden.estado_pago),
+            (self.proveedor, self.cedis, OrdenCompra.Estatus.RECIBIDA, OrdenCompra.EstadoPago.CREDITO),
+        )
+        [detalle] = orden.detalles.all()
+        self.assertEqual(
+            (detalle.precio_unitario, detalle.cantidad_recibida), (Decimal("36.0000"), Decimal("350.00"))
+        )
+        # El precio de scv_web ya es neto: no se le aplica el descuento del proveedor.
+        self.assertEqual((orden.descuento_base_pct, orden.total), (Decimal("0.00"), Decimal("12600.00")))
+        self.assertFalse(CuentaPorPagar.objects.filter(orden_compra=orden).exists())
+        self.assertFalse(Lote.objects.exists())
+
+    def test_depurar_borra_las_transacciones_de_prueba_y_no_los_catalogos(self):
+        venta = Venta.objects.create(cliente=self.publico, almacen=Almacen.objects.get(nombre="LERDO"))
+        Lote.objects.create(
+            producto=self.maiz, almacen=self.cedis, fecha_ingreso=date(2026, 1, 1),
+            costo_unitario=Decimal("9.00"), cantidad_inicial=1, cantidad_disponible=1,
+        )
+
+        call_command("depurar_transacciones_prueba", stdout=StringIO())
+        self.assertTrue(Venta.objects.filter(pk=venta.pk).exists())
+
+        call_command("depurar_transacciones_prueba", aplicar=True, stdout=StringIO())
+        self.assertFalse(Venta.objects.exists())
+        self.assertFalse(Lote.objects.exists())
+        self.assertTrue(Cliente.objects.filter(pk=self.publico.pk).exists())
+        self.assertTrue(Producto.objects.filter(pk=self.maiz.pk).exists())
+
+    def test_el_vendedor_queda_como_usuario_inactivo_unificado_por_nombre(self):
+        self._importar("import_legacy_ventas")
+
+        [vendedor] = User.objects.filter(first_name="MARLIT GONZALEZ DE LOS SANTOS")
+        self.assertEqual((vendedor.username, vendedor.is_active, vendedor.has_usable_password()), ("mgonzalez", False, False))
+        self.assertEqual(set(Venta.objects.values_list("created_by", flat=True)), {vendedor.pk})
+
+    def test_solo_vendedores_completa_las_ventas_ya_importadas(self):
+        self._importar("import_legacy_ventas")
+        Venta.objects.update(created_by=None)
+        User.objects.filter(username="mgonzalez").delete()
+
+        self._importar("import_legacy_ventas", solo_vendedores=True)
+
+        vendedor = User.objects.get(username="mgonzalez")
+        self.assertEqual(Venta.objects.filter(created_by=vendedor).count(), 2)
+
+    def test_la_comision_de_ruta_se_calcula_sin_iva(self):
+        from apps.comisiones_ruta.models import ComisionColaboradorLinea
+        from apps.products.models import Linea
+
+        self._importar("import_legacy_ventas")
+        linea = Linea.objects.create(nombre="ALIMENTOS")
+        Producto.objects.filter(pk=self.maiz.pk).update(linea=linea, tipo_iva=Producto.TipoIVA.GRAVADO, tasa_iva=Decimal("16.00"))
+        vendedor = User.objects.get(username="mgonzalez")
+        ComisionColaboradorLinea.objects.create(colaborador=vendedor, linea=linea, porcentaje=Decimal("1.00"))
+        admin = User.objects.create_superuser(username="admin-comisiones", password="S3guridad!2026")
+        self.client.force_login(admin)
+
+        respuesta = self.client.get(
+            reverse("comisiones_ruta:reporte"), {"fecha_desde": "2025-01-01", "fecha_hasta": "2025-01-31"}
+        )
+
+        # 30 vendidas - 5 devueltas = 25 x 8.33 = 208.25 con IVA -> 179.52 sin IVA
+        # (lista MEDIO MAYOREO, % propio del colaborador) -> 1% = 1.80.
+        [grupo] = respuesta.context["grupos"]
+        self.assertEqual((grupo["total_importe"], grupo["total_comision"]), (Decimal("179.52"), Decimal("1.80")))
+
+    def test_el_analisis_por_producto_muestra_la_venta_historica_sin_mover_existencia(self):
+        from apps.ventas.analisis import analisis_por_producto
+
+        self._importar("import_legacy_ventas")
+        bodega = Almacen.objects.get(nombre="BODEGA SUR")
+
+        resultado = analisis_por_producto(bodega, date(2025, 1, 1), date(2025, 1, 31))
+
+        [grupo] = resultado["grupos"]
+        [fila] = grupo["filas"]
+        self.assertEqual(
+            (fila["producto"], fila["ventas"], fila["ventas_historicas"], fila["inicial"], fila["final"]),
+            (self.maiz, 30, 30, 0, 0),
+        )
+
+    def test_el_analisis_por_producto_deja_elegir_el_movil_con_ventas_historicas(self):
+        self._importar("import_legacy_ventas")
+        admin = User.objects.create_superuser(username="admin-analisis", password="S3guridad!2026")
+        self.client.force_login(admin)
+        movil = Almacen.objects.get(nombre="MOVIL CLIENTES SUR")
+
+        respuesta = self.client.get(
+            reverse("ventas:analisis-producto"),
+            {"almacen": movil.pk, "fecha_desde": "2025-01-01", "fecha_hasta": "2025-01-31"},
+        )
+
+        self.assertEqual(respuesta.context["almacen"], movil)
+        self.assertEqual(respuesta.context["resultado"]["totales"]["ventas_historicas"], 2)
+
+    def _ventas_por_producto(self, **filtros):
+        admin = User.objects.filter(username="admin-ventas").first() or User.objects.create_superuser(
+            username="admin-ventas", password="S3guridad!2026"
+        )
+        self.client.force_login(admin)
+        return self.client.get(
+            reverse("ventas:ventas-producto"), {"fecha_desde": "2025-01-01", "fecha_hasta": "2025-01-31", **filtros}
+        )
+
+    def test_ventas_por_producto_suma_registros_cantidad_costo_e_importes(self):
+        self._importar("import_legacy_ventas")
+
+        respuesta = self._ventas_por_producto()
+
+        filas = {f["nombre"]: f for f in respuesta.context["resultado"]["filas"]}
+        maiz, panacur = filas["Maíz"], filas["Panacur"]
+        # Maíz: 30 x 8.33 = 249.90 con IVA 16% -> 215.43 sin IVA; costo histórico 30 x 6.65.
+        self.assertEqual(
+            (maiz["registros"], maiz["cantidad"], maiz["costo"], maiz["importe"], maiz["total"]),
+            (1, 30, Decimal("199.50"), Decimal("215.43"), Decimal("249.90")),
+        )
+        # Panacur sin costo histórico (era absurdo en scv_web): el de catálogo, 2 x 30.00.
+        self.assertEqual((panacur["costo"], panacur["total"]), (Decimal("60.00"), Decimal("100.00")))
+        self.assertEqual(respuesta.context["resultado"]["totales"]["registros"], 2)
+
+    def test_ventas_por_producto_agrupa_por_sucursal_y_por_vendedor(self):
+        self._importar("import_legacy_ventas")
+
+        por_sucursal = self._ventas_por_producto(agrupar="sucursal").context["resultado"]["filas"]
+        self.assertEqual([f["nombre"] for f in por_sucursal], ["BODEGA SUR", "MOVIL CLIENTES SUR"])
+        por_vendedor = self._ventas_por_producto(agrupar="vendedor").context["resultado"]["filas"]
+        self.assertEqual([(f["nombre"], f["registros"]) for f in por_vendedor], [("MARLIT GONZALEZ DE LOS SANTOS", 2)])
+
+    def test_ventas_por_producto_se_descarga_en_excel_con_formulas(self):
+        import io
+
+        import openpyxl
+
+        self._importar("import_legacy_ventas")
+        self._ventas_por_producto()
+
+        respuesta = self.client.get(
+            reverse("ventas:ventas-producto-excel"), {"fecha_desde": "2025-01-01", "fecha_hasta": "2025-01-31"}
+        )
+
+        self.assertEqual(respuesta["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
+        self.assertEqual([c.value for c in hoja[4]][:4], ["Producto", "SKU", "Registros", "Cantidad"])
+        self.assertEqual((hoja["A5"].value, hoja["C5"].value, hoja["I5"].value), ("Maíz", 1, "=H5-G5"))
+        self.assertEqual((hoja["A7"].value, hoja["C7"].value), ("Total", "=SUM(C5:C6)"))
+
+    def test_el_inventario_inicial_queda_en_la_sucursal_y_el_movil_con_su_costo(self):
+        from apps.inventario.models import MovimientoInventario
+
+        self._importar("import_legacy_existencias", corte="2026-10-26")
+
+        bodega = Lote.objects.get(almacen__nombre="BODEGA SUR")
+        self.assertEqual(
+            (bodega.producto, bodega.almacen.tipo, bodega.cantidad_disponible, bodega.costo_unitario, bodega.fecha_ingreso),
+            (self.maiz, Almacen.Tipo.SUCURSAL, Decimal("120.50"), Decimal("6.65"), date(2026, 10, 26)),
+        )
+        # Sin costo en scv_web: el de catálogo de sitordillo.
+        movil = Lote.objects.get(almacen__nombre="MOVIL CLIENTES SUR")
+        self.assertEqual((movil.producto, movil.costo_unitario), (self.panacur, Decimal("30.00")))
+        # La existencia negativa y el producto que no existe no se cargan.
+        self.assertEqual(Lote.objects.count(), 2)
+        movimiento = MovimientoInventario.objects.get(lote=bodega)
+        self.assertEqual(
+            (movimiento.tipo, movimiento.cantidad, movimiento.cantidad_nueva, timezone.localtime(movimiento.fecha_movimiento).date()),
+            (MovimientoInventario.Tipo.AJUSTE, Decimal("120.50"), Decimal("120.50"), date(2026, 10, 26)),
+        )
+
+    def test_con_el_inventario_inicial_ya_se_puede_surtir_una_venta(self):
+        from apps.inventario.services import registrar_salida
+
+        self._importar("import_legacy_existencias", corte="2026-10-26")
+
+        registrar_salida(self.maiz, Almacen.objects.get(nombre="BODEGA SUR"), Decimal("20"), motivo="Venta de prueba")
+
+        self.assertEqual(Lote.objects.get(producto=self.maiz).cantidad_disponible, Decimal("100.50"))
+
+    def test_el_inventario_inicial_no_se_carga_dos_veces_y_el_dry_run_no_escribe(self):
+        salida = self._importar("import_legacy_existencias", corte="2026-10-26", dry_run=True)
+        self.assertIn("Lotes de inventario inicial=2", salida)
+        self.assertFalse(Lote.objects.exists())
+
+        self._importar("import_legacy_existencias", corte="2026-10-26")
+        with self.assertRaisesMessage(CommandError, "Ya hay inventario en sitordillo"):
+            self._importar("import_legacy_existencias", corte="2026-10-26")
+        self.assertEqual(Lote.objects.count(), 2)
+
+    def _volcado_de_productos(self):
+        """Volcado actual de scv_web (formato mariadb-dump --skip-extended-insert,
+        ver exportar_scv_web) con un producto que ya existe (MAIQ) y uno nuevo
+        (NO-EXISTE) cuyo nombre choca con el del existente."""
+        from apps.products.management.commands.import_legacy_productos import PRODUCTO_COLS
+
+        def sql(valor):
+            if valor is None:
+                return "NULL"
+            if isinstance(valor, str):
+                return "'" + valor.replace("'", "\\'") + "'"
+            return str(valor)
+
+        def producto(id_, codigo, nombre, costo):
+            r = {col: 0 for col in PRODUCTO_COLS}
+            r.update({
+                "id": id_, "codigo": codigo, "nombre": nombre, "tipo": "ARTICULO", "estado": "ACTIVO",
+                "descripcion": "", "costeo": "ultimo", "costo": costo, "exento": "NO", "impuesto_iva": 16,
+                "codigo_barras": "-", "id_unidad_medida": 1, "imagen": "", "id_linea": 1, "id_marca": 1,
+                "id_categoria": 1, "control": "", "precio_con_impuesto_1": 116, "control_auxiliar": "NO",
+                "id_unidad_medida_auxiliar": None, "sat_cfdi_3_3_c_claveprodserv": "", "id_clase": None,
+                "fecha_modificacion": None, "codigo_proveedor": "", "id_punto_entrega": None,
+            })
+            return [r[col] for col in PRODUCTO_COLS]
+
+        directorio = Path(self.directorio) / "catalogos"
+        directorio.mkdir()
+        tablas = {
+            "marca": [[1, "01", "MARCA SCV"]], "categoria": [[1, "01", "CATEGORIA SCV"]],
+            "linea": [[1, "01", "LINEA SCV"]], "unidad_medida": [[1, "PZA", "PIEZA"]],
+            "producto": [producto(1, "MAIQ", "MAIZ CAMBIADO", 99), producto(2, "NO-EXISTE", "MAÍZ", 10)],
+        }
+        for tabla, filas in tablas.items():
+            (directorio / f"{tabla}.sql").write_text(
+                "".join(f"INSERT INTO `{tabla}` VALUES ({','.join(sql(v) for v in fila)});\n" for fila in filas),
+                encoding="utf8",
+            )
+        return directorio
+
+    def test_solo_nuevos_da_de_alta_el_producto_que_faltaba_sin_tocar_los_existentes(self):
+        salida = StringIO()
+        call_command(
+            "import_legacy_productos", solo_nuevos=True, directorio=str(self._volcado_de_productos()), stdout=salida,
+        )
+
+        nuevo = Producto.objects.get(sku="NO-EXISTE")
+        # "MAÍZ" choca (sin mayúsculas) con el "Maíz" que ya existe: se le agrega su SKU.
+        self.assertEqual((nuevo.nombre, nuevo.precio_costo, nuevo.precio_venta), ("MAÍZ (NO-EXISTE)", 10, 116))
+        self.maiz.refresh_from_db()
+        self.assertEqual((self.maiz.nombre, self.maiz.precio_costo), ("Maíz", Decimal("9.0000")))
+        self.assertIn("Ya existían (no se tocaron)=1", salida.getvalue())
+
+    def test_con_el_producto_nuevo_se_completan_venta_compra_e_inventario(self):
+        self._importar("import_legacy_ventas")
+        self._importar("import_legacy_compras")
+        self._importar("import_legacy_existencias", corte="2026-10-26")
+        venta = Venta.objects.get(id_legado=100)
+        self.assertEqual(venta.detalles.count(), 1)
+
+        call_command(
+            "import_legacy_productos", solo_nuevos=True, directorio=str(self._volcado_de_productos()), stdout=StringIO(),
+        )
+        salida_ventas = self._importar("import_legacy_ventas")
+        salida_compras = self._importar("import_legacy_compras")
+        self._importar("import_legacy_existencias", corte="2026-10-26", completar=True)
+
+        nuevo = Producto.objects.get(sku="NO-EXISTE")
+        self.assertIn("renglones que se les completaron: 1", salida_ventas)
+        self.assertIn("renglones que se les completaron: 1", salida_compras)
+        self.assertEqual(sorted(d.producto.sku for d in venta.detalles.all()), ["MAIQ", "NO-EXISTE"])
+        self.assertTrue(OrdenCompra.objects.get(id_legado=700).detalles.filter(producto=nuevo).exists())
+        lote = Lote.objects.get(producto=nuevo)
+        self.assertEqual((lote.almacen.nombre, lote.cantidad_disponible), ("IQUINUAPA", Decimal("5.00")))
+        self.assertEqual(Lote.objects.count(), 3)
+        # Repetir no duplica nada.
+        self._importar("import_legacy_ventas")
+        self._importar("import_legacy_existencias", corte="2026-10-26", completar=True)
+        self.assertEqual((venta.detalles.count(), Lote.objects.count()), (2, 3))
+
+    def test_completar_el_inventario_se_niega_si_ya_hubo_operaciones(self):
+        from apps.inventario.services import registrar_salida
+
+        self._importar("import_legacy_existencias", corte="2026-10-26")
+        registrar_salida(self.maiz, Almacen.objects.get(nombre="BODEGA SUR"), Decimal("1"), motivo="Venta")
+
+        with self.assertRaisesMessage(CommandError, "Ya hubo operaciones sobre el inventario"):
+            self._importar("import_legacy_existencias", corte="2026-10-26", completar=True)
+
+    def test_la_compra_de_un_proveedor_con_rfc_invalido_entra_con_su_correccion(self):
+        salida = self._importar("import_legacy_compras")
+        self.assertIn("sin proveedor=1", salida)
+        self.assertFalse(OrdenCompra.objects.filter(id_legado=701).exists())
+
+        Path(self.directorio, "correcciones_proveedores.csv").write_text(
+            "id_asociado,nombre_fiscal,rfc,regimen\n2,PROVEEDOR MAL CAPTURADO SA,MAL010101AB1,\n", encoding="utf8",
+        )
+        self._importar("import_legacy_compras")
+
+        orden = OrdenCompra.objects.get(id_legado=701)
+        self.assertEqual(
+            (orden.proveedor.rfc, orden.proveedor.nombre_fiscal, orden.proveedor.regimen_fiscal.clave),
+            ("MAL010101AB1", "PROVEEDOR MAL CAPTURADO SA", "601"),
+        )
+
+    def test_depurar_se_niega_si_ya_hay_historial_importado(self):
+        self._importar("import_legacy_ventas")
+
+        with self.assertRaisesMessage(CommandError, "Ya hay ventas o compras importadas"):
+            call_command("depurar_transacciones_prueba", aplicar=True, stdout=StringIO())
+        self.assertEqual(Venta.objects.count(), 2)

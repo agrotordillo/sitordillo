@@ -248,6 +248,9 @@ class Command(BaseCommand):
             observaciones=observaciones,
         )
         cliente.save()
+        # Lo usa también apps.core.scv_web.ClientesLegado para dar de alta a
+        # los clientes de las ventas históricas que no existían.
+        return cliente
 
 
 class _DryRunRollback(Exception):

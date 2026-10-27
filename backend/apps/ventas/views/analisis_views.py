@@ -1,5 +1,7 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator
+from django.db.models import Exists, OuterRef, Q
+from django.http import HttpResponse
 from django.utils import timezone
 from django.views.generic import TemplateView
 
@@ -11,13 +13,15 @@ from apps.products.models import Almacen
 from apps.ventas.analisis import (
     AGRUPACIONES_PRECIO,
     AGRUPACIONES_PRODUCTO,
+    AGRUPACIONES_VENTAS,
     AGRUPAR_DETALLE,
     MOSTRAR_EXISTENCIA_O_MOVIMIENTO,
     OPCIONES_MOSTRAR,
     analisis_por_precio,
     analisis_por_producto,
+    ventas_por_producto,
 )
-from apps.ventas.models import VentaDetalle
+from apps.ventas.models import Venta, VentaDetalle
 
 TIPOS_VENTA = [("venta", "Solo ventas"), ("remision", "Solo remisiones")]
 LINEAS_POR_PAGINA = 100
@@ -35,7 +39,10 @@ def _rango_de_fechas(request):
 
 
 def _almacenes_del_usuario(user):
-    almacenes = Almacen.objects.filter(is_active=True).order_by("nombre")
+    # También los almacenes inactivos que solo sostienen ventas importadas de
+    # scv_web (los móviles, ver apps.core.scv_web.Almacenes).
+    con_historico = Venta.objects.filter(almacen=OuterRef("pk"), id_legado__isnull=False)
+    almacenes = Almacen.objects.filter(Q(is_active=True) | Q(Exists(con_historico))).order_by("nombre")
     visibles = almacenes_visibles(user)
     if visibles is not None:
         almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
@@ -105,6 +112,68 @@ class AnalisisVentasProductoView(PermissionRequiredMixin, TemplateView):
             "agrupaciones": [(valor, etiqueta) for valor, etiqueta, _ in AGRUPACIONES_PRODUCTO],
         })
         return context
+
+
+class VentasPorProductoView(PermissionRequiredMixin, TemplateView):
+    """Lo vendido en un periodo por producto (o agrupado por catálogo,
+    sucursal o vendedor), con costo y utilidad, como "Consulta - Ventas por
+    producto" de scvweb (ver ventas.analisis.ventas_por_producto). A
+    diferencia del análisis por producto (existencias), puede abarcar todas
+    las sucursales y cuenta las ventas importadas del sistema anterior."""
+
+    permission_required = "ventas.view_analisis_ventas"
+    template_name = "ventas/ventas_producto.html"
+    extra_context = {"active_module": "sales"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        request = self.request
+        desde, hasta = _rango_de_fechas(request)
+
+        almacenes = _almacenes_del_usuario(request.user)
+        almacen = almacenes.filter(pk=id_valido(request.GET.get("almacen"))).first()
+        detalles = VentaDetalle.objects.filter(
+            venta__fecha_venta__date__gte=desde, venta__fecha_venta__date__lte=hasta,
+            venta__almacen__in=[almacen] if almacen else almacenes,
+        )
+        tipo = request.GET.get("tipo", "") if request.GET.get("tipo") in dict(TIPOS_VENTA) else ""
+        if tipo:
+            detalles = detalles.filter(venta__es_remision=tipo == "remision")
+        detalles = _filtro_de_productos(request)(detalles, "producto__")
+
+        agrupar = request.GET.get("agrupar", "")
+        if agrupar not in {valor for valor, _, _ in AGRUPACIONES_VENTAS}:
+            agrupar = "producto"
+
+        context.update(contexto_filtros_producto(request))
+        context.update({
+            "resultado": ventas_por_producto(detalles, agrupar),
+            "almacenes": almacenes,
+            "almacen": almacen,
+            "fecha_desde": desde,
+            "fecha_hasta": hasta,
+            "q": request.GET.get("q", "").strip(),
+            "tipo": tipo,
+            "tipos_venta": TIPOS_VENTA,
+            "agrupar": agrupar,
+            "agrupar_etiqueta": dict((v, e) for v, e, _ in AGRUPACIONES_VENTAS)[agrupar],
+            "agrupaciones": [(valor, etiqueta) for valor, etiqueta, _ in AGRUPACIONES_VENTAS],
+        })
+        return context
+
+
+class VentasPorProductoExcelView(VentasPorProductoView):
+    """Descarga en Excel la misma tabla de Ventas por producto que se ve en
+    pantalla, con los mismos filtros (botón XLS de scvweb)."""
+
+    def render_to_response(self, context, **response_kwargs):
+        from apps.ventas.excel import libro_ventas_por_producto
+
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        nombre = f"ventas_por_producto_{context['fecha_desde']:%Y%m%d}_{context['fecha_hasta']:%Y%m%d}.xlsx"
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        libro_ventas_por_producto(context).save(response)
+        return response
 
 
 class AnalisisVentasPrecioView(PermissionRequiredMixin, TemplateView):

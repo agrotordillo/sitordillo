@@ -289,6 +289,7 @@
       {% if perms.ventas.view_analisis_ventas %}
       <a href="{% url 'ventas:analisis-producto' %}" class="sidebar-sublink">Análisis de ventas por producto</a>
       <a href="{% url 'ventas:analisis-precio' %}" class="sidebar-sublink">Análisis de ventas por precio</a>
+      <a href="{% url 'ventas:ventas-producto' %}" class="sidebar-sublink">Ventas por producto</a>
       {% endif %}
       {% if perms.cobros.view_cuentaporcobrar %}
       <a href="{% url 'cobros:cuenta-list' %}" class="sidebar-sublink">Cuentas por cobrar</a>

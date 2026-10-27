@@ -32,7 +32,7 @@ OPCIONES_MOSTRAR = [
     (MOSTRAR_TODOS, "Todos"),
 ]
 
-COLUMNAS_PRODUCTO = ("inicial", "entradas", "salidas", "ventas", "final")
+COLUMNAS_PRODUCTO = ("inicial", "entradas", "salidas", "ventas", "ventas_historicas", "final")
 
 
 def _totales_en_cero(columnas):
@@ -66,6 +66,12 @@ def analisis_por_producto(almacen, fecha_desde, fecha_hasta, *, filtrar=None, mo
     se registra como venta. Por eso la existencia final es la física, que
     puede ser mayor que la "disponible" si hay pedidos abiertos.
 
+    Las ventas importadas de scv_web (Venta.id_legado) no tienen lotes ni
+    movimientos: suman a "ventas" directo de sus renglones, pero no se
+    restan de la existencia -nunca salieron del inventario de sitordillo, y
+    restarlas daría existencias negativas- (decisión del usuario,
+    2026-10-27). `ventas_historicas` dice cuánto de "ventas" es de ellas.
+
     `filtrar(queryset, prefijo)` aplica los filtros de producto de la vista
     (marca, línea, búsqueda...) a un queryset que llega a Producto por
     `prefijo`."""
@@ -98,14 +104,30 @@ def analisis_por_producto(almacen, fecha_desde, fecha_hasta, *, filtrar=None, mo
         .annotate(total=Sum("cantidad"))
         .values_list("lote__producto", "total")
     )
+    vendido_historico = dict(
+        filtrar(
+            VentaDetalle.objects.filter(
+                venta__almacen=almacen,
+                venta__id_legado__isnull=False,
+                venta__fecha_venta__date__gte=fecha_desde,
+                venta__fecha_venta__date__lte=fecha_hasta,
+            ),
+            "producto__",
+        )
+        .values("producto")
+        .annotate(total=Sum("cantidad"))
+        .values_list("producto", "total")
+    )
 
-    productos = Producto.objects.filter(pk__in=saldos.keys()).select_related(
+    sin_movimiento = {"inicial": CERO, "entradas": CERO, "restado": CERO}
+    productos = Producto.objects.filter(pk__in={*saldos, *vendido_historico}).select_related(
         "marca", "linea", "categoria", "clase", "unidad_medida"
     )
     filas = []
     for producto in productos:
-        saldo = saldos[producto.pk]
+        saldo = saldos.get(producto.pk, sin_movimiento)
         ventas = vendido.get(producto.pk, CERO)
+        historicas = vendido_historico.get(producto.pk, CERO)
         fila = {
             "producto": producto,
             "inicial": saldo["inicial"],
@@ -113,9 +135,10 @@ def analisis_por_producto(almacen, fecha_desde, fecha_hasta, *, filtrar=None, mo
             # Lo vendido también es un movimiento negativo: se separa aquí
             # para no contarlo dos veces.
             "salidas": -saldo["restado"] - ventas,
-            "ventas": ventas,
+            "ventas": ventas + historicas,
+            "ventas_historicas": historicas,
         }
-        fila["final"] = fila["inicial"] + fila["entradas"] - fila["salidas"] - fila["ventas"]
+        fila["final"] = fila["inicial"] + fila["entradas"] - fila["salidas"] - ventas
         movio = fila["entradas"] or fila["salidas"] or fila["ventas"]
         if mostrar == MOSTRAR_CON_MOVIMIENTO and not movio:
             continue
@@ -194,8 +217,9 @@ def _clave_grupo(detalle, agrupar):
 def _costo_de_linea():
     """Lo que costó de verdad lo que salió en la línea (sus lotes, ya con los
     componentes si fue un paquete); para una venta sin ese registro, el costo
-    de catálogo, igual que al devolverla (ver
-    ventas.services._reingresos_sin_registro_de_lotes)."""
+    histórico de la línea si es importada del sistema anterior
+    (VentaDetalle.costo_unitario) y si no, el costo de catálogo, igual que al
+    devolverla (ver ventas.services._reingresos_sin_registro_de_lotes)."""
     importe_lote = F("cantidad") * F("costo_unitario")
     del_lote = (
         VentaDetalleLote.objects.filter(detalle=OuterRef("pk"))
@@ -235,6 +259,8 @@ def analisis_por_precio(detalles, agrupar="producto"):
         importe = detalle.importe_sin_impuesto
         if detalle.costo_lotes is not None:
             costo = detalle.costo_lotes
+        elif detalle.costo_unitario is not None:
+            costo = detalle.cantidad * detalle.costo_unitario
         else:
             costo = detalle.cantidad * detalle.producto.precio_costo
         costo = costo.quantize(Decimal("0.01"))
@@ -280,6 +306,108 @@ def analisis_por_precio(detalles, agrupar="producto"):
     totales["importes_lista"] = [totales_lista[clave] for clave, _ in columnas_lista]
 
     return {"filas": filas, "totales": totales, "columnas_lista": columnas_lista}
+
+
+# --- Ventas por producto -------------------------------------------------------
+
+# (valor del parámetro "agrupar", etiqueta, campo de VentaDetalle con la clave).
+AGRUPACIONES_VENTAS = [
+    ("producto", "Producto", "producto_id"),
+    ("linea", "Línea", "producto__linea_id"),
+    ("categoria", "Categoría", "producto__categoria_id"),
+    ("marca", "Marca", "producto__marca_id"),
+    ("clase", "Clase", "producto__clase_id"),
+    ("sucursal", "Sucursal", "venta__almacen_id"),
+    ("vendedor", "Vendedor", "vendedor_id"),
+]
+COLUMNAS_VENTAS = ("registros", "cantidad", "cantidad_auxiliar", "costo", "importe", "utilidad", "total")
+
+
+def _nombres_de_grupo(agrupar, claves):
+    """{clave: (nombre, detalle secundario)} de los renglones del reporte."""
+    from apps.accounts.models import User
+    from apps.products.models import Almacen, Categoria, Clase, Linea, Marca
+
+    claves = [c for c in claves if c is not None]
+    if agrupar == "producto":
+        return {
+            p.pk: (p.nombre, p.sku, p.unidad_medida_auxiliar.nombre if p.unidad_medida_auxiliar_id else "")
+            for p in Producto.objects.filter(pk__in=claves).select_related("unidad_medida_auxiliar")
+        }
+    if agrupar == "vendedor":
+        return {u.pk: (u.get_full_name() or u.username, u.username, "") for u in User.objects.filter(pk__in=claves)}
+    modelo = {"linea": Linea, "categoria": Categoria, "marca": Marca, "clase": Clase, "sucursal": Almacen}[agrupar]
+    return {pk: (nombre, "", "") for pk, nombre in modelo.objects.filter(pk__in=claves).values_list("pk", "nombre")}
+
+
+def ventas_por_producto(detalles, agrupar="producto"):
+    """Lo vendido en las líneas `detalles` (un queryset de VentaDetalle ya
+    filtrado por la vista), un renglón por producto o por el catálogo de
+    `agrupar` (ver AGRUPACIONES_VENTAS), como "Consulta - Ventas por
+    producto" de scvweb (grid_ven_analisis_ventas): registros (líneas de
+    venta), cantidad, cantidad auxiliar (cantidad x el contenido de la
+    presentación, Producto.factor_unidad_auxiliar), costo, importe sin
+    impuesto, utilidad e importe con impuesto. Las devoluciones no se restan,
+    igual que en scvweb.
+
+    Los importes salen de las mismas fórmulas que el ticket (ver
+    ventas.models.subtotal_de_linea); el costo, como en analisis_por_precio:
+    el de los lotes, si no el histórico de la línea importada y si no el de
+    catálogo. Se leen valores sueltos en vez de objetos porque un mes de
+    todas las sucursales son más de 100 mil líneas."""
+    from apps.ventas.models import importe_sin_impuesto_de_linea, subtotal_de_linea, tasas_de_producto
+
+    campo_clave = dict((valor, campo) for valor, _, campo in AGRUPACIONES_VENTAS)[agrupar]
+    filas_bd = (
+        detalles.annotate(
+            costo_lotes=_costo_de_linea(),
+            vendedor_id=Coalesce(
+                "venta__cotizacion_origen__created_by", "venta__pedido_origen__created_by", "venta__created_by"
+            ),
+        )
+        .order_by()
+        .values_list(
+            campo_clave, "cantidad", "precio_unitario", "descuento", "costo_lotes", "costo_unitario",
+            "producto__precio_costo", "producto__factor_unidad_auxiliar",
+            "producto__tipo_iva", "producto__tasa_iva", "producto__aplica_ieps", "producto__tasa_ieps",
+        )
+    )
+
+    renglones = {}
+    for (clave, cantidad, precio, descuento, costo_lotes, costo_unitario, precio_costo, factor,
+         tipo_iva, tasa_iva, aplica_ieps, tasa_ieps) in filas_bd.iterator(chunk_size=5000):
+        subtotal = subtotal_de_linea(cantidad, precio, descuento)
+        importe = importe_sin_impuesto_de_linea(subtotal, *tasas_de_producto(tipo_iva, tasa_iva, aplica_ieps, tasa_ieps))
+        if costo_lotes is not None:
+            costo = costo_lotes
+        else:
+            costo = cantidad * (costo_unitario if costo_unitario is not None else precio_costo)
+        costo = costo.quantize(Decimal("0.01"))
+
+        renglon = renglones.setdefault(clave, _totales_en_cero(COLUMNAS_VENTAS))
+        renglon["registros"] += 1
+        renglon["cantidad"] += cantidad
+        renglon["cantidad_auxiliar"] += cantidad * (factor or CERO)
+        renglon["costo"] += costo
+        renglon["importe"] += importe
+        renglon["utilidad"] += importe - costo
+        renglon["total"] += subtotal
+
+    nombres = _nombres_de_grupo(agrupar, renglones)
+    etiqueta = dict((valor, etiqueta) for valor, etiqueta, _ in AGRUPACIONES_VENTAS)[agrupar]
+    filas = []
+    for clave, renglon in renglones.items():
+        nombre, secundario, unidad_auxiliar = nombres.get(clave, (f"Sin {etiqueta.lower()}", "", ""))
+        renglon.update({"clave": clave, "nombre": nombre, "secundario": secundario, "unidad_auxiliar": unidad_auxiliar})
+        renglon["margen"] = _margen(renglon)
+        filas.append(renglon)
+    filas.sort(key=lambda r: (r["clave"] is None, r["nombre"]))
+
+    totales = _totales_en_cero(COLUMNAS_VENTAS)
+    for fila in filas:
+        _sumar(totales, fila, COLUMNAS_VENTAS)
+    totales["margen"] = _margen(totales)
+    return {"filas": filas, "totales": totales}
 
 
 def _margen(fila):

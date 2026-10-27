@@ -223,6 +223,16 @@ class OrdenCompra(BaseAbstractModel):
         max_digits=12, decimal_places=2, default=Decimal("0.00"), verbose_name="Retención ISR"
     )
     observaciones = models.TextField(blank=True, verbose_name="Observaciones")
+    id_legado = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Clave en el sistema anterior",
+        help_text="gasto.id de scv_web cuando la compra es histórica (ver "
+        "compras.management.commands.import_legacy_compras): llega ya Recibida, sin lotes, "
+        "movimientos de inventario ni cuenta por pagar.",
+    )
 
     class Meta:
         verbose_name = "Orden de compra"

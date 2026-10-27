@@ -5,6 +5,33 @@ from django.utils import timezone
 from apps.core.models import BaseAbstractModel
 
 
+def subtotal_de_linea(cantidad, precio_unitario, descuento):
+    """Precio final de una línea de venta (con impuestos, ya con su % de
+    descuento), redondeado al centavo. Es VentaDetalle.subtotal; aparte para
+    los reportes que leen valores sueltos en vez de objetos."""
+    bruto = (cantidad or Decimal("0")) * (precio_unitario or Decimal("0"))
+    neto = bruto * (Decimal("1") - (descuento or Decimal("0")) / Decimal("100"))
+    return neto.quantize(Decimal("0.01"))
+
+
+def tasas_de_producto(tipo_iva, tasa_iva, aplica_ieps, tasa_ieps):
+    """(IVA, IEPS) como fracción (0.16, 0.08) según la configuración fiscal
+    del producto."""
+    from apps.products.models import Producto
+
+    iva = (tasa_iva / Decimal("100")) if tipo_iva == Producto.TipoIVA.GRAVADO else Decimal("0")
+    ieps = (tasa_ieps / Decimal("100")) if aplica_ieps and tasa_ieps else Decimal("0")
+    return iva, ieps
+
+
+def importe_sin_impuesto_de_linea(subtotal, iva, ieps):
+    """La base sin IVA/IEPS de un precio final con impuestos (misma fórmula
+    que products.PrecioProducto.precio_sin_impuesto). Es
+    VentaDetalle.importe_sin_impuesto."""
+    factor = (Decimal("1") + ieps) * (Decimal("1") + iva)
+    return (subtotal / factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 class Venta(BaseAbstractModel):
     # Clave SAT c_FormaPago "99 - Por definir": la que se usa para una
     # venta a crédito (método de pago PPD) cuando todavía no se sabe cómo
@@ -86,6 +113,16 @@ class Venta(BaseAbstractModel):
         help_text="Sigue el mismo proceso que cualquier venta (descuenta inventario, se cobra "
         "igual), pero nunca tiene impacto fiscal: no se le genera factura individual ni entra "
         "a la factura global del turno, y se imprime como Nota de remisión en vez de ticket.",
+    )
+    id_legado = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Clave en el sistema anterior",
+        help_text="documento.id de scv_web cuando la venta es histórica (ver "
+        "ventas.management.commands.import_legacy_ventas); vacío en las ventas registradas aquí. "
+        "Una venta histórica no movió inventario ni generó cuenta por cobrar.",
     )
 
     class Meta:
@@ -312,6 +349,17 @@ class VentaDetalle(BaseAbstractModel):
         default=Estrategia.FIFO,
         verbose_name="Estrategia de salida",
     )
+    costo_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Costo unitario histórico",
+        help_text="Solo en ventas importadas del sistema anterior, que no tienen lotes (ver "
+        "Venta.id_legado): el costo con el que salió la mercancía ese día. Las ventas registradas "
+        "aquí lo toman de sus lotes (VentaDetalleLote).",
+    )
 
     class Meta:
         verbose_name = "Detalle de venta"
@@ -344,19 +392,20 @@ class VentaDetalle(BaseAbstractModel):
 
     @property
     def subtotal(self):
-        bruto = (self.cantidad or Decimal("0")) * (self.precio_unitario or Decimal("0"))
-        neto = bruto * (Decimal("1") - (self.descuento or Decimal("0")) / Decimal("100"))
-        return neto.quantize(Decimal("0.01"))
+        return subtotal_de_linea(self.cantidad, self.precio_unitario, self.descuento)
+
+    @property
+    def _tasas(self):
+        p = self.producto
+        return tasas_de_producto(p.tipo_iva, p.tasa_iva, p.aplica_ieps, p.tasa_ieps)
 
     @property
     def _tasa_iva(self):
-        producto = self.producto
-        return (producto.tasa_iva / Decimal("100")) if producto.tipo_iva == producto.TipoIVA.GRAVADO else Decimal("0")
+        return self._tasas[0]
 
     @property
     def _tasa_ieps(self):
-        producto = self.producto
-        return (producto.tasa_ieps / Decimal("100")) if producto.aplica_ieps and producto.tasa_ieps else Decimal("0")
+        return self._tasas[1]
 
     @property
     def importe_sin_impuesto(self):
@@ -365,8 +414,8 @@ class VentaDetalle(BaseAbstractModel):
         fórmula que products.PrecioProducto.precio_sin_impuesto, usando la
         tasa vigente del producto-. Es solo el desglose informativo que se
         imprime en el ticket; el cobro real sigue siendo `subtotal`."""
-        factor = (Decimal("1") + self._tasa_ieps) * (Decimal("1") + self._tasa_iva)
-        return (self.subtotal / factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        iva, ieps = self._tasas
+        return importe_sin_impuesto_de_linea(self.subtotal, iva, ieps)
 
     @property
     def importe_ieps(self):
@@ -450,6 +499,15 @@ class DevolucionCliente(BaseAbstractModel):
     )
     fecha = models.DateField(verbose_name="Fecha de devolución")
     motivo = models.TextField(blank=True, verbose_name="Motivo")
+    id_legado = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Clave en el sistema anterior",
+        help_text="documento.id (NOTA_DEVOLUCION) de scv_web cuando la devolución es histórica; "
+        "no reingresó nada a inventario.",
+    )
 
     class Meta:
         verbose_name = "Devolución de cliente"
