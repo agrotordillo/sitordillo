@@ -22,9 +22,10 @@
 {% endblock table_actions %}
 {% block main_content %}
 <p class="text-sm text-gray-500 mb-4">
-  Reglas de cada colaborador: sobre lo que él vende o sobre toda la venta de una sucursal, para una línea,
-  categoría y/o clase (vacío = todo). Si varias reglas aplican a un producto, gana la más específica
-  (categoría, luego clase, luego línea). Un % para PUBLICO/MEDIO MAYOREO y otro para las demás listas.
+  Reglas de cada colaborador: sobre lo que él vende (en cualquier sucursal o solo en una) o sobre toda la venta
+  de una sucursal, para una línea, categoría y/o clase (vacío = todo). Si varias reglas aplican a un producto,
+  gana la más específica (categoría, luego clase, luego línea). Un % para PUBLICO/MEDIO MAYOREO y otro para las
+  demás listas; lo cobrado con precio especial de sucursal solo cuenta en las reglas que lo incluyen.
 </p>
 <div class="relative overflow-x-auto">
   <table class="w-full text-sm text-left text-gray-600">

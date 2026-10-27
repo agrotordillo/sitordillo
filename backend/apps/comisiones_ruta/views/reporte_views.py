@@ -32,17 +32,26 @@ def _vendedor(detalle):
 
 def _reglas_que_aplican(detalle, vendedor, propias, de_sucursal):
     """{colaborador_id: regla} para una línea de venta: por cada colaborador,
-    la más específica de sus reglas que aplica al producto (ver
-    ComisionColaboradorLinea.especificidad); a igualdad, la de sus propias
-    ventas antes que la de sucursal."""
-    candidatas = [*(propias.get(vendedor.pk, []) if vendedor else []), *de_sucursal.get(detalle.venta.almacen_id, [])]
+    la más específica de sus reglas que aplica (ver
+    ComisionColaboradorLinea.especificidad). Una regla de "sus ventas en una
+    sucursal" solo aplica a lo que vendió en esa sucursal, y lo cobrado con
+    precio especial solo cuenta en las reglas que lo incluyen. Cada regla solo
+    aplica en su vigencia y sus días de la semana (descansos y suplencias)."""
+    almacen_id = detalle.venta.almacen_id
+    fecha = timezone.localtime(detalle.venta.fecha_venta).date()
+    candidatas = [*(propias.get(vendedor.pk, []) if vendedor else []), *de_sucursal.get(almacen_id, [])]
     elegidas = {}
     for regla in candidatas:
+        if regla.alcance == regla.Alcance.PROPIAS_EN_SUCURSAL and regla.almacen_id != almacen_id:
+            continue
+        if not regla.aplica_en(fecha):
+            continue
+        if detalle.precio_especial and not regla.comisiona_precio_especial:
+            continue
         if not regla.aplica_a(detalle.producto):
             continue
         actual = elegidas.get(regla.colaborador_id)
-        clave = (regla.especificidad, regla.almacen_id is None)
-        if actual is None or clave > (actual.especificidad, actual.almacen_id is None):
+        if actual is None or regla.especificidad > actual.especificidad:
             elegidas[regla.colaborador_id] = regla
     return elegidas
 
@@ -74,7 +83,10 @@ def reporte_comisiones_ruta_view(request):
     reglas = list(ComisionColaboradorLinea.objects.select_related("colaborador", "linea", "categoria", "clase", "almacen"))
     propias, de_sucursal = defaultdict(list), defaultdict(list)
     for regla in reglas:
-        (de_sucursal[regla.almacen_id] if regla.almacen_id else propias[regla.colaborador_id]).append(regla)
+        if regla.alcance == regla.Alcance.SUCURSAL:
+            de_sucursal[regla.almacen_id].append(regla)
+        else:
+            propias[regla.colaborador_id].append(regla)
 
     con_reglas = list(propias)
     detalles = (

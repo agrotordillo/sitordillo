@@ -47,6 +47,14 @@ COLUMNAS_DEVOLUCION_PRODUCTO = ["id", "id_documento", "codigo", "cantidad"]
 
 COSTO_ANOMALO_VECES = 3
 LOTE = 2000
+# En scv_web, Precio 6 a 10 son los precios especiales por sucursal: no salen
+# en las columnas Precio 1-5 del Excel de comisiones (ver
+# VentaDetalle.precio_especial).
+PRIMER_PRECIO_ESPECIAL = 6
+
+
+def _es_precio_especial(renglon):
+    return int(renglon["tipo_precio"] or 0) >= PRIMER_PRECIO_ESPECIAL
 
 
 class Command(BaseCommand):
@@ -109,12 +117,13 @@ class Command(BaseCommand):
         pagos = scv_web.Emparejador(scv_web.agrupar_por(
             scv_web.leer_tsv(self.directorio, "ventas_pagos", COLUMNAS_PAGO), "id_documento"
         ))
-        lote, faltantes = [], []
+        lote, faltantes, especiales = [], [], []
         for fila in scv_web.leer_tsv(self.directorio, "ventas", COLUMNAS_VENTA):
             id_venta = int(fila["id"])
             renglones, cobros = productos.de(id_venta), pagos.de(id_venta)
             if id_venta in self.importadas:
                 self.stats["ya_importadas"] += 1
+                especiales.extend(f"VTD-L{r['id']}" for r in renglones if _es_precio_especial(r))
                 # Renglones que se omitieron al importarla porque su producto
                 # todavía no existía en sitordillo (ver
                 # import_legacy_productos --solo-nuevos): se completan ahora.
@@ -134,6 +143,13 @@ class Command(BaseCommand):
         self.stats["renglones_completados"] = len(faltantes)
         if faltantes and not self.dry_run:
             VentaDetalle.objects.bulk_create(faltantes, batch_size=5000)
+        # Renglones importados antes de que se guardara el precio especial.
+        self.stats["precio_especial_marcado"] = 0
+        if not self.dry_run:
+            for inicio in range(0, len(especiales), 5000):
+                self.stats["precio_especial_marcado"] += VentaDetalle.objects.filter(
+                    folio__in=especiales[inicio:inicio + 5000], precio_especial=False
+                ).update(precio_especial=True)
 
     def _renglones(self, renglones, contar=True):
         """Los VentaDetalle (sin venta) de los renglones de scv_web que se
@@ -154,6 +170,7 @@ class Command(BaseCommand):
                 folio=f"VTD-L{r['id']}", slug=f"vtd-l{r['id']}", producto_id=producto_id,
                 cantidad=cantidad, precio_unitario=precio, descuento=Decimal("0.00"),
                 lista_precio_id=self.listas.get(r["tipo_precio"]), costo_unitario=self._costo(r, contar),
+                precio_especial=_es_precio_especial(r),
             )
             if contar:
                 self.stats["diferencia_total"] += abs(detalle.subtotal - total)
@@ -333,7 +350,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Ventas={s['ventas']:,} renglones={s['renglones']:,} con pago dividido={s['pagos_divididos']:,} "
             f"(ya importadas antes: {s['ya_importadas']:,}; renglones que se les completaron: "
-            f"{s.get('renglones_completados', 0):,})"
+            f"{s.get('renglones_completados', 0):,}; marcados con precio especial: {s.get('precio_especial_marcado', 0):,})"
         ))
         self.stdout.write(
             f"Devoluciones={s['devoluciones']} (omitidas sin venta o renglón de origen: {s['devoluciones_omitidas']})"

@@ -13,7 +13,7 @@ ventas, compras, comisiones e inventario inicial. Se corre en **QA** con el cort
 | Ventas desde 2025-01-01 | `documento` (notas y remisiones) + `documento_productos` + `documento_metodos_pago` | `Venta`, `VentaDetalle` (con costo histórico), `VentaPago` |
 | Devoluciones | `documento` NOTA_DEVOLUCION | `DevolucionCliente` |
 | Vendedores | `slz_users` | Usuarios **inactivos** (sin acceso) en `Venta.created_by` |
-| Comisiones | `datos/COMISIONES P36.xlsx` | Reglas de `ComisionColaboradorLinea` |
+| Comisiones | `datos/COMISIONES P43.xlsx` (el más reciente) | Reglas de `ComisionColaboradorLinea` |
 | Inventario inicial | entradas − salidas de `movimiento_almacen` | Un lote "INICIAL" por producto y almacén |
 
 Lo histórico no mueve inventario, no genera cuentas por cobrar o pagar, ni facturas, ni turnos.
@@ -26,7 +26,7 @@ La carpeta `datos/` no está en git: se copia a mano a `datos/` del servidor (ju
 - `datos/scv_web/correcciones_proveedores.csv`: RFC y régimen corregidos de 9 proveedores
   (salió de `compras_no_importadas_scv_web_corregido.xlsx`). **Sin este archivo esas 116
   compras no entran.**
-- `datos/COMISIONES P36.xlsx`.
+- `datos/COMISIONES P43.xlsx` (o el Excel de comisiones más reciente: `--archivo`).
 
 Si en el servidor no hay copia de scv_web, se pueden generar los archivos en otro equipo con
 `exportar_scv_web` y copiar la carpeta completa.
@@ -48,7 +48,9 @@ Desde `backend/`, con el entorno virtual del proyecto. Cada comando de importaci
    `python manage.py import_legacy_productos --solo-nuevos --directorio ../datos/scv_web/catalogos`
 6. `python manage.py import_legacy_compras`
 7. `python manage.py import_legacy_ventas` (unos 10 minutos)
-8. `python manage.py import_comisiones_p36`
+8. Reglas de comisión (reemplazan solo las que vinieron de un Excel):
+   `python manage.py import_comisiones_excel` (por defecto el P43) y, como MIGUEL no viene en el
+   P43, `python manage.py import_comisiones_excel --archivo "../datos/COMISIONES P36.xlsx" --hojas "MIGUEL RMZ"`
 9. `python manage.py import_legacy_existencias --corte 2026-10-26`
 
 Todos se pueden repetir sin duplicar: lo ya importado se salta y solo se agrega lo que falte.
@@ -84,5 +86,15 @@ faltó, mientras no haya operaciones: `--completar`).
 - Costos de venta absurdos en scv_web (más de 3 veces el precio) se dejan vacíos y el análisis
   usa el costo de catálogo.
 - Comisiones sobre el importe sin IVA, igual que el Excel con el que se pagan.
+- Lo vendido con precio especial de sucursal (Precio 6 a 9 en scv_web) queda marcado en el
+  renglón (`VentaDetalle.precio_especial`) y, como en el Excel, solo comisiona en las reglas
+  sobre toda la venta (FRANKLIN, JUAN DANIEL, JUAN CARLOS, JHONY en IQUINUAPA).
+- Las reglas de comisión pueden ser sobre sus ventas, sus ventas en una sucursal (JHONY) o toda
+  la venta de una sucursal (médicos; LUIS GERARDO y MIGUEL por la clase de producto que llevan su
+  nombre en scv_web: JOSE MANUEL y MIGUEL RAMIREZ). Cada regla tiene días de la semana (el día de
+  descanso de quien cobra sobre toda la sucursal lo cobra quien lo cubre) y vigencia para
+  suplencias (TARACENA en las vacaciones de MIGUEL). `import_comisiones_excel` las recarga del
+  Excel semanal y no toca las capturadas a mano; las suplencias de cada semana se capturan en
+  Ventas → Comisiones por colaborador.
 - Tres proveedores quedaron con RFC ficticio por decisión del negocio (HEPE1234567H0,
   PROD1234567H0, CUCA1234567H0).

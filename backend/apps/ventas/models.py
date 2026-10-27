@@ -360,6 +360,15 @@ class VentaDetalle(BaseAbstractModel):
         "Venta.id_legado): el costo con el que salió la mercancía ese día. Las ventas registradas "
         "aquí lo toman de sus lotes (VentaDetalleLote).",
     )
+    precio_especial = models.BooleanField(
+        default=False,
+        editable=False,
+        verbose_name="Precio especial de sucursal",
+        help_text="Se cobró con un precio especial de sucursal (en scv_web, Precio 6 a 9). En las comisiones "
+        "por colaborador solo cuenta para las reglas que lo incluyen (ver "
+        "ComisionColaboradorLinea.comisiona_precio_especial), como en el Excel de comisiones. Hoy solo lo "
+        "traen las ventas importadas del sistema anterior.",
+    )
 
     class Meta:
         verbose_name = "Detalle de venta"

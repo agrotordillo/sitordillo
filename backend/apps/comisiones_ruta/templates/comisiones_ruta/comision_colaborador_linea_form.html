@@ -27,7 +27,12 @@
       {% if form.colaborador.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.colaborador.errors.0 }}</p>{% endif %}
     </div>
     <div>
-      <label for="{{ form.almacen.id_for_label }}" class="label">Sobre la venta de la sucursal <span class="text-gray-400 font-normal">(opcional)</span></label>
+      <label for="{{ form.alcance.id_for_label }}" class="label">Sobre qué ventas</label>
+      {{ form.alcance }}
+      {% if form.alcance.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.alcance.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.almacen.id_for_label }}" class="label">Sucursal <span class="text-gray-400 font-normal">(opcional)</span></label>
       {{ form.almacen }}
       <p class="mt-1.5 text-xs text-gray-400">{{ form.almacen.help_text }}</p>
       {% if form.almacen.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.almacen.errors.0 }}</p>{% endif %}
@@ -58,6 +63,34 @@
       {{ form.porcentaje_otras_listas }}
       <p class="mt-1.5 text-xs text-gray-400">{{ form.porcentaje_otras_listas.help_text }}</p>
       {% if form.porcentaje_otras_listas.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.porcentaje_otras_listas.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.vigente_desde.id_for_label }}" class="label">Vigente desde <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.vigente_desde }}
+      {% if form.vigente_desde.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.vigente_desde.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label for="{{ form.vigente_hasta.id_for_label }}" class="label">Vigente hasta <span class="text-gray-400 font-normal">(opcional)</span></label>
+      {{ form.vigente_hasta }}
+      <p class="mt-1.5 text-xs text-gray-400">{{ form.vigente_hasta.help_text }}</p>
+      {% if form.vigente_hasta.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.vigente_hasta.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <span class="label">Días de la semana</span>
+      <div class="flex flex-wrap gap-x-4 gap-y-2">
+        {% for opcion in form.dias %}
+        <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+        {% endfor %}
+      </div>
+      <p class="mt-1.5 text-xs text-gray-400">{{ form.dias.help_text }}</p>
+      {% if form.dias.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.dias.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="sm:col-span-2">
+      <div class="flex items-center gap-2">
+        {{ form.comisiona_precio_especial }}
+        <label for="{{ form.comisiona_precio_especial.id_for_label }}" class="label mb-0">Incluye ventas con precio especial de sucursal</label>
+      </div>
+      <p class="mt-1.5 text-xs text-gray-400">{{ form.comisiona_precio_especial.help_text }}</p>
     </div>
     <div class="sm:col-span-2">
       <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>

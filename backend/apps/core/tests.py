@@ -705,8 +705,9 @@ ARCHIVOS_SCV_WEB = {
     "ventas_productos": [
         [1, 100, "MAIQ", "30.000", "6.650000", "8.330000", "249.900000", "249.900000", 2],
         [2, 100, "NO-EXISTE", "1.000", "5.000000", "10.000000", "10.000000", "10.000000", 1],
-        # Costo mal capturado en scv_web (36,000 por pieza contra 40 de precio).
-        [3, 101, "PAN4", "2.000", "36000.000000", "40.000000", "80.000000", "100.000000", 1],
+        # Costo mal capturado en scv_web (36,000 por pieza contra 40 de precio),
+        # cobrado con un precio especial de sucursal (Precio 7).
+        [3, 101, "PAN4", "2.000", "36000.000000", "40.000000", "80.000000", "100.000000", 7],
     ],
     "ventas_pagos": [
         [1, 100, "01", "249.900000", ""],
@@ -811,6 +812,17 @@ class ImportacionScvWebTests(TestCase):
         [detalle] = venta.detalles.all()
         self.assertEqual((detalle.precio_unitario, detalle.costo_unitario), (Decimal("50.00"), None))
         self.assertEqual(Almacen.objects.filter(is_active=False).count(), 11)
+
+    def test_el_precio_especial_de_sucursal_queda_marcado_y_se_completa_al_reimportar(self):
+        self._importar("import_legacy_ventas")
+        especiales = VentaDetalle.objects.filter(precio_especial=True)
+        self.assertEqual([d.producto for d in especiales], [self.panacur])
+
+        VentaDetalle.objects.update(precio_especial=False)  # importado antes de que existiera la marca
+        salida = self._importar("import_legacy_ventas")
+
+        self.assertIn("marcados con precio especial: 1", salida)
+        self.assertEqual([d.producto for d in VentaDetalle.objects.filter(precio_especial=True)], [self.panacur])
 
     def test_la_devolucion_se_liga_a_la_linea_de_la_venta_importada(self):
         self._importar("import_legacy_ventas")
