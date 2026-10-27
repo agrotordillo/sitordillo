@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -56,8 +57,7 @@ def _reglas_que_aplican(detalle, vendedor, propias, de_sucursal):
     return elegidas
 
 
-@permission_required("comisiones_ruta.view_comisioncolaboradorlinea", raise_exception=True)
-def reporte_comisiones_ruta_view(request):
+def calcular_comisiones_ruta(request, con_detalle=False):
     """Comisión por colaborador en un periodo, según sus reglas
     (ComisionColaboradorLinea): sobre lo que vendió él -atribuido igual que
     en mostrador, ver _vendedor- o sobre toda la venta de una sucursal. Se
@@ -72,7 +72,8 @@ def reporte_comisiones_ruta_view(request):
 
     Con el historial de scv_web un mes son decenas de miles de líneas, así
     que el reporte se resume por regla; el detalle por venta solo se arma al
-    filtrar un colaborador."""
+    filtrar un colaborador, o para todos con `con_detalle` (la descarga a
+    Excel). Devuelve el contexto que usan la pantalla y la descarga."""
     hoy = timezone.localdate()
     fecha_desde = fecha(request.GET.get("fecha_desde")) or hoy.replace(day=1)
     fecha_hasta = fecha(request.GET.get("fecha_hasta")) or hoy
@@ -143,9 +144,10 @@ def reporte_comisiones_ruta_view(request):
             })
             totales["vendido_variable" if lista_variable else "vendido_otras"] += importe_neto
             totales["comision"] += comision
-            if colaborador_id == empleado_pk:
+            if con_detalle or colaborador_id == empleado_pk:
                 filas_por_colaborador[colaborador_id].append({
                     "venta": detalle.venta,
+                    "regla": regla,
                     "vendedor": vendedor,
                     "producto": detalle.producto,
                     "lista_precio": detalle.lista_precio,
@@ -181,19 +183,36 @@ def reporte_comisiones_ruta_view(request):
     if visibles is not None:
         almacenes = almacenes.filter(pk__in=visibles.values_list("pk", flat=True))
 
-    return render(
-        request,
-        "comisiones_ruta/reporte_comisiones_ruta.html",
-        {
-            "grupos": grupos,
-            "total_general": sum((g["total_comision"] for g in grupos), CERO),
-            "fecha_desde": fecha_desde.isoformat(),
-            "fecha_hasta": fecha_hasta.isoformat(),
-            "almacen_id": almacen_id,
-            "empleado_id": empleado_id,
-            "empleados": sorted(colaboradores_en_periodo, key=lambda u: u.get_full_name() or u.username),
-            "almacenes": almacenes,
-            "sin_lista_precio": sin_lista_precio,
-            "active_module": "sales",
-        },
-    )
+    return {
+        "grupos": grupos,
+        "total_general": sum((g["total_comision"] for g in grupos), CERO),
+        "fecha_desde": fecha_desde.isoformat(),
+        "fecha_hasta": fecha_hasta.isoformat(),
+        "periodo": (fecha_desde, fecha_hasta),
+        "almacen_id": almacen_id,
+        "almacen": almacenes.filter(pk=id_valido(almacen_id)).first() if almacen_id else None,
+        "empleado_id": empleado_id,
+        "empleados": sorted(colaboradores_en_periodo, key=lambda u: u.get_full_name() or u.username),
+        "almacenes": almacenes,
+        "sin_lista_precio": sin_lista_precio,
+        "active_module": "sales",
+    }
+
+
+@permission_required("comisiones_ruta.view_comisioncolaboradorlinea", raise_exception=True)
+def reporte_comisiones_ruta_view(request):
+    return render(request, "comisiones_ruta/reporte_comisiones_ruta.html", calcular_comisiones_ruta(request))
+
+
+@permission_required("comisiones_ruta.view_comisioncolaboradorlinea", raise_exception=True)
+def reporte_comisiones_ruta_excel_view(request):
+    """El mismo reporte, con los mismos filtros, en Excel: un resumen y una
+    hoja por colaborador con sus reglas y el detalle por venta."""
+    from apps.comisiones_ruta.excel import libro_comisiones_ruta
+
+    contexto = calcular_comisiones_ruta(request, con_detalle=True)
+    desde, hasta = contexto["periodo"]
+    respuesta = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    respuesta["Content-Disposition"] = f'attachment; filename="comisiones_{desde:%Y%m%d}_{hasta:%Y%m%d}.xlsx"'
+    libro_comisiones_ruta(contexto).save(respuesta)
+    return respuesta

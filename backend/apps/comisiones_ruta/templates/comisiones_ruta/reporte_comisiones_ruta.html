@@ -41,7 +41,10 @@
       {% endfor %}
     </select>
   </div>
-  <button type="submit" class="btn-primary">Consultar</button>
+  <div class="flex items-center gap-2">
+    <button type="submit" class="btn-primary">Consultar</button>
+    <a href="{% url 'comisiones_ruta:reporte-excel' %}?{{ request.GET.urlencode }}" class="btn-secondary whitespace-nowrap">Descargar Excel</a>
+  </div>
 </form>
 {% endblock table_actions %}
 {% block main_content %}

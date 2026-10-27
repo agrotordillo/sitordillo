@@ -5,12 +5,13 @@ from .views.catalogo_views import (
     ComisionColaboradorLineaListView,
     ComisionColaboradorLineaUpdateView,
 )
-from .views.reporte_views import reporte_comisiones_ruta_view
+from .views.reporte_views import reporte_comisiones_ruta_excel_view, reporte_comisiones_ruta_view
 
 app_name = "comisiones_ruta"
 
 urlpatterns = [
     path("", reporte_comisiones_ruta_view, name="reporte"),
+    path("excel/", reporte_comisiones_ruta_excel_view, name="reporte-excel"),
     path("por-colaborador/", ComisionColaboradorLineaListView.as_view(), name="comision-colaborador-linea-list"),
     path("por-colaborador/crear/", ComisionColaboradorLineaCreateView.as_view(), name="comision-colaborador-linea-create"),
     path("por-colaborador/<int:pk>/editar/", ComisionColaboradorLineaUpdateView.as_view(), name="comision-colaborador-linea-update"),

@@ -314,6 +314,30 @@ class ReporteComisionesRutaTests(TestCase):
         regla.save()
         self.assertEqual(self._comisiones()[0]["alberto"], Decimal("40.00"))
 
+    def test_se_descarga_en_excel_con_una_hoja_por_colaborador_y_su_detalle(self):
+        import io
+
+        respuesta = self.client.get(
+            reverse("comisiones_ruta:reporte-excel"), {"fecha_desde": "2026-09-01", "fecha_hasta": "2026-09-30"}
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('filename="comisiones_20260901_20260930.xlsx"', respuesta["Content-Disposition"])
+        libro = openpyxl.load_workbook(io.BytesIO(respuesta.content))
+        self.assertEqual(libro.sheetnames, ["Resumen", "ALBERTO", "JHONY", "LUIS", "MARLIT"])
+        resumen = libro["Resumen"]
+        self.assertEqual(
+            [(resumen.cell(f, 1).value, resumen.cell(f, 4).value) for f in range(5, 9)],
+            [("ALBERTO", 40), ("JHONY", 7), ("LUIS", 70), ("MARLIT", 5)],
+        )
+        self.assertEqual((resumen["A9"].value, resumen["D9"].value), ("Total", "=SUM(D5:D8)"))
+        # La hoja de LUIS: sus 2 reglas, su total y el detalle de sus 2 ventas.
+        luis = libro["LUIS"]
+        self.assertEqual(luis["F7"].value, "=SUM(F5:F6)")
+        folios = [luis.cell(f, 2).value for f in range(11, 13)]
+        self.assertEqual(len(folios), 2)
+        self.assertEqual(luis.cell(13, 11).value, "=SUM(K11:K12)")
+
     def test_el_detalle_por_venta_solo_sale_al_filtrar_un_colaborador(self):
         _, respuesta = self._comisiones()
         self.assertTrue(all(not g["filas"] for g in respuesta.context["grupos"]))
