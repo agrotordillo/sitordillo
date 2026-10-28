@@ -1,8 +1,11 @@
 from collections import defaultdict
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import permission_required
-from django.db.models import Q
+from django.db.models import Case, DecimalField, F, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -11,7 +14,7 @@ from apps.comisiones_ruta.models import ComisionColaboradorLinea
 from apps.core.parametros import fecha, filtrar_por_id, id_valido
 from apps.core.scoping import almacen_principal, almacenes_visibles
 from apps.products.models import Almacen
-from apps.ventas.models import VentaDetalle
+from apps.ventas.models import DevolucionClienteDetalle, VentaDetalle
 
 # Ventas en estas dos listas comisionan al `porcentaje` de la regla; en
 # cualquier otra (MAYOREO, SUB DISTRIBUIDOR, PROMOCION), al
@@ -23,15 +26,31 @@ LISTAS_PORCENTAJE_VARIABLE = {"PUBLICO", "MEDIO MAYOREO"}
 CERO = Decimal("0.00")
 
 
-def _vendedor(detalle):
-    """Quien LEVANTÓ EL PEDIDO -Cotizacion.created_by- o, si la venta se
-    registró directa, quien la registró (Venta.created_by; en una venta
-    importada de scv_web, su vendedor)."""
-    documento = detalle.venta.documento_mostrador
-    return documento.created_by if documento else detalle.venta.created_by
+# Quien LEVANTÓ EL PEDIDO -Cotizacion/Pedido.created_by, ver
+# Venta.documento_mostrador- o, si la venta se registró directa, quien la
+# registró (Venta.created_by; en una venta importada de scv_web, su
+# vendedor). Se resuelve en la consulta para no traer por cada línea la
+# cotización, el pedido y sus usuarios.
+VENDEDOR_ID = Case(
+    When(venta__cotizacion_origen__isnull=False, then=F("venta__cotizacion_origen__created_by_id")),
+    When(venta__pedido_origen__isnull=False, then=F("venta__pedido_origen__created_by_id")),
+    default=F("venta__created_by_id"),
+)
+# Lo devuelto de la línea (DevolucionClienteDetalle), sumado en la consulta:
+# es VentaDetalle.cantidad_devuelta sin un prefetch por cada línea.
+DEVUELTO = Coalesce(
+    Subquery(
+        DevolucionClienteDetalle.objects.filter(venta_detalle=OuterRef("pk"))
+        .values("venta_detalle")
+        .annotate(total=Sum("cantidad"))
+        .values("total")
+    ),
+    Value(Decimal("0.00")),
+    output_field=DecimalField(max_digits=12, decimal_places=2),
+)
 
 
-def _reglas_que_aplican(detalle, vendedor, propias, de_sucursal):
+def _reglas_que_aplican(detalle, fecha, propias, de_sucursal):
     """{colaborador_id: regla} para una línea de venta: por cada colaborador,
     la más específica de sus reglas que aplica (ver
     ComisionColaboradorLinea.especificidad). Una regla de "sus ventas en una
@@ -39,8 +58,7 @@ def _reglas_que_aplican(detalle, vendedor, propias, de_sucursal):
     precio especial solo cuenta en las reglas que lo incluyen. Cada regla solo
     aplica en su vigencia y sus días de la semana (descansos y suplencias)."""
     almacen_id = detalle.venta.almacen_id
-    fecha = timezone.localtime(detalle.venta.fecha_venta).date()
-    candidatas = [*(propias.get(vendedor.pk, []) if vendedor else []), *de_sucursal.get(almacen_id, [])]
+    candidatas = [*propias.get(detalle.vendedor_id, []), *de_sucursal.get(almacen_id, [])]
     elegidas = {}
     for regla in candidatas:
         if regla.alcance == regla.Alcance.PROPIAS_EN_SUCURSAL and regla.almacen_id != almacen_id:
@@ -89,25 +107,24 @@ def calcular_comisiones_ruta(request, con_detalle=False):
         else:
             propias[regla.colaborador_id].append(regla)
 
-    con_reglas = list(propias)
+    # Por rango de fecha y hora -no con __date- para que use el índice de
+    # Venta.fecha_venta. Con el historial de scv_web son decenas de miles de
+    # líneas al mes: solo se traen las columnas que se usan (cada modelo
+    # cargado completo eran ~12 fechas por línea que convertir).
+    zona = timezone.get_current_timezone()
+    inicio = timezone.make_aware(datetime.combine(fecha_desde, time.min), zona)
+    fin = timezone.make_aware(datetime.combine(fecha_hasta + timedelta(days=1), time.min), zona)
     detalles = (
-        VentaDetalle.objects.filter(
-            venta__fecha_venta__date__gte=fecha_desde,
-            venta__fecha_venta__date__lte=fecha_hasta,
+        VentaDetalle.objects.filter(venta__fecha_venta__gte=inicio, venta__fecha_venta__lt=fin)
+        .annotate(vendedor_id=VENDEDOR_ID, devuelto=DEVUELTO)
+        .filter(Q(vendedor_id__in=list(propias)) | Q(venta__almacen_id__in=list(de_sucursal)))
+        .select_related("producto", "lista_precio", "venta", "venta__almacen")
+        .only(
+            "cantidad", "precio_unitario", "descuento", "precio_especial", "lista_precio__nombre",
+            "venta__folio", "venta__fecha_venta", "venta__almacen__nombre",
+            "producto__nombre", "producto__sku", "producto__linea", "producto__categoria", "producto__clase",
+            "producto__tipo_iva", "producto__tasa_iva", "producto__aplica_ieps", "producto__tasa_ieps",
         )
-        .filter(
-            Q(venta__created_by_id__in=con_reglas)
-            | Q(venta__cotizacion_origen__created_by_id__in=con_reglas)
-            | Q(venta__pedido_origen__created_by_id__in=con_reglas)
-            | Q(venta__almacen_id__in=list(de_sucursal))
-        )
-        .select_related(
-            "producto", "lista_precio",
-            "venta", "venta__created_by", "venta__almacen",
-            "venta__cotizacion_origen", "venta__cotizacion_origen__created_by",
-            "venta__pedido_origen", "venta__pedido_origen__created_by",
-        )
-        .prefetch_related("devoluciones")
         .order_by("venta__fecha_venta", "pk")
     )
     visibles = almacenes_visibles(request.user)
@@ -120,14 +137,13 @@ def calcular_comisiones_ruta(request, con_detalle=False):
     filas_por_colaborador = defaultdict(list)
     sin_lista_precio = 0
     for detalle in detalles.iterator(chunk_size=2000):
-        vendedor = _vendedor(detalle)
-        elegidas = _reglas_que_aplican(detalle, vendedor, propias, de_sucursal)
+        elegidas = _reglas_que_aplican(detalle, detalle.venta.fecha_venta.astimezone(zona).date(), propias, de_sucursal)
         if not elegidas:
             continue
         if detalle.lista_precio_id is None:
             sin_lista_precio += 1
             continue
-        cantidad_neta = detalle.cantidad - detalle.cantidad_devuelta
+        cantidad_neta = detalle.cantidad - detalle.devuelto
         if cantidad_neta <= 0:
             continue
         precio_neto_unitario = (detalle.importe_sin_impuesto / detalle.cantidad) if detalle.cantidad else CERO
@@ -148,7 +164,7 @@ def calcular_comisiones_ruta(request, con_detalle=False):
                 filas_por_colaborador[colaborador_id].append({
                     "venta": detalle.venta,
                     "regla": regla,
-                    "vendedor": vendedor,
+                    "vendedor": detalle.vendedor_id,
                     "producto": detalle.producto,
                     "lista_precio": detalle.lista_precio,
                     "cantidad": cantidad_neta,
@@ -156,6 +172,14 @@ def calcular_comisiones_ruta(request, con_detalle=False):
                     "porcentaje": pct,
                     "comision": comision,
                 })
+
+    # Los vendedores del detalle, de una vez (se guardó solo su id).
+    vendedores = get_user_model().objects.in_bulk(
+        {fila["vendedor"] for filas in filas_por_colaborador.values() for fila in filas} - {None}
+    )
+    for filas in filas_por_colaborador.values():
+        for fila in filas:
+            fila["vendedor"] = vendedores.get(fila["vendedor"])
 
     grupos_por_clave = {}
     for (colaborador_id, _), totales in resumen.items():
