@@ -961,10 +961,14 @@ class ImportacionScvWebTests(TestCase):
             reverse("comisiones_ruta:reporte"), {"fecha_desde": "2025-01-01", "fecha_hasta": "2025-01-31"}
         )
 
-        # 30 vendidas - 5 devueltas = 25 x 8.33 = 208.25 con IVA -> 179.52 sin IVA
-        # (lista MEDIO MAYOREO, % propio del colaborador) -> 1% = 1.80.
+        # 30 vendidas x 8.33 = 249.90 con IVA -> 215.43 sin IVA (lista MEDIO
+        # MAYOREO, % propio del colaborador) -> 1% = 2.15; la devolución de 5
+        # del mismo periodo resta 35.90 -> 0.36: 1.79.
         [grupo] = respuesta.context["grupos"]
-        self.assertEqual((grupo["total_importe"], grupo["total_comision"]), (Decimal("179.52"), Decimal("1.80")))
+        self.assertEqual(
+            (grupo["total_importe"], grupo["total_devuelto"], grupo["total_comision"]),
+            (Decimal("215.43"), Decimal("35.90"), Decimal("1.79")),
+        )
 
     def test_el_analisis_por_producto_muestra_la_venta_historica_sin_mover_existencia(self):
         from apps.ventas.analisis import analisis_por_producto

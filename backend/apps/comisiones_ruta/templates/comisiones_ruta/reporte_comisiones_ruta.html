@@ -50,15 +50,21 @@
 {% block main_content %}
 <p class="text-sm text-gray-500 mb-4">
   Cada colaborador cobra según sus reglas: sobre lo que él vendió (quien levantó el pedido en mostrador, o quien
-  registró la venta directa) o sobre toda la venta de una sucursal. Se calcula sin impuestos, incluye ventas de
-  contado y a crédito y descuenta lo devuelto. Un % para PUBLICO/MEDIO MAYOREO y otro para las demás listas —
-  configura las reglas en
+  registró la venta directa) o sobre toda la venta de una sucursal. Se calcula sin impuestos e incluye ventas de
+  contado y a crédito. Un % para PUBLICO/MEDIO MAYOREO y otro para las demás listas — configura las reglas en
   <a href="{% url 'comisiones_ruta:comision-colaborador-linea-list' %}" class="text-primary-600 hover:text-primary-700 font-medium">Comisiones por colaborador</a>.
-  Elige un colaborador para ver el detalle por venta.
+  Una devolución se descuenta en el periodo en que se registra, con el % con que se pagó la venta, aunque la venta
+  sea de un periodo ya pagado. Elige un colaborador para ver el detalle por venta.
 </p>
 
-<div class="mb-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-sm">
+<div class="mb-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-sm flex flex-wrap gap-x-6 gap-y-1">
   <span class="text-gray-500">Comisión total del periodo: <span class="font-semibold text-gray-800">${{ total_general|moneda }}</span></span>
+  {% if total_devuelto %}
+  <span class="text-gray-500">Ya descuenta devoluciones por <span class="font-medium text-red-600">−${{ total_devuelto|moneda }}</span> de venta</span>
+  {% endif %}
+  {% if total_por_descontar %}
+  <span class="text-gray-500">Devoluciones posteriores, a descontar en periodos siguientes: <span class="font-medium text-amber-700">−${{ total_por_descontar|moneda|cut:"-" }}</span> de comisión</span>
+  {% endif %}
 </div>
 
 {% if sin_lista_precio %}
@@ -77,6 +83,9 @@
     </span>
     <div class="flex items-center gap-4 text-xs text-gray-500">
       <span>Vendido: <span class="text-gray-700 font-medium">${{ grupo.total_importe|moneda }}</span></span>
+      {% if grupo.total_devuelto %}
+      <span>Devuelto: <span class="text-red-600 font-medium">−${{ grupo.total_devuelto|moneda }}</span></span>
+      {% endif %}
       <span>Comisión: <span class="text-emerald-600 font-semibold">${{ grupo.total_comision|moneda }}</span></span>
     </div>
   </div>
@@ -88,6 +97,7 @@
         <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">%</th>
         <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Vendido otras listas</th>
         <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">%</th>
+        <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Devuelto</th>
         <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Comisión</th>
       </tr>
     </thead>
@@ -99,11 +109,24 @@
         <td class="px-4 sm:px-6 py-2.5 text-right text-gray-500">{{ totales.regla.porcentaje }}%</td>
         <td class="px-4 sm:px-6 py-2.5 text-right">${{ totales.vendido_otras|moneda }}</td>
         <td class="px-4 sm:px-6 py-2.5 text-right text-gray-500">{{ totales.regla.porcentaje_otras_listas }}%</td>
+        <td class="px-4 sm:px-6 py-2.5 text-right {% if totales.devuelto %}text-red-600{% else %}text-gray-400{% endif %}">{% if totales.devuelto %}−${{ totales.devuelto|moneda }}{% else %}—{% endif %}</td>
         <td class="px-4 sm:px-6 py-2.5 text-right font-medium text-gray-800">${{ totales.comision|moneda }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% if grupo.devoluciones %}
+  <div class="px-4 sm:px-6 py-2 border-t border-gray-100 bg-red-50/40 text-xs font-semibold text-red-700">
+    Devoluciones descontadas en este periodo
+  </div>
+  {% include "comisiones_ruta/includes/_devoluciones.html" with filas=grupo.devoluciones periodo_label="Venta pagada en" periodo_campo="venta" %}
+  {% endif %}
+  {% if grupo.devoluciones_posteriores %}
+  <div class="px-4 sm:px-6 py-2 border-t border-gray-100 bg-amber-50/60 text-xs font-semibold text-amber-800">
+    Devoluciones posteriores de ventas de este periodo — no cambian esta comisión; se descuentan en el periodo indicado
+  </div>
+  {% include "comisiones_ruta/includes/_devoluciones.html" with filas=grupo.devoluciones_posteriores periodo_label="Se descuenta en" periodo_campo="descuento" %}
+  {% endif %}
   {% if grupo.filas %}
   <table class="w-full text-sm text-left text-gray-600 border-t border-gray-100">
     <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">

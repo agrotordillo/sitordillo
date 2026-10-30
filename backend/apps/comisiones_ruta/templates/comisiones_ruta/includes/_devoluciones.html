@@ -1,0 +1,49 @@
+{% load core_extras %}
+{% comment %}
+Devoluciones de un colaborador (ver calcular_comisiones_ruta): las que se
+descuentan en el periodo (periodo_campo="venta": muestra en qué periodo se
+pagó la venta) o las posteriores (periodo_campo="descuento": en qué periodo
+se descuentan). Cantidad, importe y comisión vienen en negativo.
+{% endcomment %}
+<table class="w-full text-sm text-left text-gray-600">
+  <thead class="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+    <tr>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Devolución</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Venta</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">{{ periodo_label }}</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Vendió</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold">Producto</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Cantidad</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Importe</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">%</th>
+      <th scope="col" class="px-4 sm:px-6 py-2.5 font-semibold text-right">Comisión</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-gray-100">
+    {% for fila in filas %}
+    <tr class="hover:bg-gray-50/50 transition-colors">
+      <td class="px-4 sm:px-6 py-2.5 whitespace-nowrap">
+        <span class="font-mono text-xs text-gray-500">{{ fila.devolucion.folio }}</span>
+        <span class="block text-xs text-gray-400">{{ fila.devolucion.fecha|date:"d/m/Y" }}</span>
+      </td>
+      <td class="px-4 sm:px-6 py-2.5 whitespace-nowrap">
+        <span class="font-mono text-xs text-gray-500">{{ fila.venta.folio }}</span>
+        <span class="block text-xs text-gray-400">{{ fila.venta.fecha_venta|date:"d/m/Y" }}</span>
+      </td>
+      <td class="px-4 sm:px-6 py-2.5 whitespace-nowrap text-xs font-medium text-gray-700">
+        {% if periodo_campo == "descuento" %}
+        {{ fila.periodo_descuento.0|date:"d/m/Y" }} – {{ fila.periodo_descuento.1|date:"d/m/Y" }}
+        {% else %}
+        {{ fila.periodo_venta.0|date:"d/m/Y" }} – {{ fila.periodo_venta.1|date:"d/m/Y" }}
+        {% endif %}
+      </td>
+      <td class="px-4 sm:px-6 py-2.5 text-gray-500">{% if fila.vendedor %}{{ fila.vendedor.get_full_name|default:fila.vendedor.username }}{% else %}—{% endif %}</td>
+      <td class="px-4 sm:px-6 py-2.5 text-gray-700">{{ fila.producto.nombre }}</td>
+      <td class="px-4 sm:px-6 py-2.5 text-right text-red-600">{{ fila.cantidad }}</td>
+      <td class="px-4 sm:px-6 py-2.5 text-right text-red-600">−${{ fila.importe|moneda|cut:"-" }}</td>
+      <td class="px-4 sm:px-6 py-2.5 text-right text-gray-500">{{ fila.porcentaje }}%</td>
+      <td class="px-4 sm:px-6 py-2.5 text-right font-medium text-red-600">−${{ fila.comision|moneda|cut:"-" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

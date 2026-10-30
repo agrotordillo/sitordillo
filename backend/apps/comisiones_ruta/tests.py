@@ -13,8 +13,9 @@ from django.utils import timezone
 
 from apps.clientes.models import Cliente
 from apps.comisiones_ruta.models import ComisionColaboradorLinea
+from apps.comisiones_ruta.views.reporte_views import periodo_de_pago
 from apps.products.models import Almacen, Categoria, Clase, Linea, ListaPrecio, Producto
-from apps.ventas.models import Venta, VentaDetalle
+from apps.ventas.models import DevolucionCliente, DevolucionClienteDetalle, Venta, VentaDetalle
 
 User = get_user_model()
 
@@ -327,16 +328,17 @@ class ReporteComisionesRutaTests(TestCase):
         self.assertEqual(libro.sheetnames, ["Resumen", "ALBERTO", "JHONY", "LUIS", "MARLIT"])
         resumen = libro["Resumen"]
         self.assertEqual(
-            [(resumen.cell(f, 1).value, resumen.cell(f, 4).value) for f in range(5, 9)],
+            [(resumen.cell(f, 1).value, resumen.cell(f, 5).value) for f in range(5, 9)],
             [("ALBERTO", 40), ("JHONY", 7), ("LUIS", 70), ("MARLIT", 5)],
         )
-        self.assertEqual((resumen["A9"].value, resumen["D9"].value), ("Total", "=SUM(D5:D8)"))
+        self.assertEqual((resumen["A9"].value, resumen["E9"].value), ("Total", "=SUM(E5:E8)"))
         # La hoja de LUIS: sus 2 reglas, su total y el detalle de sus 2 ventas.
         luis = libro["LUIS"]
-        self.assertEqual(luis["F7"].value, "=SUM(F5:F6)")
-        folios = [luis.cell(f, 2).value for f in range(11, 13)]
-        self.assertEqual(len(folios), 2)
-        self.assertEqual(luis.cell(13, 11).value, "=SUM(K11:K12)")
+        self.assertEqual(luis["G7"].value, "=SUM(G5:G6)")
+        self.assertEqual(luis["A10"].value, "Detalle por venta")
+        folios = [luis.cell(f, 2).value for f in range(12, 14)]
+        self.assertTrue(all(folios))
+        self.assertEqual(luis.cell(14, 11).value, "=SUM(K12:K13)")
 
     def test_el_detalle_por_venta_solo_sale_al_filtrar_un_colaborador(self):
         _, respuesta = self._comisiones()
@@ -345,3 +347,85 @@ class ReporteComisionesRutaTests(TestCase):
         _, respuesta = self._comisiones(empleado=self.luis.pk)
         [grupo] = respuesta.context["grupos"]
         self.assertEqual(sorted(f["comision"] for f in grupo["filas"]), [Decimal("20.00"), Decimal("50.00")])
+
+    # --- Devoluciones ---------------------------------------------------------
+
+    def _devolver(self, vendedor, producto, dia):
+        """Devuelve la pieza que `vendedor` vendió de `producto` el día `dia`
+        de septiembre de 2026."""
+        detalle = VentaDetalle.objects.get(venta__created_by=vendedor, producto=producto)
+        devolucion = DevolucionCliente.objects.create(venta=detalle.venta, fecha=date(2026, 9, dia))
+        DevolucionClienteDetalle.objects.create(devolucion=devolucion, venta_detalle=detalle, cantidad=1)
+        return devolucion
+
+    def _grupo(self, respuesta, colaborador):
+        return next(g for g in respuesta.context["grupos"] if g["empleado"] == colaborador)
+
+    def test_el_periodo_de_pago_va_de_jueves_a_miercoles(self):
+        self.assertEqual(periodo_de_pago(date(2026, 10, 28)), (date(2026, 10, 22), date(2026, 10, 28)))
+        self.assertEqual(periodo_de_pago(date(2026, 10, 29)), (date(2026, 10, 29), date(2026, 11, 4)))
+
+    def test_la_devolucion_de_una_venta_ya_pagada_se_descuenta_en_el_periodo_en_que_se_registra(self):
+        # La venta es del miércoles 2/9 (periodo de pago del 27/8 al 2/9) y
+        # la devuelven el jueves 10/9, con ese periodo ya pagado.
+        devolucion = self._devolver(self.luis, self.antibiotico, 10)
+
+        pagado, respuesta = self._comisiones(fecha_desde="2026-08-27", fecha_hasta="2026-09-02")
+        # El periodo pagado no cambia, pero avisa dónde se descontará.
+        self.assertEqual((pagado["luisg"], pagado["alberto"]), (Decimal("70.00"), Decimal("40.00")))
+        [posterior] = self._grupo(respuesta, self.luis)["devoluciones_posteriores"]
+        self.assertEqual(
+            (posterior["devolucion"], posterior["comision"], posterior["periodo_descuento"]),
+            (devolucion, Decimal("-50.00"), (date(2026, 9, 10), date(2026, 9, 16))),
+        )
+        self.assertEqual(respuesta.context["total_por_descontar"], Decimal("-90.00"))
+        self.assertContains(respuesta, "Devoluciones posteriores de ventas de este periodo")
+
+        siguiente, respuesta = self._comisiones(fecha_desde="2026-09-10", fecha_hasta="2026-09-16")
+        # Se retira lo que se pagó: a LUIS su 5% de FARMACIA y a ALBERTO su 4%
+        # de MEDICOS en LERDO, aunque no hayan vendido nada en este periodo.
+        self.assertEqual(siguiente, {"luisg": Decimal("-50.00"), "alberto": Decimal("-40.00")})
+        luis = self._grupo(respuesta, self.luis)
+        [descontada] = luis["devoluciones"]
+        self.assertEqual(
+            (descontada["devolucion"], descontada["importe"], descontada["periodo_venta"]),
+            (devolucion, Decimal("-1000.00"), (date(2026, 8, 27), date(2026, 9, 2))),
+        )
+        self.assertEqual((luis["total_importe"], luis["total_devuelto"]), (Decimal("0.00"), Decimal("1000.00")))
+        self.assertContains(respuesta, "Devoluciones descontadas en este periodo")
+
+    def test_la_devolucion_en_el_mismo_periodo_se_descuenta_ahi_mismo(self):
+        self._devolver(self.luis, self.antibiotico, 2)
+
+        comisiones, respuesta = self._comisiones()
+
+        self.assertEqual((comisiones["luisg"], comisiones["alberto"]), (Decimal("20.00"), Decimal("0.00")))
+        self.assertFalse(any(g["devoluciones_posteriores"] for g in respuesta.context["grupos"]))
+
+    def test_la_devolucion_retira_con_la_regla_del_dia_de_la_venta_aunque_ya_no_este_vigente(self):
+        regla = ComisionColaboradorLinea.objects.get(colaborador=self.alberto)
+        regla.vigente_hasta = date(2026, 9, 5)  # una cobertura que ya terminó
+        regla.save()
+        self._devolver(self.luis, self.antibiotico, 10)
+
+        comisiones, _ = self._comisiones(fecha_desde="2026-09-10", fecha_hasta="2026-09-16")
+
+        self.assertEqual(comisiones["alberto"], Decimal("-40.00"))
+
+    def test_el_excel_trae_las_devoluciones_descontadas_y_las_posteriores(self):
+        import io
+
+        self._devolver(self.luis, self.antibiotico, 10)
+        textos = {}
+        for desde, hasta in [("2026-08-27", "2026-09-02"), ("2026-09-10", "2026-09-16")]:
+            respuesta = self.client.get(
+                reverse("comisiones_ruta:reporte-excel"), {"fecha_desde": desde, "fecha_hasta": hasta}
+            )
+            luis = openpyxl.load_workbook(io.BytesIO(respuesta.content))["LUIS"]
+            textos[desde] = [str(c.value) for fila in luis.iter_rows() for c in fila if c.value is not None]
+
+        self.assertIn("Se descuenta en el periodo", textos["2026-08-27"])
+        self.assertIn("10/09/2026 al 16/09/2026", textos["2026-08-27"])
+        self.assertIn("Devoluciones descontadas en este periodo", textos["2026-09-10"])
+        self.assertIn("27/08/2026 al 02/09/2026", textos["2026-09-10"])
+        self.assertIn("-50", textos["2026-09-10"])
