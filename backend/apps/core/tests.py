@@ -840,6 +840,45 @@ class ImportacionScvWebTests(TestCase):
         self.assertEqual(DevolucionCliente.objects.count(), 1)
         self.assertEqual(Cliente.objects.filter(nombre="CLIENTE NUEVO").count(), 1)
 
+    def _sin(self, nombre, *ids):
+        """Reescribe un TSV sin los documentos `ids`: así queda la exportación
+        cuando se cancelaron en scv_web después de importarlos."""
+        with open(f"{self.directorio}/{nombre}.tsv", "w", encoding="utf8", newline="") as archivo:
+            archivo.writelines(
+                "\t".join(str(valor) for valor in fila) + "\n" for fila in ARCHIVOS_SCV_WEB[nombre] if fila[0] not in ids
+            )
+
+    def test_la_venta_cancelada_despues_en_scv_web_se_quita_al_reimportar(self):
+        self._importar("import_legacy_ventas")
+        self._sin("ventas", 101)
+
+        salida = self._importar("import_legacy_ventas")
+
+        self.assertIn("Se quitaron 1 ventas (0102R1)", salida)
+        self.assertEqual(list(Venta.objects.values_list("id_legado", flat=True)), [100])
+
+    def test_la_venta_cancelada_con_devolucion_se_conserva_hasta_que_se_cancela_la_devolucion(self):
+        self._importar("import_legacy_ventas")
+        self._sin("ventas", 100)
+        # Otra venta del día anterior sigue en la exportación (sin ella, la
+        # cancelada quedaría antes de la primera fecha exportada).
+        with open(f"{self.directorio}/ventas.tsv", "a", encoding="utf8") as archivo:
+            archivo.write("99\tNOTA_VENTA\t0102V0\t2025-01-01 08:00:00\t4152\t02\tCONTADO\t0\t0\t8\n")
+
+        salida = self._importar("import_legacy_ventas")
+
+        self.assertIn("conservadas por tener una devolución u otro documento: 0102V1", salida)
+        self.assertTrue(Venta.objects.filter(id_legado=100).exists())
+
+        # Se cancela también la devolución (en la exportación queda otra del
+        # mismo día): primero se quita ella y luego la venta que protegía.
+        with open(f"{self.directorio}/devoluciones.tsv", "w", encoding="utf8") as archivo:
+            archivo.write("501\t0102D2\t2025-01-03 11:00:00\t101\t\n")
+        self._importar("import_legacy_ventas")
+
+        self.assertFalse(DevolucionCliente.objects.filter(id_legado=500).exists())
+        self.assertFalse(Venta.objects.filter(id_legado=100).exists())
+
     def test_dry_run_no_escribe_nada(self):
         salida = self._importar("import_legacy_ventas", dry_run=True)
 

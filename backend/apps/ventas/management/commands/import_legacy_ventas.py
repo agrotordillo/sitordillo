@@ -23,11 +23,18 @@ Reglas, decididas con el usuario en la evaluación del 2026-10-26:
     así que se puede volver a exportar e importar para traer lo más reciente;
     a esas se les agregan los renglones que se habían omitido porque su
     producto no existía y ya existe (VentaDetalle con folio VTD-L<id>).
+  - Las ventas y devoluciones ya importadas que se cancelaron después en
+    scv_web (dejan de venir en la exportación) se borran, para que no sigan
+    contando en reportes y comisiones (p. ej. la remisión 0301R3144,
+    cancelada al día siguiente y vuelta a hacer). Solo se buscan desde la
+    primera fecha de la exportación, para no borrar historia si se exportó
+    con otro --desde.
 """
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils.text import slugify
 
 from apps.core import scv_web
@@ -81,6 +88,7 @@ class Command(BaseCommand):
 
         self._importar_ventas()
         self._importar_devoluciones()
+        self._quitar_ventas_canceladas()
         self._reportar()
 
     # --- Preparación ---------------------------------------------------------
@@ -90,6 +98,7 @@ class Command(BaseCommand):
             "ventas": 0, "ya_importadas": 0, "renglones": 0, "pagos_divididos": 0,
             "sin_cliente": 0, "sin_renglones": 0, "renglones_sin_producto": 0, "importe_sin_producto": Decimal("0"),
             "costo_anomalo": 0, "diferencia_total": Decimal("0"), "devoluciones": 0, "devoluciones_omitidas": 0,
+            "canceladas": [], "canceladas_conservadas": [], "devoluciones_canceladas": [],
         }
         self.errores = []
         with transaction.atomic():
@@ -118,8 +127,11 @@ class Command(BaseCommand):
             scv_web.leer_tsv(self.directorio, "ventas_pagos", COLUMNAS_PAGO), "id_documento"
         ))
         lote, faltantes, especiales = [], [], []
+        exportadas, fechas = set(), []
         for fila in scv_web.leer_tsv(self.directorio, "ventas", COLUMNAS_VENTA):
             id_venta = int(fila["id"])
+            exportadas.add(id_venta)
+            fechas.append(fila["fecha"])
             renglones, cobros = productos.de(id_venta), pagos.de(id_venta)
             if id_venta in self.importadas:
                 self.stats["ya_importadas"] += 1
@@ -150,6 +162,33 @@ class Command(BaseCommand):
                 self.stats["precio_especial_marcado"] += VentaDetalle.objects.filter(
                     folio__in=especiales[inicio:inicio + 5000], precio_especial=False
                 ).update(precio_especial=True)
+        self.exportadas, self.fechas_exportadas = exportadas, fechas
+
+    def _quitar_ventas_canceladas(self):
+        """Borra las ventas importadas desde la primera fecha de la exportación
+        que ya no vienen en ella: se cancelaron después en scv_web. Una venta histórica
+        no movió inventario ni generó cuenta por cobrar, así que no deja nada
+        colgando; la que tiene una devolución (u otro documento que la
+        proteja) se conserva y se reporta. Va después de las devoluciones,
+        para que antes se quiten las canceladas que la protegían."""
+        if not self.fechas_exportadas:
+            return
+        desde = scv_web.fecha_hora(min(self.fechas_exportadas))
+        ids = [
+            id_legado for id_legado in Venta.objects.exclude(id_legado=None)
+            .filter(fecha_venta__gte=desde).values_list("id_legado", flat=True)
+            if id_legado not in self.exportadas
+        ]
+        for venta in Venta.objects.filter(id_legado__in=ids).order_by("fecha_venta"):
+            if not self.dry_run:
+                try:
+                    with transaction.atomic():
+                        venta.delete()
+                except ProtectedError:
+                    self.stats["canceladas_conservadas"].append(venta.folio)
+                    continue
+            self.stats["canceladas"].append(venta.folio)
+            self.importadas.pop(venta.id_legado, None)
 
     def _renglones(self, renglones, contar=True):
         """Los VentaDetalle (sin venta) de los renglones de scv_web que se
@@ -295,7 +334,19 @@ class Command(BaseCommand):
             scv_web.leer_tsv(self.directorio, "devoluciones_productos", COLUMNAS_DEVOLUCION_PRODUCTO), "id_documento"
         ))
         ya = set(DevolucionCliente.objects.exclude(id_legado=None).values_list("id_legado", flat=True))
-        for fila in scv_web.leer_tsv(self.directorio, "devoluciones", COLUMNAS_DEVOLUCION):
+        filas = list(scv_web.leer_tsv(self.directorio, "devoluciones", COLUMNAS_DEVOLUCION))
+        if filas:
+            # Las ya importadas que se cancelaron después en scv_web (ver
+            # _quitar_ventas_canceladas); sus renglones se borran en cascada.
+            exportadas = {int(fila["id"]) for fila in filas}
+            desde = min(scv_web.fecha_hora(fila["fecha"]).date() for fila in filas)
+            canceladas = DevolucionCliente.objects.exclude(id_legado=None).filter(
+                fecha__gte=desde
+            ).exclude(id_legado__in=exportadas)
+            self.stats["devoluciones_canceladas"] = list(canceladas.values_list("folio", flat=True))
+            if not self.dry_run:
+                canceladas.delete()
+        for fila in filas:
             renglones = productos.de(int(fila["id"]))
             if int(fila["id"]) in ya:
                 continue
@@ -355,6 +406,17 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Devoluciones={s['devoluciones']} (omitidas sin venta o renglón de origen: {s['devoluciones_omitidas']})"
         )
+        accion = "Se quitarían" if self.dry_run else "Se quitaron"
+        self.stdout.write(
+            f"Canceladas después en scv_web: {accion} {len(s['canceladas'])} ventas "
+            f"({', '.join(s['canceladas'][:20])}) y {len(s['devoluciones_canceladas'])} devoluciones "
+            f"({', '.join(s['devoluciones_canceladas'][:20])})"
+        )
+        if s["canceladas_conservadas"]:
+            self.stdout.write(self.style.WARNING(
+                f"  Canceladas en scv_web pero conservadas por tener una devolución u otro documento: "
+                f"{', '.join(s['canceladas_conservadas'][:20])}"
+            ))
         self.stdout.write(
             f"Omitidas: sin cliente={s['sin_cliente']} sin renglones importables={s['sin_renglones']} · "
             f"renglones sin producto en sitordillo={s['renglones_sin_producto']} (${s['importe_sin_producto']:,.2f}) · "
