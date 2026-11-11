@@ -124,6 +124,19 @@ class Venta(BaseAbstractModel):
         "ventas.management.commands.import_legacy_ventas); vacío en las ventas registradas aquí. "
         "Una venta histórica no movió inventario ni generó cuenta por cobrar.",
     )
+    sucursal_caja = models.ForeignKey(
+        "products.Almacen",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="ventas_cobradas",
+        verbose_name="Sucursal de la caja",
+        help_text="Solo en ventas históricas: la sucursal del turno en que se cobró en scv_web. Difiere de "
+        "`almacen` cuando la mercancía salió de un móvil (p. ej. MOVIL CLIENTES LERDO se cobra en las cajas "
+        "de LERDO). Vacío en las ventas registradas aquí, donde `almacen` ya es la sucursal del turno. Ver "
+        "Venta.sucursal_de_cobro.",
+    )
 
     class Meta:
         verbose_name = "Venta"
@@ -168,6 +181,12 @@ class Venta(BaseAbstractModel):
         (`created_by`) es el vendedor de mostrador al que se le atribuye la
         venta en el ticket y en los reportes de comisiones."""
         return getattr(self, "cotizacion_origen", None) or getattr(self, "pedido_origen", None)
+
+    @property
+    def sucursal_de_cobro(self):
+        """La sucursal en cuya caja se cobró: la que cuenta en las comisiones
+        sobre toda la venta de una sucursal (ver Venta.sucursal_caja)."""
+        return self.sucursal_caja or self.almacen
 
     @property
     def vendedor_mostrador(self):

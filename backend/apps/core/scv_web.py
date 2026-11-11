@@ -414,13 +414,23 @@ class ProveedoresLegado:
         return normalize_rfc(fila["rfc"])
 
 
+# Cuentas de caja de scv_web registradas con el nombre de un vendedor: ANGELC
+# es la caja que opera MIGUEL R. y lleva su nombre (confirmado por el usuario
+# el 2026-11-10). No se unifican con él: lo que se cobra en caja no cuenta en
+# las comisiones sobre toda la venta de una sucursal. login -> nombre del
+# usuario en sitordillo.
+CUENTAS_DE_CAJA = {"ANGELC": "ANGELC (CAJA)"}
+
+
 class VendedoresLegado:
     """id de usuario de scv_web (documento.id_vendedor) -> pk de un User de
     sitordillo, para atribuir las comisiones de las ventas históricas
     (Venta.created_by, ver comisiones.views.reporte_views). Decisión del
     usuario: cada vendedor es un usuario inactivo -sin contraseña ni acceso,
     se activa a mano si llega a operar aquí-, y las personas con dos usuarios
-    en scv_web (mismo nombre, p. ej. MARLIT o ANIBAL) se unifican en uno."""
+    en scv_web (mismo nombre, p. ej. MARLIT o ANIBAL) se unifican en uno,
+    salvo las cuentas de caja (CUENTAS_DE_CAJA), que van aparte y marcadas
+    como que no comisionan en la sucursal (User.comisiona_en_sucursal)."""
 
     def __init__(self, directorio, crear):
         from django.contrib.auth import get_user_model
@@ -437,12 +447,13 @@ class VendedoresLegado:
         }
         self._por_id = {}
         for fila in filas:
-            nombre = normalizar_nombre(fila["nombre"]) or normalizar_nombre(fila["login"])
+            caja = CUENTAS_DE_CAJA.get(texto(fila["login"]).upper())
+            nombre = normalizar_nombre(caja or fila["nombre"]) or normalizar_nombre(fila["login"])
             if nombre not in por_nombre:
-                por_nombre[nombre] = self._crear(fila, nombre, usados)
+                por_nombre[nombre] = self._crear(fila, nombre, usados, comisiona_en_sucursal=caja is None)
             self._por_id[int(fila["id"])] = por_nombre[nombre]
 
-    def _crear(self, fila, nombre, usados):
+    def _crear(self, fila, nombre, usados, comisiona_en_sucursal=True):
         base = re.sub(r"[^a-z0-9._-]", "", texto(fila["login"]).lower()) or f"vendedor{fila['id']}"
         username, n = base, 2
         while username in usados:
@@ -451,7 +462,9 @@ class VendedoresLegado:
         self.creados.append(f"{username} ({nombre})")
         if not self.crear:
             return 0  # marcador de "se crearía" en el dry-run
-        usuario = self.User(username=username, first_name=nombre[:150], is_active=False)
+        usuario = self.User(
+            username=username, first_name=nombre[:150], is_active=False, comisiona_en_sucursal=comisiona_en_sucursal,
+        )
         usuario.set_unusable_password()
         usuario.save()
         return usuario.pk

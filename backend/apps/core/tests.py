@@ -696,12 +696,20 @@ ARCHIVOS_SCV_WEB = {
         # RFC mal capturado en scv_web: no se puede dar de alta sin corregirlo.
         [2, "PROVEEDOR", "MALO SF", "PROVEEDOR MAL CAPTURADO SA", "", "", "0.000000", "NO", "0.0000", 0, "", 0, "601"],
     ],
+    # La última columna es la sucursal de la caja (turno): la remisión salió
+    # del móvil M3 pero se cobró en la caja de BODEGA SUR (02).
     "ventas": [
-        [100, "NOTA_VENTA", "0102V1", "2025-01-02 08:00:00", 4152, "02", "CONTADO", "300.000000", "249.900000", 8],
-        [101, "NOTA_REMISION", "0102R1", "2025-01-02 09:00:00", 9000, "M3", "CONTADO", "0.000000", "100.000000", 86],
+        [100, "NOTA_VENTA", "0102V1", "2025-01-02 08:00:00", 4152, "02", "CONTADO", "300.000000", "249.900000", 8,
+         "02"],
+        [101, "NOTA_REMISION", "0102R1", "2025-01-02 09:00:00", 9000, "M3", "CONTADO", "0.000000", "100.000000", 86,
+         "02"],
     ],
-    # La misma persona con dos usuarios en scv_web.
-    "vendedores": [[8, "mgonzalez", "MARLIT GONZALEZ DE LOS SANTOS"], [86, "Marlit", "MARLIT GONZALEZ DE LOS SANTOS"]],
+    # La misma persona con dos usuarios en scv_web, y una cuenta de caja que
+    # lleva su nombre (ver scv_web.CUENTAS_DE_CAJA).
+    "vendedores": [
+        [8, "mgonzalez", "MARLIT GONZALEZ DE LOS SANTOS"], [86, "Marlit", "MARLIT GONZALEZ DE LOS SANTOS"],
+        [91, "ANGELC", "MARLIT GONZALEZ DE LOS SANTOS"],
+    ],
     "ventas_productos": [
         [1, 100, "MAIQ", "30.000", "6.650000", "8.330000", "249.900000", "249.900000", 2],
         [2, 100, "NO-EXISTE", "1.000", "5.000000", "10.000000", "10.000000", "10.000000", 1],
@@ -863,7 +871,7 @@ class ImportacionScvWebTests(TestCase):
         # Otra venta del día anterior sigue en la exportación (sin ella, la
         # cancelada quedaría antes de la primera fecha exportada).
         with open(f"{self.directorio}/ventas.tsv", "a", encoding="utf8") as archivo:
-            archivo.write("99\tNOTA_VENTA\t0102V0\t2025-01-01 08:00:00\t4152\t02\tCONTADO\t0\t0\t8\n")
+            archivo.write("99\tNOTA_VENTA\t0102V0\t2025-01-01 08:00:00\t4152\t02\tCONTADO\t0\t0\t8\t02\n")
 
         salida = self._importar("import_legacy_ventas")
 
@@ -934,6 +942,33 @@ class ImportacionScvWebTests(TestCase):
         [vendedor] = User.objects.filter(first_name="MARLIT GONZALEZ DE LOS SANTOS")
         self.assertEqual((vendedor.username, vendedor.is_active, vendedor.has_usable_password()), ("mgonzalez", False, False))
         self.assertEqual(set(Venta.objects.values_list("created_by", flat=True)), {vendedor.pk})
+
+    def test_la_venta_de_un_movil_guarda_la_sucursal_de_la_caja_donde_se_cobro(self):
+        self._importar("import_legacy_ventas")
+
+        remision = Venta.objects.get(id_legado=101)
+        self.assertEqual(
+            (remision.almacen.nombre, remision.sucursal_caja.nombre, remision.sucursal_de_cobro.nombre),
+            ("MOVIL CLIENTES SUR", "BODEGA SUR", "BODEGA SUR"),
+        )
+
+    def test_la_cuenta_de_caja_no_se_unifica_y_reimportar_corrige_vendedor_y_sucursal(self):
+        self._importar("import_legacy_ventas")
+        # Importada antes de separar la cuenta de caja y de traer la sucursal
+        # de la caja: queda a nombre de MARLIT y sin sucursal.
+        Venta.objects.update(sucursal_caja=None)
+        filas = [list(f) for f in ARCHIVOS_SCV_WEB["ventas"]]
+        filas[1][9] = 91  # la cobró la cuenta de caja
+        with open(f"{self.directorio}/ventas.tsv", "w", encoding="utf8", newline="") as archivo:
+            archivo.writelines("\t".join(str(v) for v in fila) + "\n" for fila in filas)
+
+        salida = self._importar("import_legacy_ventas")
+
+        self.assertIn("se corrigieron el vendedor de 1 y la sucursal de la caja de 2", salida)
+        caja = Venta.objects.get(id_legado=101).created_by
+        self.assertEqual((caja.username, caja.first_name, caja.comisiona_en_sucursal), ("angelc", "ANGELC (CAJA)", False))
+        self.assertEqual(Venta.objects.get(id_legado=100).created_by.username, "mgonzalez")
+        self.assertFalse(Venta.objects.filter(sucursal_caja=None).exists())
 
     def test_solo_vendedores_completa_las_ventas_ya_importadas(self):
         self._importar("import_legacy_ventas")

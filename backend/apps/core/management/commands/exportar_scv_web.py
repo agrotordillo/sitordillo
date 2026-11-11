@@ -8,8 +8,9 @@ renglón por línea, separado por tabuladores. Por eso cada campo de texto se
 limpia en la consulta (sin tabuladores ni saltos de línea).
 
 Qué se exporta, desde --desde (por defecto 2025-01-01):
-  - ventas: notas de venta y remisiones no canceladas. Las FACTURAS no: todas
-    agrupan notas (documento_notas) y repiten sus renglones.
+  - ventas: notas de venta y remisiones no canceladas, con el almacén de
+    salida y la sucursal de la caja (turno). Las FACTURAS no: todas agrupan
+    notas (documento_notas) y repiten sus renglones.
   - devoluciones: notas de devolución activas.
   - compras: gastos activos de la cuenta 2999 "MATERIALES PARA VENTA
     (ALMACEN)", que es donde scv_web registra la entrada por compra.
@@ -51,12 +52,17 @@ COMPRAS_WHERE = f"cu.codigo = '{CUENTA_COMPRAS}' AND g.estado = 'ACTIVO' AND g.f
 # Nombre del archivo -> consulta. El orden de las columnas es el que esperan
 # los comandos de importación; los detalles van ordenados por su encabezado.
 CONSULTAS = {
+    # El almacén es de donde salió la mercancía (un móvil, p. ej.); el de la
+    # caja (turno) es la sucursal donde se cobró, la que cuenta en las
+    # comisiones sobre toda la venta de una sucursal.
     "ventas": f"""
         SELECT d.id, d.tipo, {t('d.folio')}, d.fecha, d.id_cliente, IFNULL(a.codigo, ''), d.estado_pago,
-               IFNULL(d.efectivo_recibido, 0), d.total, IFNULL(d.id_vendedor, 0)
+               IFNULL(d.efectivo_recibido, 0), d.total, IFNULL(d.id_vendedor, 0), IFNULL(ac.codigo, '')
         FROM documento d
         LEFT JOIN movimiento_almacen m ON m.id = d.id_movimiento_almacen
         LEFT JOIN almacen a ON a.id = m.id_almacen
+        LEFT JOIN turno tu ON tu.id = d.id_turno
+        LEFT JOIN almacen ac ON ac.id = tu.id_almacen
         WHERE {VENTAS_WHERE} ORDER BY d.id""",
     "ventas_productos": f"""
         SELECT p.id, p.id_documento, {t('pr.codigo')}, p.cantidad, IFNULL(p.costo, 0), p.precio, p.importe,

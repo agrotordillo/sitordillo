@@ -185,6 +185,44 @@ class ImportComisionesExcelTests(TestCase):
         )
         self.assertIn("se creó el usuario inactivo jtaracena", salida.getvalue())
 
+    def test_sobres_por_categoria_de_su_clase_y_alimento_premium_sin_granel(self):
+        lerdo = Almacen.objects.create(nombre="LERDO", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        jose_manuel = Clase.objects.create(nombre="JOSE MANUEL")
+        farmacia = Linea.objects.create(nombre="FARMACIA")
+        sobres, vitamina, nupec = (Categoria.objects.create(nombre=n) for n in ("SOBRES", "VITAMINA", "MASCOTAS NUPEC"))
+        Producto.objects.create(nombre="PANACUR SOBRE", sku="PAN", linea=farmacia, categoria=sobres, clase=jose_manuel)
+        Producto.objects.create(nombre="FOSFYCAL", sku="FOS", linea=farmacia, categoria=vitamina, clase=jose_manuel)
+        Producto.objects.create(nombre="NUPEC 20KG", sku="NUP", linea=self.alimentos, categoria=nupec)
+        luis = User.objects.create(username="luisg", is_active=False)
+        self._agregar_hojas(**{"LUIS GDO": {
+            # El bloque SOBRES de RH trae también la categoría VITAMINA.
+            "C3": "SOBRES", "C4": "Registros", "B5": "PANACUR SOBRE", "B6": "FOSFYCAL", "F9": "=+F8*10%",
+            "H9": "=+H8*1%",
+            "C11": "ALIMENTOS", "C12": "Registros", "B13": "NUPEC 20KG", "F16": "=+F15*3%", "H16": "=+H15*1%",
+        }})
+        salida = StringIO()
+
+        call_command("import_comisiones_excel", archivo=self.archivo, stdout=salida)
+
+        Alcance = ComisionColaboradorLinea.Alcance
+        reglas = {
+            (r.categoria.nombre, r.linea.nombre if r.linea else None): (
+                r.alcance, r.almacen, r.clase, r.porcentaje, r.excluye_granel,
+            )
+            for r in ComisionColaboradorLinea.objects.filter(colaborador=luis)
+        }
+        self.assertEqual(reglas, {
+            # SOBRES y VITAMINA de su clase, sobre toda la venta de LERDO.
+            ("SOBRES", None): (Alcance.SUCURSAL, lerdo, jose_manuel, Decimal("10.00"), False),
+            ("VITAMINA", None): (Alcance.SUCURSAL, lerdo, jose_manuel, Decimal("10.00"), False),
+            # Alimento premium: lo que él vende de esas categorías, sin granel
+            # (MASCOTAS GANADOR PREMIUM la crea la migración 0033 de products).
+            ("MASCOTAS NUPEC", "ALIMENTOS"): (Alcance.PROPIAS, None, None, Decimal("3.00"), True),
+            ("MASCOTAS GANADOR PREMIUM", "ALIMENTOS"): (Alcance.PROPIAS, None, None, Decimal("3.00"), True),
+            ("SOBRES", "ALIMENTOS"): (Alcance.PROPIAS, None, None, Decimal("3.00"), True),
+        })
+        self.assertIn("no existe la categoría MASCOTAS KANTEK del alimento premium", salida.getvalue())
+
     def test_lee_el_periodo_del_encabezado_de_la_hoja(self):
         from apps.comisiones_ruta.management.commands.import_comisiones_excel import periodo_de_la_hoja
 
@@ -347,6 +385,46 @@ class ReporteComisionesRutaTests(TestCase):
         _, respuesta = self._comisiones(empleado=self.luis.pk)
         [grupo] = respuesta.context["grupos"]
         self.assertEqual(sorted(f["comision"] for f in grupo["filas"]), [Decimal("20.00"), Decimal("50.00")])
+
+    # --- Sucursal de la caja, cajeros y granel ---------------------------------
+
+    def _vender(self, vendedor, producto, importe, almacen, **venta):
+        v = Venta.objects.create(cliente=self.cliente, almacen=almacen, fecha_venta=_en(2), created_by=vendedor, **venta)
+        VentaDetalle.objects.create(
+            venta=v, producto=producto, cantidad=1, precio_unitario=importe, lista_precio=self.publico,
+        )
+
+    def test_lo_que_sale_de_un_movil_cuenta_en_la_sucursal_donde_se_cobro(self):
+        movil = Almacen.objects.create(nombre="MOVIL CLIENTES LERDO", tipo=Almacen.Tipo.MOVIL, numero=9)
+        self._vender(self.luis, self.antibiotico, Decimal("500.00"), movil, sucursal_caja=self.lerdo)
+
+        comisiones, _ = self._comisiones(almacen=self.lerdo.pk)
+
+        # ALBERTO: 4% de la clase MEDICOS de LERDO, ahora también la del móvil.
+        self.assertEqual(comisiones["alberto"], Decimal("60.00"))
+
+    def test_lo_que_vende_un_cajero_no_cuenta_en_toda_la_sucursal(self):
+        cajera = User.objects.create(username="auri", first_name="AURI", is_active=False, comisiona_en_sucursal=False)
+        self._vender(cajera, self.antibiotico, Decimal("1000.00"), self.lerdo)
+
+        comisiones, _ = self._comisiones()
+
+        self.assertEqual(comisiones["alberto"], Decimal("40.00"))
+
+    def test_la_regla_sin_granel_no_cuenta_lo_vendido_por_kilo(self):
+        from apps.products.models import UnidadMedida
+
+        kilo = UnidadMedida.objects.get_or_create(abreviatura="KG", defaults={"nombre": "KG"})[0]
+        granel = Producto.objects.create(
+            nombre="Croqueta a granel", sku="CRQK", linea=self.croqueta.linea, unidad_medida=kilo,
+            tipo_iva=Producto.TipoIVA.GRAVADO, tasa_iva=Decimal("0.00"),
+        )
+        self._vender(self.marlit, granel, Decimal("1000.00"), self.lerdo)
+        self.assertEqual(self._comisiones()[0]["mgonzalez"], Decimal("15.00"))
+
+        ComisionColaboradorLinea.objects.filter(colaborador=self.marlit).update(excluye_granel=True)
+
+        self.assertEqual(self._comisiones()[0]["mgonzalez"], Decimal("5.00"))
 
     # --- Devoluciones ---------------------------------------------------------
 

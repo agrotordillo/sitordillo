@@ -19,6 +19,12 @@ Reglas, decididas con el usuario en la evaluación del 2026-10-26:
     que es a quien los reportes de comisiones le atribuyen la venta; cada
     vendedor es un usuario inactivo (ver scv_web.VendedoresLegado).
     --solo-vendedores lo asigna a las ventas que ya estaban importadas.
+  - La sucursal de la caja (turno) en que se cobró queda en
+    Venta.sucursal_caja: es la que cuenta en las comisiones sobre toda la
+    venta de una sucursal, también cuando la mercancía salió de un móvil.
+  - Al reimportar, el vendedor y la sucursal de la caja de las ventas ya
+    importadas se corrigen si cambiaron (p. ej. al separar la cuenta de caja
+    ANGELC de Miguel, ver scv_web.VendedoresLegado).
   - Es repetible: las ventas cuyo id ya se importó (Venta.id_legado) se saltan,
     así que se puede volver a exportar e importar para traer lo más reciente;
     a esas se les agregan los renglones que se habían omitido porque su
@@ -43,7 +49,7 @@ from apps.ventas.models import DevolucionCliente, DevolucionClienteDetalle, Vent
 
 COLUMNAS_VENTA = [
     "id", "tipo", "folio", "fecha", "id_cliente", "almacen", "estado_pago", "efectivo_recibido", "total",
-    "id_vendedor",
+    "id_vendedor", "almacen_caja",
 ]
 COLUMNAS_PRODUCTO = [
     "id", "id_documento", "codigo", "cantidad", "costo", "precio", "importe", "total", "tipo_precio",
@@ -127,7 +133,7 @@ class Command(BaseCommand):
             scv_web.leer_tsv(self.directorio, "ventas_pagos", COLUMNAS_PAGO), "id_documento"
         ))
         lote, faltantes, especiales = [], [], []
-        exportadas, fechas = set(), []
+        exportadas, fechas, esperado = set(), [], {}
         for fila in scv_web.leer_tsv(self.directorio, "ventas", COLUMNAS_VENTA):
             id_venta = int(fila["id"])
             exportadas.add(id_venta)
@@ -135,6 +141,7 @@ class Command(BaseCommand):
             renglones, cobros = productos.de(id_venta), pagos.de(id_venta)
             if id_venta in self.importadas:
                 self.stats["ya_importadas"] += 1
+                esperado[id_venta] = (self.vendedores.pk_de(fila["id_vendedor"]), self._sucursal_caja(fila))
                 especiales.extend(f"VTD-L{r['id']}" for r in renglones if _es_precio_especial(r))
                 # Renglones que se omitieron al importarla porque su producto
                 # todavía no existía en sitordillo (ver
@@ -162,7 +169,50 @@ class Command(BaseCommand):
                 self.stats["precio_especial_marcado"] += VentaDetalle.objects.filter(
                     folio__in=especiales[inicio:inicio + 5000], precio_especial=False
                 ).update(precio_especial=True)
+        self._sincronizar_importadas(esperado)
         self.exportadas, self.fechas_exportadas = exportadas, fechas
+
+    def _sucursal_caja(self, fila):
+        """pk de la sucursal del turno en que se cobró, o None (sin turno, o
+        en el dry-run una sucursal que se crearía)."""
+        codigo = texto(fila["almacen_caja"])
+        if not codigo:
+            return None
+        try:
+            sucursal = self.almacenes.de_venta(codigo)
+        except KeyError:
+            self.errores.append(f"venta {fila['folio']}: sucursal de la caja {codigo!r} sin equivalente")
+            return None
+        return getattr(sucursal, "pk", None)
+
+    def _sincronizar_importadas(self, esperado):
+        """Corrige el vendedor (created_by) y la sucursal de la caja de las
+        ventas ya importadas cuando no coinciden con la exportación: un
+        vendedor que se separó de otro con el mismo nombre (ver
+        scv_web.VendedoresLegado.CUENTAS_DE_CAJA) o la sucursal de la caja,
+        que las exportaciones anteriores no traían. Se agrupan por valor para
+        actualizar de a muchas."""
+        cambios = {"created_by_id": {}, "sucursal_caja_id": {}}
+        actuales = Venta.objects.filter(id_legado__isnull=False).values_list(
+            "id_legado", "created_by_id", "sucursal_caja_id"
+        )
+        for id_legado, vendedor, sucursal in actuales.iterator(chunk_size=20000):
+            if id_legado not in esperado:
+                continue
+            vendedor_esperado, sucursal_esperada = esperado[id_legado]
+            if vendedor != vendedor_esperado:
+                cambios["created_by_id"].setdefault(vendedor_esperado, []).append(id_legado)
+            if sucursal != sucursal_esperada:
+                cambios["sucursal_caja_id"].setdefault(sucursal_esperada, []).append(id_legado)
+        self.stats["vendedor_corregido"] = sum(len(ids) for ids in cambios["created_by_id"].values())
+        self.stats["sucursal_caja_corregida"] = sum(len(ids) for ids in cambios["sucursal_caja_id"].values())
+        if self.dry_run:
+            return
+        with transaction.atomic():
+            for campo, por_valor in cambios.items():
+                for valor, ids in por_valor.items():
+                    for inicio in range(0, len(ids), 5000):
+                        Venta.objects.filter(id_legado__in=ids[inicio:inicio + 5000]).update(**{campo: valor})
 
     def _quitar_ventas_canceladas(self):
         """Borra las ventas importadas desde la primera fecha de la exportación
@@ -239,6 +289,7 @@ class Command(BaseCommand):
             folio=texto(fila["folio"], 20), slug=slugify(f"{fila['folio']}-{id_venta}"), id_legado=id_venta,
             cliente_id=cliente_id, almacen=almacen, fecha_venta=scv_web.fecha_hora(fila["fecha"]),
             es_remision=fila["tipo"] == "NOTA_REMISION", created_by_id=self.vendedores.pk_de(fila["id_vendedor"]),
+            sucursal_caja_id=self._sucursal_caja(fila),
         )
         pagos = []
         if len(cobros) == 1:
@@ -403,6 +454,11 @@ class Command(BaseCommand):
             f"(ya importadas antes: {s['ya_importadas']:,}; renglones que se les completaron: "
             f"{s.get('renglones_completados', 0):,}; marcados con precio especial: {s.get('precio_especial_marcado', 0):,})"
         ))
+        accion_corregir = "se corregirían" if self.dry_run else "se corrigieron"
+        self.stdout.write(
+            f"Ya importadas: {accion_corregir} el vendedor de {s.get('vendedor_corregido', 0):,} y la sucursal de la "
+            f"caja de {s.get('sucursal_caja_corregida', 0):,}"
+        )
         self.stdout.write(
             f"Devoluciones={s['devoluciones']} (omitidas sin venta o renglón de origen: {s['devoluciones_omitidas']})"
         )

@@ -15,10 +15,14 @@ contra las ventas de scv_web de cada semana (P36 y P43, 2026-10-27):
     se repiten (la semana partida por el día de descanso, o un colaborador
     con dos usuarios) dan la misma regla.
   - Un bloque titulado con una categoría (SOBRES) es una regla de esa
-    categoría; FARMACIA RESPONSIVA es la clase MEDICOS; ALIMENTOS en las
-    hojas de los médicos son solo los "premium" (clases MASCOTAS*). Algunos
-    bloques son sobre toda la venta de una sucursal (ALCANCE_SUCURSAL): así
-    cuadran sus bases, no con lo que vendió el colaborador.
+    categoría; en las hojas por clase (ESQUEMAS_POR_CLASE), una por cada
+    categoría de sus productos y solo de esa clase (el SOBRES de LUIS trae
+    SOBRES, SUSTITUTO DE LECHE y VITAMINA). FARMACIA RESPONSIVA es la clase
+    MEDICOS. ALIMENTOS en las hojas de los médicos son solo los "premium"
+    (CATEGORIAS_PREMIUM, sin lo vendido a granel: decisión del usuario,
+    2026-11-11). Algunos bloques son sobre toda la venta de una sucursal
+    (ALCANCE_SUCURSAL): así cuadran sus bases, no con lo que vendió el
+    colaborador.
   - Las hojas de un solo total (HOJAS_DE_TOTAL) cobran un % de todo lo que
     vende el colaborador, incluido lo vendido con precio especial de sucursal
     (Precio 6-9), que en las demás no cuenta. MARLIT: solo ALIMENTOS en
@@ -111,9 +115,14 @@ COBERTURAS = {"JUAN TARACENA", "MVZ GUSTAVO"}
 USUARIOS_NUEVOS = {"JUAN TARACENA": ("jtaracena", "JUAN ALBERTO TARACENA")}
 # Títulos de bloque que no son línea ni categoría: qué clase de producto son.
 GRUPOS_POR_CLASE = {"FARMACIA RESPONSIVA": ["MEDICOS"]}
-# En estas hojas, ALIMENTOS son solo los alimentos "premium" para mascotas.
+# En estas hojas, ALIMENTOS son solo los alimentos "premium" para mascotas:
+# estas categorías de la línea ALIMENTOS, en bolsa (lo vendido a granel no
+# cuenta). Ganador Premium tiene su propia categoría (products, migración
+# 0033) para no revolverse con lo demás de ADM.
 ALIMENTOS_PREMIUM = {"MVZ ALBERTO", "LUIS GDO"}
-CLASES_PREMIUM = ["MASCOTAS ADM", "MASCOTAS NUPEC", "MASCOTAS FLAGASA", "MASCOTAS-VIMIFOS"]
+CATEGORIAS_PREMIUM = [
+    "MASCOTAS NUPEC", "MASCOTAS KANTEK", "MASCOTAS ROYAL CANIN", "MASCOTAS GANADOR PREMIUM", "SOBRES",
+]
 # (hoja, título del bloque) -> sucursal de cuya venta total sale la base.
 ALCANCE_SUCURSAL = {
     ("MVZ ALBERTO", "FARMACIA RESPONSIVA"): "LERDO",
@@ -255,6 +264,11 @@ class Command(BaseCommand):
             normalizar(SUFIJO_SKU.sub("", nombre)): linea_id
             for nombre, linea_id in Producto.objects.exclude(linea=None).values_list("nombre", "linea_id")
         }
+        self.categoria_de_producto = {
+            normalizar(SUFIJO_SKU.sub("", nombre)): categoria_id
+            for nombre, categoria_id in Producto.objects.exclude(categoria=None).values_list("nombre", "categoria_id")
+        }
+        self.categorias_por_id = {c.pk: c for c in self.categorias.values()}
         self.lineas_por_id = {l.pk: l for l in self.lineas.values()}
         nombres_usuario = {**HOJA_USUARIO, **{h: u for h, (u, _) in USUARIOS_NUEVOS.items()}}
         usuarios = {u.username: u for u in get_user_model().objects.filter(username__in=nombres_usuario.values())}
@@ -385,7 +399,20 @@ class Command(BaseCommand):
                 self._agregar(nombre_hoja, usuario, variable, otras, clase=self.clases.get(normalizar(clase)), **extra)
             return
         if titulo not in self.lineas and titulo in self.categorias:
-            self._agregar(nombre_hoja, usuario, variable, otras, categoria=self.categorias[titulo], **extra)
+            if nombre_hoja not in ESQUEMAS_POR_CLASE:
+                self._agregar(nombre_hoja, usuario, variable, otras, categoria=self.categorias[titulo], **extra)
+                return
+            # Toda la venta de la sucursal de su clase, en cada categoría que
+            # trae el bloque.
+            sucursal, clase = ESQUEMAS_POR_CLASE[nombre_hoja]
+            extra.update(alcance=ComisionColaboradorLinea.Alcance.SUCURSAL, almacen=self.almacenes[normalizar(sucursal)])
+            categorias = {self.categorias[titulo].pk} | {
+                self.categoria_de_producto[normalizar(p)] for p in bloque["productos"]
+                if normalizar(p) in self.categoria_de_producto
+            }
+            for categoria_id in sorted(categorias):
+                self._agregar(nombre_hoja, usuario, variable, otras, categoria=self.categorias_por_id[categoria_id],
+                              clase=self.clases.get(normalizar(clase)), **extra)
             return
         linea_titulo = self.lineas.get(titulo)
         if linea_titulo is None:
@@ -398,10 +425,12 @@ class Command(BaseCommand):
         if linea != linea_titulo:
             self.avisos.append(f"{nombre_hoja}: el bloque titulado '{bloque['titulo']}' trae productos de {linea.nombre}")
         if nombre_hoja in ALIMENTOS_PREMIUM and normalizar(linea.nombre) == "ALIMENTOS":
-            for clase in CLASES_PREMIUM:
-                if normalizar(clase) in self.clases:
+            for categoria in CATEGORIAS_PREMIUM:
+                if normalizar(categoria) in self.categorias:
                     self._agregar(nombre_hoja, usuario, variable, otras, linea=linea,
-                                  clase=self.clases[normalizar(clase)], **extra)
+                                  categoria=self.categorias[normalizar(categoria)], sin_granel=True, **extra)
+                else:
+                    self.avisos.append(f"{nombre_hoja}: no existe la categoría {categoria} del alimento premium")
             return
         if nombre_hoja in ESQUEMAS_POR_CLASE:
             # Línea de su clase vendida por cualquiera en la sucursal.
@@ -411,7 +440,7 @@ class Command(BaseCommand):
         self._agregar(nombre_hoja, usuario, variable, otras, linea=linea, clase=clase_del_esquema, **extra)
 
     def _agregar(self, nombre_hoja, usuario, porcentaje, otras, *, linea=None, categoria=None, clase=None,
-                 almacen=None, alcance=None, especial=False, dias=None, vigencia=None):
+                 almacen=None, alcance=None, especial=False, dias=None, vigencia=None, sin_granel=False):
         Alcance = ComisionColaboradorLinea.Alcance
         alcance = alcance or (Alcance.SUCURSAL if almacen else Alcance.PROPIAS)
         if dias is None:
@@ -423,7 +452,7 @@ class Command(BaseCommand):
         regla = ComisionColaboradorLinea(
             colaborador=usuario, alcance=alcance, almacen=almacen, linea=linea, categoria=categoria, clase=clase,
             porcentaje=porcentaje, porcentaje_otras_listas=otras, comisiona_precio_especial=especial,
-            dias_semana=dias, vigente_desde=desde, vigente_hasta=hasta,
+            excluye_granel=sin_granel, dias_semana=dias, vigente_desde=desde, vigente_hasta=hasta,
         )
         clave = (usuario.username, alcance, getattr(almacen, "pk", None), getattr(linea, "pk", None),
                  getattr(categoria, "pk", None), getattr(clase, "pk", None), desde)

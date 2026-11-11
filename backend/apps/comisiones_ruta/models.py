@@ -7,6 +7,14 @@ from apps.core.models import BaseAbstractModel
 
 TODOS_LOS_DIAS = "0123456"
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+# Unidades de venta de lo que se vende a granel (por kilo), p. ej. GANADOR
+# PREM CACHORRO KG o NUCAN X KG; las bolsas se venden por pieza.
+UNIDADES_A_GRANEL = {"KG", "KILO"}
+
+
+def es_a_granel(producto):
+    unidad = producto.unidad_medida
+    return unidad is not None and unidad.abreviatura.strip().upper() in UNIDADES_A_GRANEL
 
 
 class ComisionColaboradorLinea(BaseAbstractModel):
@@ -22,7 +30,11 @@ class ComisionColaboradorLinea(BaseAbstractModel):
       - PROPIAS_EN_SUCURSAL: las que vendió él en `almacen` (p. ej. JHONY
         cobra distinto en IQUINUAPA, TECOLUTILLA y LERDO).
       - SUCURSAL: TODAS las de `almacen`, las haya vendido quien sea (p. ej.
-        el MVZ cobra el 4% de toda la farmacia de clase MÉDICOS de LERDO).
+        el MVZ cobra el 4% de toda la farmacia de clase MÉDICOS de LERDO),
+        salvo las de cajeros y almacenistas (User.comisiona_en_sucursal),
+        como las quita RH del Excel.
+    La sucursal de una venta es la de la caja donde se cobró
+    (Venta.sucursal_de_cobro): incluye lo que salió de sus móviles.
     Y de qué: los productos de su `linea`, `categoria` y `clase` (los que
     estén capturados; ninguno = todo lo vendido). Si varias reglas del mismo
     colaborador aplican a una línea de venta, gana la más específica
@@ -109,6 +121,12 @@ class ComisionColaboradorLinea(BaseAbstractModel):
         verbose_name="Incluye ventas con precio especial de sucursal",
         help_text="En el Excel de comisiones solo las incluyen los esquemas sobre toda la venta (un % de todo).",
     )
+    excluye_granel = models.BooleanField(
+        default=False,
+        verbose_name="No cuenta lo vendido a granel",
+        help_text="Lo que se vende por kilo (unidad KG o KILO) no comisiona en esta regla; las bolsas sí. "
+        "Así se paga el alimento premium de los médicos.",
+    )
     vigente_desde = models.DateField(null=True, blank=True, verbose_name="Vigente desde")
     vigente_hasta = models.DateField(
         null=True,
@@ -174,6 +192,8 @@ class ComisionColaboradorLinea(BaseAbstractModel):
             partes.append(f"toda la venta de {self.almacen.nombre}")
         if self.comisiona_precio_especial:
             partes.append("incluye precio especial")
+        if self.excluye_granel:
+            partes.append("sin granel")
         if self.dias_semana and self.dias_semana != TODOS_LOS_DIAS:
             faltan = [DIAS[int(d)] for d in TODOS_LOS_DIAS if d not in self.dias_semana]
             presentes = [DIAS[int(d)] for d in self.dias_semana]
@@ -207,6 +227,7 @@ class ComisionColaboradorLinea(BaseAbstractModel):
             (not self.linea_id or producto.linea_id == self.linea_id)
             and (not self.categoria_id or producto.categoria_id == self.categoria_id)
             and (not self.clase_id or producto.clase_id == self.clase_id)
+            and not (self.excluye_granel and es_a_granel(producto))
         )
 
     def clean(self):

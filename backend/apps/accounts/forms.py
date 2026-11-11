@@ -90,7 +90,7 @@ class UsuarioCreateForm(_CapacidadesProtegidasMixin, UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = get_user_model()
-        fields = ("username", "first_name", "last_name", "email")
+        fields = ("username", "first_name", "last_name", "email", "comisiona_en_sucursal")
 
     def __init__(self, *args, solicitante=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -151,7 +151,7 @@ class UsuarioUpdateForm(_CapacidadesProtegidasMixin, forms.ModelForm):
 
     class Meta:
         model = get_user_model()
-        fields = ("username", "first_name", "last_name", "email")
+        fields = ("username", "first_name", "last_name", "email", "comisiona_en_sucursal")
 
     def __init__(self, *args, solicitante=None, **kwargs):
         super().__init__(*args, **kwargs)

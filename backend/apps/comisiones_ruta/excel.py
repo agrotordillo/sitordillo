@@ -203,7 +203,7 @@ def _hoja_del_colaborador(libro, grupo, filtros, usados):
         fila = _tabla(hoja, fila, titulo, columnas, formatos_devolucion, [
             [f["devolucion"].folio, f"{f['devolucion'].fecha:%d/%m/%Y}", f["venta"].folio,
              f["venta"].fecha_venta.astimezone(zona).strftime("%d/%m/%Y %H:%M"), _periodo(f[periodo]),
-             f["venta"].almacen.nombre, _nombre(f["vendedor"]) if f["vendedor"] else "", f["producto"].nombre,
+             f["venta"].sucursal_de_cobro.nombre, _nombre(f["vendedor"]) if f["vendedor"] else "", f["producto"].nombre,
              f["producto"].sku, float(f["cantidad"]), float(f["importe"]), float(f["porcentaje"]),
              float(f["comision"]), descripciones[f["regla"].pk]]
             for f in grupo[clave]
@@ -216,7 +216,7 @@ def _hoja_del_colaborador(libro, grupo, filtros, usados):
             ("Lista", 14), ("Cantidad", 11), ("Importe (sin IVA)", 15), ("%", 9), ("Comisión", 13), ("Regla", 60),
         ], [None, None, None, None, None, None, None, CANTIDAD, MONEDA, PORCENTAJE, MONEDA, None], (
             [f["venta"].fecha_venta.astimezone(zona).strftime("%d/%m/%Y %H:%M"), f["venta"].folio,
-             f["venta"].almacen.nombre, _nombre(f["vendedor"]) if f["vendedor"] else "", f["producto"].nombre,
+             f["venta"].sucursal_de_cobro.nombre, _nombre(f["vendedor"]) if f["vendedor"] else "", f["producto"].nombre,
              f["producto"].sku, f["lista_precio"].nombre if f["lista_precio"] else "", float(f["cantidad"]),
              float(f["importe"]), float(f["porcentaje"]), float(f["comision"]), descripciones[f["regla"].pk]]
             for f in grupo["filas"]

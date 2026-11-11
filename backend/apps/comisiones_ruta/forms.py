@@ -20,7 +20,7 @@ class ComisionColaboradorLineaForm(BaseModelForm):
         model = ComisionColaboradorLinea
         fields = [
             "colaborador", "alcance", "almacen", "linea", "categoria", "clase",
-            "porcentaje", "porcentaje_otras_listas", "comisiona_precio_especial",
+            "porcentaje", "porcentaje_otras_listas", "comisiona_precio_especial", "excluye_granel",
             "vigente_desde", "vigente_hasta", "observaciones",
         ]
         widgets = {

@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Case, F, Q, When
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -46,20 +47,28 @@ VENDEDOR_ID = Case(
     When(venta__pedido_origen__isnull=False, then=F("venta__pedido_origen__created_by_id")),
     default=F("venta__created_by_id"),
 )
+# La sucursal en cuya caja se cobró (Venta.sucursal_de_cobro): en una venta
+# histórica que salió de un móvil, la del turno; si no, la de la venta.
+SUCURSAL_ID = Coalesce("venta__sucursal_caja_id", "venta__almacen_id")
 
 
-def _reglas_que_aplican(detalle, fecha, propias, de_sucursal):
+def _reglas_que_aplican(detalle, fecha, propias, de_sucursal, sin_comision_en_sucursal=frozenset()):
     """{colaborador_id: regla} para una línea de venta: por cada colaborador,
     la más específica de sus reglas que aplica (ver
-    ComisionColaboradorLinea.especificidad). Una regla de "sus ventas en una
-    sucursal" solo aplica a lo que vendió en esa sucursal, y lo cobrado con
-    precio especial solo cuenta en las reglas que lo incluyen. Cada regla solo
-    aplica en su vigencia y sus días de la semana (descansos y suplencias)."""
-    almacen_id = detalle.venta.almacen_id
-    candidatas = [*propias.get(detalle.vendedor_id, []), *de_sucursal.get(almacen_id, [])]
+    ComisionColaboradorLinea.especificidad). La sucursal es la de la caja
+    donde se cobró (SUCURSAL_ID). Una regla de "sus ventas en una sucursal"
+    solo aplica a lo que vendió en esa sucursal; las de toda la venta de una
+    sucursal no cuentan lo que vendieron cajeros y almacenistas
+    (`sin_comision_en_sucursal`, ver User.comisiona_en_sucursal), y lo cobrado
+    con precio especial solo cuenta en las reglas que lo incluyen. Cada regla
+    solo aplica en su vigencia y sus días de la semana (descansos y
+    suplencias)."""
+    sucursal_id = detalle.sucursal_id
+    de_la_sucursal = [] if detalle.vendedor_id in sin_comision_en_sucursal else de_sucursal.get(sucursal_id, [])
+    candidatas = [*propias.get(detalle.vendedor_id, []), *de_la_sucursal]
     elegidas = {}
     for regla in candidatas:
-        if regla.alcance == regla.Alcance.PROPIAS_EN_SUCURSAL and regla.almacen_id != almacen_id:
+        if regla.alcance == regla.Alcance.PROPIAS_EN_SUCURSAL and regla.almacen_id != sucursal_id:
             continue
         if not regla.aplica_en(fecha):
             continue
@@ -73,13 +82,15 @@ def _reglas_que_aplican(detalle, fecha, propias, de_sucursal):
     return elegidas
 
 
-def _comisiones_de_linea(detalle, cantidad, propias, de_sucursal, zona):
+def _comisiones_de_linea(detalle, cantidad, propias, de_sucursal, zona, sin_comision_en_sucursal=frozenset()):
     """[(regla, lista_variable, importe, porcentaje, comision)] por cada
     colaborador que comisiona `cantidad` de una línea de venta: las reglas y
     el % del DÍA DE LA VENTA, también cuando se calcula una devolución
     posterior -así se retira exactamente lo que se pagó-. None si la línea no
     tiene lista de precio (no se puede repartir entre los dos %)."""
-    elegidas = _reglas_que_aplican(detalle, detalle.venta.fecha_venta.astimezone(zona).date(), propias, de_sucursal)
+    elegidas = _reglas_que_aplican(
+        detalle, detalle.venta.fecha_venta.astimezone(zona).date(), propias, de_sucursal, sin_comision_en_sucursal
+    )
     if not elegidas:
         return []
     if detalle.lista_precio_id is None:
@@ -157,27 +168,35 @@ def calcular_comisiones_ruta(request, con_detalle=False):
     inicio = timezone.make_aware(datetime.combine(fecha_desde, time.min), zona)
     fin = timezone.make_aware(datetime.combine(fecha_hasta + timedelta(days=1), time.min), zona)
     visibles = almacenes_visibles(request.user)
+    sin_comision_en_sucursal = frozenset(
+        get_user_model().objects.filter(comisiona_en_sucursal=False).values_list("pk", flat=True)
+    )
 
     def comisionables(lineas):
         """Las líneas de venta que pueden comisionar -de un vendedor con
         reglas propias o de una sucursal con reglas sobre toda su venta-,
-        con su vendedor y solo las columnas que usa el cálculo. La sucursal
-        (filtro y lo que el usuario puede ver) es la de la venta, también
-        para sus devoluciones."""
+        con su vendedor, la sucursal de la caja donde se cobró y solo las
+        columnas que usa el cálculo. La sucursal (filtro y lo que el usuario
+        puede ver) es la de la caja de la venta, también para sus
+        devoluciones."""
         lineas = (
-            lineas.annotate(vendedor_id=VENDEDOR_ID)
-            .filter(Q(vendedor_id__in=list(propias)) | Q(venta__almacen_id__in=list(de_sucursal)))
-            .select_related("producto", "lista_precio", "venta", "venta__almacen")
+            lineas.annotate(vendedor_id=VENDEDOR_ID, sucursal_id=SUCURSAL_ID)
+            .filter(Q(vendedor_id__in=list(propias)) | Q(sucursal_id__in=list(de_sucursal)))
+            .select_related(
+                "producto", "producto__unidad_medida", "lista_precio", "venta", "venta__almacen",
+                "venta__sucursal_caja",
+            )
             .only(
                 "cantidad", "precio_unitario", "descuento", "precio_especial", "lista_precio__nombre",
-                "venta__folio", "venta__fecha_venta", "venta__almacen__nombre",
+                "venta__folio", "venta__fecha_venta", "venta__almacen__nombre", "venta__sucursal_caja__nombre",
                 "producto__nombre", "producto__sku", "producto__linea", "producto__categoria", "producto__clase",
                 "producto__tipo_iva", "producto__tasa_iva", "producto__aplica_ieps", "producto__tasa_ieps",
+                "producto__unidad_medida__abreviatura",
             )
         )
         if visibles is not None:
-            lineas = lineas.filter(venta__almacen__in=visibles)
-        return filtrar_por_id(lineas, "venta__almacen_id", almacen_id)
+            lineas = lineas.filter(sucursal_id__in=visibles.values("pk"))
+        return filtrar_por_id(lineas, "sucursal_id", almacen_id)
 
     def con_su_venta(devoluciones):
         """[(DevolucionClienteDetalle, su línea de venta comisionable)]."""
@@ -207,7 +226,9 @@ def calcular_comisiones_ruta(request, con_detalle=False):
         VentaDetalle.objects.filter(venta__fecha_venta__gte=inicio, venta__fecha_venta__lt=fin)
     ).order_by("venta__fecha_venta", "pk")
     for detalle in ventas.iterator(chunk_size=2000):
-        comisiones = _comisiones_de_linea(detalle, detalle.cantidad, propias, de_sucursal, zona)
+        comisiones = _comisiones_de_linea(
+            detalle, detalle.cantidad, propias, de_sucursal, zona, sin_comision_en_sucursal
+        )
         if comisiones is None:
             sin_lista_precio += 1
             continue
@@ -226,7 +247,7 @@ def calcular_comisiones_ruta(request, con_detalle=False):
     del_periodo = DevolucionClienteDetalle.objects.filter(devolucion__fecha__range=(fecha_desde, fecha_hasta))
     for devuelto, detalle in con_su_venta(del_periodo):
         for regla, _, importe, porcentaje, comision in _comisiones_de_linea(
-            detalle, devuelto.cantidad, propias, de_sucursal, zona
+            detalle, devuelto.cantidad, propias, de_sucursal, zona, sin_comision_en_sucursal
         ) or []:
             totales = totales_de(regla)
             totales["devuelto"] += importe
@@ -245,7 +266,7 @@ def calcular_comisiones_ruta(request, con_detalle=False):
     )
     for devuelto, detalle in con_su_venta(posteriores):
         for regla, _, importe, porcentaje, comision in _comisiones_de_linea(
-            detalle, devuelto.cantidad, propias, de_sucursal, zona
+            detalle, devuelto.cantidad, propias, de_sucursal, zona, sin_comision_en_sucursal
         ) or []:
             totales_de(regla)["por_descontar"] -= comision
             posteriores_por_colaborador[regla.colaborador_id].append(

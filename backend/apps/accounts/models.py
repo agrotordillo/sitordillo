@@ -14,6 +14,13 @@ class User(AbstractUser):
     respetan sin cambios PermissionRequiredMixin, `user.has_perm()` y
     `{% if perms.gastos... %}` en menús y plantillas."""
 
+    comisiona_en_sucursal = models.BooleanField(
+        default=True,
+        verbose_name="Sus ventas cuentan en las comisiones de toda la sucursal",
+        help_text="Desmárcalo para cajeros y almacenistas: lo que cobran o venden con su usuario no entra en "
+        "las comisiones sobre toda la venta de una sucursal (ver comisiones_ruta.ComisionColaboradorLinea).",
+    )
+
     def has_perm(self, perm, obj=None):
         if es_permiso_estricto(perm):
             return perm in permisos_explicitos(self)

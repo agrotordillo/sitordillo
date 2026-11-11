@@ -93,6 +93,13 @@
       <p class="mt-1.5 text-xs text-gray-400">{{ form.comisiona_precio_especial.help_text }}</p>
     </div>
     <div class="sm:col-span-2">
+      <div class="flex items-center gap-2">
+        {{ form.excluye_granel }}
+        <label for="{{ form.excluye_granel.id_for_label }}" class="label mb-0">No cuenta lo vendido a granel</label>
+      </div>
+      <p class="mt-1.5 text-xs text-gray-400">{{ form.excluye_granel.help_text }}</p>
+    </div>
+    <div class="sm:col-span-2">
       <label for="{{ form.observaciones.id_for_label }}" class="label">Observaciones <span class="text-gray-400 font-normal">(opcional)</span></label>
       {{ form.observaciones }}
     </div>
