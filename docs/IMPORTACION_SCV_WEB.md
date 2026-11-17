@@ -50,7 +50,8 @@ Desde `backend/`, con el entorno virtual del proyecto. Cada comando de importaci
 7. `python manage.py import_legacy_ventas` (unos 10 minutos)
 8. Reglas de comisión (reemplazan solo las que vinieron de un Excel):
    `python manage.py import_comisiones_excel` (por defecto el P43) y, como MIGUEL no viene en el
-   P43, `python manage.py import_comisiones_excel --archivo "../datos/COMISIONES P36.xlsx" --hojas "MIGUEL RMZ"`
+   P43, `python manage.py import_comisiones_excel --archivo "../datos/COMISIONES P36.xlsx" --hojas "MIGUEL RMZ"`.
+   Las suplencias de semanas posteriores, del Excel de su semana (ver "Decisiones tomadas").
 9. `python manage.py import_legacy_existencias --corte 2026-10-26`
 
 Todos se pueden repetir sin duplicar: lo ya importado se salta y solo se agrega lo que falte.
@@ -94,7 +95,19 @@ faltó, mientras no haya operaciones: `--completar`).
   nombre en scv_web: JOSE MANUEL y MIGUEL RAMIREZ). Cada regla tiene días de la semana (el día de
   descanso de quien cobra sobre toda la sucursal lo cobra quien lo cubre) y vigencia para
   suplencias (TARACENA en las vacaciones de MIGUEL). `import_comisiones_excel` las recarga del
-  Excel semanal y no toca las capturadas a mano; las suplencias de cada semana se capturan en
-  Ventas → Comisiones por colaborador.
+  Excel semanal y no toca las capturadas a mano. Las suplencias se cargan del Excel de cada
+  semana y se acumulan: solo se reemplazan las de las mismas fechas, así que las de semanas ya
+  pagadas se conservan. P. ej. la de TARACENA del P44:
+  `python manage.py import_comisiones_excel --archivo "../datos/COMISIONES P44.xlsx" --hojas "JUAN TARACENA"`.
+- La venta de una sucursal es la de su caja (turno en scv_web), incluidas las de sus móviles
+  (`Venta.sucursal_caja`), y en las reglas sobre toda la sucursal no cuenta lo que venden
+  cajeros y almacenistas (`User.comisiona_en_sucursal`; ANGELC, la caja que usa Miguel R., es un
+  usuario aparte). Así arma RH el Excel.
+- Alimento premium de los médicos: categorías NUPEC, KANTEK, ROYAL CANIN, MASCOTAS GANADOR
+  PREMIUM y SOBRES de alimentos, en bolsa de cualquier tamaño; lo vendido a granel (KG/KILO) no
+  cuenta.
+- Lo que no calcula el sistema: comisiones de otra razón social (parte de JHONY) o de otra base
+  (WILLIAMS y ZAMORA, TIANGUIS), y los ajustes que RH decide caso por caso (PROMOCION en 0,
+  pagos temporales a la mitad).
 - Tres proveedores quedaron con RFC ficticio por decisión del negocio (HEPE1234567H0,
   PROD1234567H0, CUCA1234567H0).

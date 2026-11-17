@@ -223,6 +223,52 @@ class ImportComisionesExcelTests(TestCase):
         })
         self.assertIn("no existe la categoría MASCOTAS KANTEK del alimento premium", salida.getvalue())
 
+    def test_los_juguetes_de_luis_cuentan_en_su_clase_y_en_lo_que_vende_el(self):
+        lerdo = Almacen.objects.create(nombre="LERDO", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        jose_manuel = Clase.objects.create(nombre="JOSE MANUEL")
+        juguetes = Linea.objects.create(nombre="JUGUETES")
+        Producto.objects.create(nombre="CEPILLO PROFESIONAL ACERO INOXIDABLE", sku="CEP", linea=juguetes)
+        luis = User.objects.create(username="luisg", is_active=False)
+        self._agregar_hojas(**{"LUIS GDO": {
+            "C3": "JUGUETES", "C4": "Registros", "B5": "CEPILLO PROFESIONAL ACERO INOXIDABLE", "F8": "=+F7*2.5%",
+        }})
+
+        call_command("import_comisiones_excel", archivo=self.archivo, stdout=StringIO())
+
+        Alcance = ComisionColaboradorLinea.Alcance
+        self.assertEqual(
+            set(ComisionColaboradorLinea.objects.filter(colaborador=luis).values_list(
+                "alcance", "almacen", "clase", "linea", "porcentaje",
+            )),
+            {(Alcance.SUCURSAL, lerdo.pk, jose_manuel.pk, juguetes.pk, Decimal("2.50")),
+             (Alcance.PROPIAS, None, None, juguetes.pk, Decimal("2.50"))},
+        )
+
+    def test_las_suplencias_de_cada_semana_se_acumulan_sin_borrar_las_anteriores(self):
+        Almacen.objects.create(nombre="LERDO", tipo=Almacen.Tipo.SUCURSAL, numero=1)
+        Clase.objects.create(nombre="MIGUEL RAMIREZ")
+
+        def cargar(encabezado, pct):
+            libro = openpyxl.Workbook()
+            hoja = libro.active
+            hoja.title = "JUAN TARACENA"
+            for celda, valor in {"B2": encabezado, "C3": "REFACCIONES PARA BOMBAS", "C4": "Registros",
+                                 "B5": "SELLO MECANICO", "F8": f"=+F7*{pct}%"}.items():
+                hoja[celda] = valor
+            libro.save(self.archivo)
+            call_command("import_comisiones_excel", archivo=self.archivo, stdout=StringIO())
+
+        cargar("COMISIONES DEL 15 AL 21 DE OCTUBRE 2026 P43", 10)
+        cargar("COMISIONES DEL 22 AL 23 DE OCTUBRE 2026 P44", 10)
+        cargar("COMISIONES DEL 22 AL 23 DE OCTUBRE 2026 P44", 5)  # se corrige la misma semana
+
+        self.assertEqual(
+            list(ComisionColaboradorLinea.objects.filter(colaborador__username="jtaracena")
+                 .order_by("vigente_desde").values_list("vigente_desde", "vigente_hasta", "porcentaje")),
+            [(date(2026, 10, 15), date(2026, 10, 21), Decimal("10.00")),
+             (date(2026, 10, 22), date(2026, 10, 23), Decimal("5.00"))],
+        )
+
     def test_lee_el_periodo_del_encabezado_de_la_hoja(self):
         from apps.comisiones_ruta.management.commands.import_comisiones_excel import periodo_de_la_hoja
 

@@ -7,8 +7,13 @@ La mayoría de las hojas tienen un bloque por línea con sus productos, la base
 primera es el `porcentaje` (PUBLICO/MEDIO MAYOREO) y la segunda el
 `porcentaje_otras_listas`. Reglas, decididas con el usuario y validadas
 contra las ventas de scv_web de cada semana (P36 y P43, 2026-10-27):
-  - Al cargar un Excel se reemplazan las reglas que vinieron de un Excel
-    para los colaboradores que trae; las capturadas a mano no se tocan.
+  - Al cargar un Excel se reemplazan las reglas permanentes que vinieron de
+    un Excel para los colaboradores que trae; las capturadas a mano no se
+    tocan. Las que tienen fechas (suplencias, ver COBERTURAS) se acumulan
+    semana a semana: solo se reemplazan las que se enciman con las fechas de
+    la hoja que se carga (decisión del usuario, 2026-11-17). Así, cada semana
+    se cargan las suplencias de su Excel (--archivo ... --hojas "JUAN
+    TARACENA") sin perder las de semanas ya pagadas.
   - La línea de cada bloque sale de sus productos, no del título: hay títulos
     copiados de otro bloque (p. ej. SEMILLAS Y FERTILIZANTES titulado
     REFACCIONES PARA BOMBAS). Se avisa cuando no coinciden. Los bloques que
@@ -66,6 +71,7 @@ HOJA_USUARIO = {
     "MVZ ALBERTO": "alberto",
     "MVZ GUSTAVO": "mvzgustavo",
     "MIGUEL RMZ": "miguelr",
+    "MIGUEL RAMIREZ": "miguelr",
     "LUIS GDO": "luisg",
     "GUILLERMO": "guillermo",
     "JHONY": "jhony",
@@ -101,12 +107,19 @@ ESQUEMA_POR_SUCURSAL = {
 ESQUEMAS_POR_CLASE = {
     "LUIS GDO": ("LERDO", "JOSE MANUEL"),
     "MIGUEL RMZ": ("LERDO", "MIGUEL RAMIREZ"),
+    "MIGUEL RAMIREZ": ("LERDO", "MIGUEL RAMIREZ"),
     "JUAN TARACENA": ("LERDO", "MIGUEL RAMIREZ"),
 }
+# Líneas que en una hoja por clase cobran también sobre lo que el colaborador
+# vende él mismo, de cualquier clase: RH arma un segundo bloque de JUGUETES con
+# lo que vende LUIS (p. ej. CEPILLO PROFESIONAL ACERO INOXIDABLE, sin clase;
+# confirmado por el usuario el 2026-11-17). Un juguete de su clase vendido por
+# él cumple las dos reglas pero se cobra una sola vez (la más específica).
+TAMBIEN_SUS_VENTAS = {("LUIS GDO", "JUGUETES")}
 # Día de descanso (0 = lunes ... 6 = domingo) de quien cobra sobre toda la
 # venta de una sucursal: ese día no le toca (lo cobra quien lo cubre). Del
 # documento INFORMACION SCVWEB; TARACENA no cubrió el domingo (lo cubrió JHONY).
-DESCANSOS = {"MVZ ALBERTO": 2, "LUIS GDO": 3, "MIGUEL RMZ": 4, "JUAN TARACENA": 6}
+DESCANSOS = {"MVZ ALBERTO": 2, "LUIS GDO": 3, "MIGUEL RMZ": 4, "MIGUEL RAMIREZ": 4, "JUAN TARACENA": 6}
 # Hojas de quien cubre a otro: sus reglas solo valen en las fechas del
 # encabezado de la hoja ("COMISIONES DEL 15 AL 21 DE OCTUBRE 2026").
 COBERTURAS = {"JUAN TARACENA", "MVZ GUSTAVO"}
@@ -304,9 +317,7 @@ class Command(BaseCommand):
         for aviso in self.avisos:
             self.stdout.write(self.style.WARNING(f"  - {aviso}"))
 
-        anteriores = ComisionColaboradorLinea.objects.filter(
-            colaborador_id__in=cargados, observaciones__startswith=MARCA
-        )
+        anteriores = self._que_se_reemplazan(cargados)
         if self.dry_run:
             self.stdout.write(self.style.WARNING(
                 f"Dry-run: se reemplazarían {anteriores.count()} reglas cargadas de un Excel por {len(self.reglas)}."
@@ -327,6 +338,29 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Listo: {len(self.reglas)} reglas cargadas de {ruta.name} (reemplazan {borradas} de un Excel anterior)."
         ))
+
+    def _que_se_reemplazan(self, cargados):
+        """Las reglas de un Excel anterior que esta carga reemplaza: las
+        permanentes (sin fechas) de los colaboradores que trae, y de las que
+        tienen fechas -suplencias- solo las que se enciman con las fechas de
+        una regla nueva del mismo colaborador; las de otras semanas se
+        conservan."""
+        de_un_excel = ComisionColaboradorLinea.objects.filter(
+            colaborador_id__in=cargados, observaciones__startswith=MARCA
+        )
+        ids = set(de_un_excel.filter(vigente_desde=None, vigente_hasta=None).values_list("pk", flat=True))
+        periodos = {}
+        for regla in self.reglas.values():
+            if regla.vigente_desde or regla.vigente_hasta:
+                periodos.setdefault(regla.colaborador.pk, []).append((regla.vigente_desde, regla.vigente_hasta))
+        for regla in de_un_excel.exclude(pk__in=ids):
+            if any(
+                (regla.vigente_desde or date.min) <= (hasta or date.max)
+                and (desde or date.min) <= (regla.vigente_hasta or date.max)
+                for desde, hasta in periodos.get(regla.colaborador_id, [])
+            ):
+                ids.add(regla.pk)
+        return de_un_excel.filter(pk__in=ids)
 
     def _usuario_nuevo(self, nombre_hoja):
         """El usuario inactivo de quien cobra comisión sin vender con usuario
@@ -432,6 +466,8 @@ class Command(BaseCommand):
                 else:
                     self.avisos.append(f"{nombre_hoja}: no existe la categoría {categoria} del alimento premium")
             return
+        if (nombre_hoja, titulo) in TAMBIEN_SUS_VENTAS:
+            self._agregar(nombre_hoja, usuario, variable, otras, linea=linea)
         if nombre_hoja in ESQUEMAS_POR_CLASE:
             # Línea de su clase vendida por cualquiera en la sucursal.
             sucursal, clase = ESQUEMAS_POR_CLASE[nombre_hoja]
